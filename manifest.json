@@ -1,0 +1,21 @@
+{
+  "name": "ЧитайКо — Хмарний Трекер",
+  "short_name": "ЧитайКо",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#4f46e5",
+  "description": "Ваша особиста хмарна бібліотека та читалка",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/4f46e5/ffffff?text=Ч",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/4f46e5/ffffff?text=Ч",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
