@@ -306,10 +306,25 @@
         }
 
         async function signInWithGoogle(btn) { 
-            const originalHtml = btn.innerHTML; btn.innerText = "Авторизація...";
-            try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); } 
-            catch (error) { showErrorMsg("Помилка: " + error.message); } finally { btn.innerHTML = originalHtml; }
+            const originalHtml = btn.innerHTML; 
+            btn.innerText = "Перенаправлення...";
+            try { 
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await auth.signInWithRedirect(provider); 
+            } 
+            catch (error) { 
+                showErrorMsg("Помилка: " + error.message); 
+                btn.innerHTML = originalHtml; 
+            }
         }
+        
+        auth.getRedirectResult().catch((error) => {
+            if (error && error.code === 'auth/unauthorized-domain') {
+                showErrorMsg("Помилка! Додайте цей домен у Firebase -> Authentication -> Settings -> Authorized domains");
+            } else if (error && error.code !== 'auth/redirect-cancelled-by-user') {
+                showErrorMsg("Помилка входу: " + error.message);
+            }
+        });
         
         function logout() { auth.signOut(); closeAllSheets(); }
 
@@ -339,7 +354,6 @@
                         const b = item.volumeInfo, div = document.createElement('div');
                         const genre = b.categories && b.categories.length > 0 ? b.categories[0] : '';
                         
-                        // ВИПРАВЛЕНО: Примусово міняємо http на https для телефонів!
                         const safeImage = (b.imageLinks?.thumbnail || '').replace(/^http:\/\//i, 'https://');
                         
                         const book = { googleId: item.id, title: b.title || '', author: b.authors ? b.authors[0] : 'Автор невідомий', pagesTotal: b.pageCount || 300, image: safeImage || PLACEHOLDER_IMG, description: b.description || 'Анотація відсутня.', genre: genre };
@@ -741,7 +755,7 @@
                     
                     if (existingTitles.has(title.toLowerCase())) continue;
 
-                    // ВИПРАВЛЕНО: Примусово міняємо http на https для телефонів!
+                    // ПРИМУСОВО HTTPS
                     const safeImage = (b.imageLinks?.thumbnail || '').replace(/^http:\/\//i, 'https://');
 
                     const book = { googleId: item.id, title: title, author: b.authors ? b.authors[0] : 'Невідомий', pagesTotal: b.pageCount || 300, image: safeImage || PLACEHOLDER_IMG, description: b.description || 'Немає опису.', genre: b.categories ? b.categories[0] : '' };
