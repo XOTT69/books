@@ -305,29 +305,36 @@
             catch (error) { showErrorMsg("Помилка: " + error.message); } finally { btn.innerText = originalText; }
         }
 
-        // РОЗУМНА АВТОРИЗАЦІЯ GOOGLE (Спливаюче вікно для ПК, Редирект для мобілок)
+        // РОЗУМНА АВТОРИЗАЦІЯ GOOGLE (Обхід блокувань Safari)
         async function signInWithGoogle(btn) { 
             const originalHtml = btn.innerHTML; 
             btn.innerText = "З'єднання з Google...";
+            const provider = new firebase.auth.GoogleAuthProvider();
+            
             try { 
-                const provider = new firebase.auth.GoogleAuthProvider();
-                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                
-                if (isMobile) {
-                    await auth.signInWithRedirect(provider);
-                } else {
-                    await auth.signInWithPopup(provider);
-                }
+                // Спочатку пробуємо безпечне спливаюче вікно (найкраще працює)
+                await auth.signInWithPopup(provider); 
             } 
             catch (error) { 
-                showErrorMsg("Помилка: " + error.message); 
-                btn.innerHTML = originalHtml; 
+                // Якщо iPhone (Safari) блокує спливаюче вікно, вмикаємо запасний план:
+                if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+                    btn.innerText = "Перенаправлення...";
+                    await auth.signInWithRedirect(provider);
+                } else {
+                    showErrorMsg("Помилка: " + error.message); 
+                    btn.innerHTML = originalHtml; 
+                }
             }
         }
         
-        auth.getRedirectResult().catch((error) => {
+        // Ловимо результат, якщо спрацював запасний план (перенаправлення)
+        auth.getRedirectResult().then((result) => {
+            if(result && result.user) {
+                console.log("Успішний вхід після перенаправлення");
+            }
+        }).catch((error) => {
             if (error && error.code === 'auth/unauthorized-domain') {
-                showErrorMsg("Помилка домену! Додайте цей домен у Firebase -> Authentication -> Settings -> Authorized domains");
+                showErrorMsg("Помилка домену! Додайте цей домен у Firebase.");
             } else if (error && error.code !== 'auth/redirect-cancelled-by-user') {
                 showErrorMsg("Помилка входу: " + error.message);
             }
@@ -346,7 +353,6 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // ПОШУК З HTTPS
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 3) { searchItems.innerHTML = ''; return; }
@@ -362,6 +368,7 @@
                         const b = item.volumeInfo, div = document.createElement('div');
                         const genre = b.categories && b.categories.length > 0 ? b.categories[0] : '';
                         
+                        // Примусово HTTPS
                         const safeImage = (b.imageLinks?.thumbnail || '').replace(/^http:\/\//i, 'https://');
                         
                         const book = { googleId: item.id, title: b.title || '', author: b.authors ? b.authors[0] : 'Автор невідомий', pagesTotal: b.pageCount || 300, image: safeImage || PLACEHOLDER_IMG, description: b.description || 'Анотація відсутня.', genre: genre };
