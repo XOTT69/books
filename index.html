@@ -756,7 +756,7 @@
             }
         }
 
-        // ЖОРСТКИЙ ФІЛЬТР РЕКОМЕНДАЦІЙ
+        // ЖОРСТКИЙ ФІЛЬТР ЖАНРІВ
         async function loadRealRecommendations() {
             const list = document.getElementById('recommendationsList');
             
@@ -768,51 +768,51 @@
 
             try {
                 const genreCounts = {};
+                // СЛОВА-ПАРАЗИТИ ДЛЯ ФІЛЬТРАЦІЇ ЖАНРІВ
+                const stopWords = ['русск', 'зарубеж', 'литератур', 'проза', 'fiction', 'современн', 'отечественн', 'книги', 'печать'];
                 
                 myLibrary.forEach(b => {
-                    if (b.rating >= 4 && b.genre && b.genre.length > 3) {
+                    if ((b.status === 'finished' || b.rating >= 4) && b.genre && b.genre.length > 3) {
                         let mainGenre = b.genre.split(',')[0].trim().toLowerCase();
-                        genreCounts[mainGenre] = (genreCounts[mainGenre] || 0) + 1;
+                        
+                        // Перевіряємо, чи немає в жанрі слів зі списку вище
+                        let isBadGenre = stopWords.some(word => mainGenre.includes(word));
+                        
+                        if (!isBadGenre) {
+                            let weight = b.rating >= 4 ? 3 : 1; 
+                            genreCounts[mainGenre] = (genreCounts[mainGenre] || 0) + weight; 
+                        }
                     }
                 });
 
-                if(Object.keys(genreCounts).length === 0) {
-                     myLibrary.forEach(b => {
-                        if (b.genre && b.genre.length > 3) {
-                            let mainGenre = b.genre.split(',')[0].trim().toLowerCase();
-                            genreCounts[mainGenre] = (genreCounts[mainGenre] || 0) + 1;
-                        }
-                    });
-                }
+                let sortedGenres = Object.keys(genreCounts).sort((a,b) => genreCounts[b] - genreCounts[a]);
 
-                const sortedGenres = Object.keys(genreCounts).sort((a,b) => genreCounts[b] - genreCounts[a]);
+                // Якщо всі жанри виявилися сміттям (напр. тільки "Русская литература")
+                if (sortedGenres.length === 0) {
+                    sortedGenres = ["фэнтези", "детектив", "любовный роман", "триллер"];
+                }
 
                 let searchQuery = '';
                 let reasonText = '';
 
-                if (sortedGenres.length > 0) {
-                    const topGenres = sortedGenres.slice(0, 3);
-                    const randomGenre = topGenres[Math.floor(Math.random() * topGenres.length)];
+                const topGenres = sortedGenres.slice(0, 5);
+                const randomGenre = topGenres[Math.floor(Math.random() * topGenres.length)];
 
-                    let keywords = randomGenre;
-                    if (randomGenre.includes('романт') && randomGenre.includes('фэнтези')) keywords = 'романтическое фэнтези магия любовь';
-                    else if (randomGenre.includes('любовн')) keywords = 'любовный роман отношения';
-                    else if (randomGenre.includes('академ') && randomGenre.includes('маг')) keywords = 'академия магии фэнтези учеба';
-                    else if (randomGenre.includes('попадан')) keywords = 'попаданцы фэнтези другой мир';
-                    else if (randomGenre.includes('фэнтези')) keywords = 'фэнтези магия приключения';
-                    else if (randomGenre.includes('детектив')) keywords = 'детектив триллер расследование';
-                    else keywords = randomGenre + " художественная литература";
+                let keywords = randomGenre;
+                if (randomGenre.includes('романт') || randomGenre.includes('любов')) keywords = 'любовный роман чувства эмоции';
+                else if (randomGenre.includes('академ') || randomGenre.includes('маг')) keywords = 'академия магии фэнтези учеба';
+                else if (randomGenre.includes('попадан')) keywords = 'попаданцы фэнтези другой мир';
+                else if (randomGenre.includes('фэнтези')) keywords = 'фэнтези магия приключения';
+                else if (randomGenre.includes('детектив') || randomGenre.includes('триллер')) keywords = 'детектив расследование загадка';
+                else keywords = randomGenre + " бестселлер сюжет";
 
-                    searchQuery = `${keywords} -учебник -словарь -наука -вестник -проблема -журнал -диссертация`;
-                    reasonText = `За настроєм: <b>${randomGenre}</b>`;
-                } else {
-                    searchQuery = 'фэнтези роман любовь -учебник -наука';
-                    reasonText = `Популярні художні книги`;
-                }
+                // ЖОРСТКИЙ БАН ДЛЯ GOOGLE
+                searchQuery = `${keywords} -учебник -словарь -наука -вестник -проблема -журнал -диссертация -русская -литература -зарубежная -пособие -право`;
+                reasonText = `Найкраще у жанрі: <b>${randomGenre}</b>`;
 
                 const startIndex = Math.floor(Math.random() * 3) * 10; 
                 
-                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=40&printType=books&orderBy=relevance&startIndex=${startIndex}`);
+                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=40&printType=books&startIndex=${startIndex}`);
                 const data = await res.json();
                 
                 if (!data.items || data.items.length === 0) throw new Error("Немає даних");
@@ -828,7 +828,7 @@
                     if (b.pageCount && b.pageCount < 80) return false; 
                     
                     const titleLower = (b.title || '').toLowerCase();
-                    if (titleLower.includes('проблема') || titleLower.includes('вестник') || titleLower.includes('учебник') || titleLower.includes('том ')) return false;
+                    if (titleLower.includes('проблема') || titleLower.includes('вестник') || titleLower.includes('учебник') || titleLower.includes('том ') || titleLower.includes('словарь')) return false;
 
                     if (existingTitles.has(titleLower)) return false;
                     return true;
@@ -865,7 +865,7 @@
                 
                 list.innerHTML = html;
             } catch (e) {
-                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Шукаємо нові рекомендації... Спробуйте оновити сторінку.</div>`;
+                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Шукаємо нові рекомендації... Спробуйте ще раз.</div>`;
             }
         }
 
