@@ -516,7 +516,7 @@
             let newBookData = { 
                 ...tempSelectedBook, status: status, pagesRead: status === 'finished' ? tempSelectedBook.pagesTotal : 0, 
                 dateAdded: Date.now(), rating: 0, review: '', epubUrl: null, timeSpent: 0, lastFileName: null,
-                dateStarted: status === 'reading' ? new DatetoISOString().slice(0, 10) : null,
+                dateStarted: status === 'reading' ? new Date().toISOString().slice(0, 10) : null,
                 dateFinished: status === 'finished' ? new Date().toISOString().slice(0, 10) : null
             };
             await db.collection('users').doc(currentUser.uid).collection('books').add(newBookData);
@@ -756,7 +756,7 @@
             }
         }
 
-        // РЕКОМЕНДАЦІЇ ВИКЛЮЧНО ЗА СЮЖЕТАМИ ТА ЖАНРАМИ (Без авторів)
+        // ЖОРСТКИЙ ФІЛЬТР РЕКОМЕНДАЦІЙ
         async function loadRealRecommendations() {
             const list = document.getElementById('recommendationsList');
             
@@ -764,92 +764,75 @@
                 list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Додайте хоча б 1 книгу, щоб ми зрозуміли ваші смаки! ☕</div>`; return;
             }
 
-            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Аналізуємо сюжети та жанри... 🧠</div>`;
+            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Шукаємо круті книги за сюжетами... 🧠</div>`;
 
             try {
                 const genreCounts = {};
                 
-                // Враховуємо тільки ті книги, які сподобалися (4 або 5 зірок)
                 myLibrary.forEach(b => {
-                    let weight = b.rating >= 4 ? 3 : (b.rating === 0 ? 1 : -1); 
-                    if (weight > 0 && b.genre && b.genre.length > 3 && b.genre !== 'Fiction') { 
-                        // Беремо тільки головний жанр (до коми)
-                        let mainGenre = b.genre.split(',')[0].trim();
-                        genreCounts[mainGenre] = (genreCounts[mainGenre] || 0) + weight; 
+                    if (b.rating >= 4 && b.genre && b.genre.length > 3) {
+                        let mainGenre = b.genre.split(',')[0].trim().toLowerCase();
+                        genreCounts[mainGenre] = (genreCounts[mainGenre] || 0) + 1;
                     }
                 });
+
+                if(Object.keys(genreCounts).length === 0) {
+                     myLibrary.forEach(b => {
+                        if (b.genre && b.genre.length > 3) {
+                            let mainGenre = b.genre.split(',')[0].trim().toLowerCase();
+                            genreCounts[mainGenre] = (genreCounts[mainGenre] || 0) + 1;
+                        }
+                    });
+                }
 
                 const sortedGenres = Object.keys(genreCounts).sort((a,b) => genreCounts[b] - genreCounts[a]);
 
                 let searchQuery = '';
                 let reasonText = '';
-                let startIndex = 0;
 
                 if (sortedGenres.length > 0) {
-                    const topGenres = sortedGenres.slice(0, 15);
+                    const topGenres = sortedGenres.slice(0, 3);
                     const randomGenre = topGenres[Math.floor(Math.random() * topGenres.length)];
-                    
-                    let cleanGenre = randomGenre;
-                    
-                    // Перекладаємо специфічні жанри LiveLib на зрозумілу для Google Books мову
-                    const gMap = {
-                        "Романтическое фэнтези": "романтическое фэнтези",
-                        "Любовные романы": "любовный роман",
-                        "Современные любовные романы": "современный любовный роман",
-                        "Зарубежное фэнтези": "фэнтези",
-                        "Боевое фэнтези": "боевое фэнтези",
-                        "Книги для подростков": "young adult",
-                        "Детективы": "детектив",
-                        "Триллер": "триллер",
-                        "Академии магии": "академия магии",
-                        "Попаданцы": "попаданцы",
-                        "Ужасы": "ужасы",
-                        "Мистика": "мистика"
-                    };
-                    
-                    let foundMatch = false;
-                    for(let key in gMap) {
-                        if(randomGenre.includes(key)) { cleanGenre = gMap[key]; foundMatch = true; break; }
-                    }
-                    
-                    if(!foundMatch) {
-                        // Очищаємо зайві слова
-                        cleanGenre = randomGenre.replace(/Зарубежн[а-я]+|Современн[а-я]+|Русск[а-я]+|книги|литература/gi, '').trim();
-                    }
-                    
-                    // Іноді шукаємо як жанр, іноді просто як сюжетний тег (для крутої різноманітності)
-                    if (Math.random() > 0.5) {
-                        searchQuery = `subject:"${cleanGenre}"`;
-                    } else {
-                        searchQuery = `"${cleanGenre}"`;
-                    }
-                    
-                    reasonText = `За схожим сюжетом та жанром: <b>${randomGenre}</b>`;
-                    startIndex = Math.floor(Math.random() * 5) * 10; 
+
+                    let keywords = randomGenre;
+                    if (randomGenre.includes('романт') && randomGenre.includes('фэнтези')) keywords = 'романтическое фэнтези магия любовь';
+                    else if (randomGenre.includes('любовн')) keywords = 'любовный роман отношения';
+                    else if (randomGenre.includes('академ') && randomGenre.includes('маг')) keywords = 'академия магии фэнтези учеба';
+                    else if (randomGenre.includes('попадан')) keywords = 'попаданцы фэнтези другой мир';
+                    else if (randomGenre.includes('фэнтези')) keywords = 'фэнтези магия приключения';
+                    else if (randomGenre.includes('детектив')) keywords = 'детектив триллер расследование';
+                    else keywords = randomGenre + " художественная литература";
+
+                    searchQuery = `${keywords} -учебник -словарь -наука -вестник -проблема -журнал -диссертация`;
+                    reasonText = `За настроєм: <b>${randomGenre}</b>`;
                 } else {
-                    searchQuery = 'subject:"фэнтези"';
-                    reasonText = `Популярні бестселери`;
+                    searchQuery = 'фэнтези роман любовь -учебник -наука';
+                    reasonText = `Популярні художні книги`;
                 }
 
-                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=40&printType=books&startIndex=${startIndex}`);
+                const startIndex = Math.floor(Math.random() * 3) * 10; 
+                
+                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=40&printType=books&orderBy=relevance&startIndex=${startIndex}`);
                 const data = await res.json();
                 
                 if (!data.items || data.items.length === 0) throw new Error("Немає даних");
 
                 const allowedLangs = ['uk', 'ru'];
-                
-                // ВІДБІР ТІЛЬКИ ЯКІСНИХ КНИГ (без брошур і без фото)
+                const existingTitles = new Set(myLibrary.map(b => b.title.trim().toLowerCase()));
+
                 const filteredItems = data.items.filter(item => {
                     const b = item.volumeInfo;
-                    const langOk = allowedLangs.includes(b.language);
-                    const hasDesc = b.description && b.description.length > 60;
-                    const hasImage = b.imageLinks && b.imageLinks.thumbnail;
-                    const isBook = b.pageCount && b.pageCount > 50; 
+                    if (!allowedLangs.includes(b.language)) return false;
+                    if (!b.description || b.description.length < 80) return false;
+                    if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
+                    if (b.pageCount && b.pageCount < 80) return false; 
                     
-                    return langOk && hasDesc && hasImage && isBook;
-                });
+                    const titleLower = (b.title || '').toLowerCase();
+                    if (titleLower.includes('проблема') || titleLower.includes('вестник') || titleLower.includes('учебник') || titleLower.includes('том ')) return false;
 
-                const existingTitles = new Set(myLibrary.map(b => b.title.trim().toLowerCase()));
+                    if (existingTitles.has(titleLower)) return false;
+                    return true;
+                });
 
                 let html = `<p class="text-xs text-slate-400 mb-3 fade-in ml-1">${reasonText}</p>`;
                 let addedBooks = 0;
@@ -860,13 +843,8 @@
                     if (addedBooks >= 6) break; 
                     
                     const b = item.volumeInfo;
-                    const title = b.title || '';
-                    
-                    if (existingTitles.has(title.toLowerCase())) continue;
-
                     const safeImage = (b.imageLinks?.thumbnail || '').replace(/^http:\/\//i, 'https://');
-
-                    const book = { googleId: item.id, title: title, author: b.authors ? b.authors[0] : 'Невідомий', pagesTotal: b.pageCount || 300, image: safeImage || PLACEHOLDER_IMG, description: b.description || 'Немає опису.', genre: b.categories ? b.categories[0] : '' };
+                    const book = { googleId: item.id, title: b.title || '', author: b.authors ? b.authors[0] : 'Невідомий', pagesTotal: b.pageCount || 300, image: safeImage || PLACEHOLDER_IMG, description: b.description || 'Немає опису.', genre: b.categories ? b.categories[0] : '' };
 
                     html += `
                     <div onclick="showBookDetails(${JSON.stringify(book).replace(/"/g, '&quot;')}, true)" class="bg-white p-4 rounded-xl flex gap-3 items-start border border-slate-100 cursor-pointer shadow-sm mb-3 fade-in active:scale-[0.98] transition-transform">
@@ -882,12 +860,12 @@
                 }
                 
                 if (addedBooks === 0) {
-                    html += `<div class="p-8 text-center text-slate-400 text-sm">Не знайшли нових якісних книг за цим сюжетом. Перейдіть на іншу вкладку і поверніться!</div>`;
+                    html += `<div class="p-8 text-center text-slate-400 text-sm">Шукаємо найкраще... Перемкніть вкладку туди-сюди для нового пошуку!</div>`;
                 }
                 
                 list.innerHTML = html;
             } catch (e) {
-                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Шукаємо нові рекомендації... Спробуйте ще раз.</div>`;
+                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Шукаємо нові рекомендації... Спробуйте оновити сторінку.</div>`;
             }
         }
 
