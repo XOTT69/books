@@ -516,7 +516,7 @@
             let newBookData = { 
                 ...tempSelectedBook, status: status, pagesRead: status === 'finished' ? tempSelectedBook.pagesTotal : 0, 
                 dateAdded: Date.now(), rating: 0, review: '', epubUrl: null, timeSpent: 0, lastFileName: null,
-                dateStarted: status === 'reading' ? new Date().toISOString().slice(0, 10) : null,
+                dateStarted: status === 'reading' ? new DatetoISOString().slice(0, 10) : null,
                 dateFinished: status === 'finished' ? new Date().toISOString().slice(0, 10) : null
             };
             await db.collection('users').doc(currentUser.uid).collection('books').add(newBookData);
@@ -756,7 +756,7 @@
             }
         }
 
-        // ЖОРСТКИЙ ФІЛЬТР ДЛЯ РЕКОМЕНДАЦІЙ
+        // РЕКОМЕНДАЦІЇ ВИКЛЮЧНО ЗА СЮЖЕТАМИ ТА ЖАНРАМИ (Без авторів)
         async function loadRealRecommendations() {
             const list = document.getElementById('recommendationsList');
             
@@ -764,54 +764,47 @@
                 list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Додайте хоча б 1 книгу, щоб ми зрозуміли ваші смаки! ☕</div>`; return;
             }
 
-            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Аналізуємо найкращі книги для вас... 🧠</div>`;
+            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Аналізуємо сюжети та жанри... 🧠</div>`;
 
             try {
                 const genreCounts = {};
-                const authorCounts = {};
                 
-                // Враховуємо тільки ті книги, які сподобалися!
+                // Враховуємо тільки ті книги, які сподобалися (4 або 5 зірок)
                 myLibrary.forEach(b => {
                     let weight = b.rating >= 4 ? 3 : (b.rating === 0 ? 1 : -1); 
-                    if (weight > 0) {
-                        if (b.genre && b.genre.length > 3 && b.genre !== 'Fiction') { 
-                            genreCounts[b.genre] = (genreCounts[b.genre] || 0) + weight; 
-                        }
-                        if (b.author && b.author !== 'Невідомий' && b.author !== 'Автор невідомий') {
-                            authorCounts[b.author] = (authorCounts[b.author] || 0) + weight;
-                        }
+                    if (weight > 0 && b.genre && b.genre.length > 3 && b.genre !== 'Fiction') { 
+                        // Беремо тільки головний жанр (до коми)
+                        let mainGenre = b.genre.split(',')[0].trim();
+                        genreCounts[mainGenre] = (genreCounts[mainGenre] || 0) + weight; 
                     }
                 });
 
                 const sortedGenres = Object.keys(genreCounts).sort((a,b) => genreCounts[b] - genreCounts[a]);
-                const sortedAuthors = Object.keys(authorCounts).sort((a,b) => authorCounts[b] - authorCounts[a]);
 
                 let searchQuery = '';
                 let reasonText = '';
                 let startIndex = 0;
 
-                const searchByAuthor = sortedAuthors.length > 0 && Math.random() > 0.4;
-
-                if (searchByAuthor) {
-                    const topAuthors = sortedAuthors.slice(0, 10);
-                    const randomAuthor = topAuthors[Math.floor(Math.random() * topAuthors.length)];
-                    searchQuery = `inauthor:"${randomAuthor}"`;
-                    reasonText = `Бо вам подобається: <b>${randomAuthor}</b>`;
-                    startIndex = Math.floor(Math.random() * 2) * 10; 
-                } else if (sortedGenres.length > 0) {
-                    const topGenres = sortedGenres.slice(0, 10);
+                if (sortedGenres.length > 0) {
+                    const topGenres = sortedGenres.slice(0, 15);
                     const randomGenre = topGenres[Math.floor(Math.random() * topGenres.length)];
                     
                     let cleanGenre = randomGenre;
+                    
+                    // Перекладаємо специфічні жанри LiveLib на зрозумілу для Google Books мову
                     const gMap = {
                         "Романтическое фэнтези": "романтическое фэнтези",
                         "Любовные романы": "любовный роман",
-                        "Современные любовные романы": "любовный роман",
+                        "Современные любовные романы": "современный любовный роман",
                         "Зарубежное фэнтези": "фэнтези",
-                        "Боевое фэнтези": "фэнтези",
+                        "Боевое фэнтези": "боевое фэнтези",
                         "Книги для подростков": "young adult",
                         "Детективы": "детектив",
-                        "Триллер": "триллер"
+                        "Триллер": "триллер",
+                        "Академии магии": "академия магии",
+                        "Попаданцы": "попаданцы",
+                        "Ужасы": "ужасы",
+                        "Мистика": "мистика"
                     };
                     
                     let foundMatch = false;
@@ -820,12 +813,19 @@
                     }
                     
                     if(!foundMatch) {
-                        cleanGenre = randomGenre.replace(/Зарубежн[а-я]+|Современн[а-я]+|Русск[а-я]+|книги|литература/gi, '').trim().split(',')[0].trim();
+                        // Очищаємо зайві слова
+                        cleanGenre = randomGenre.replace(/Зарубежн[а-я]+|Современн[а-я]+|Русск[а-я]+|книги|литература/gi, '').trim();
                     }
                     
-                    searchQuery = `subject:"${cleanGenre}"`;
-                    reasonText = `Найкраще у жанрі: <b>${randomGenre}</b>`;
-                    startIndex = Math.floor(Math.random() * 4) * 10; 
+                    // Іноді шукаємо як жанр, іноді просто як сюжетний тег (для крутої різноманітності)
+                    if (Math.random() > 0.5) {
+                        searchQuery = `subject:"${cleanGenre}"`;
+                    } else {
+                        searchQuery = `"${cleanGenre}"`;
+                    }
+                    
+                    reasonText = `За схожим сюжетом та жанром: <b>${randomGenre}</b>`;
+                    startIndex = Math.floor(Math.random() * 5) * 10; 
                 } else {
                     searchQuery = 'subject:"фэнтези"';
                     reasonText = `Популярні бестселери`;
@@ -838,13 +838,13 @@
 
                 const allowedLangs = ['uk', 'ru'];
                 
-                // ВІДБІР ТІЛЬКИ ЯКІСНИХ КНИГ
+                // ВІДБІР ТІЛЬКИ ЯКІСНИХ КНИГ (без брошур і без фото)
                 const filteredItems = data.items.filter(item => {
                     const b = item.volumeInfo;
                     const langOk = allowedLangs.includes(b.language);
-                    const hasDesc = b.description && b.description.length > 60; // Нормальний опис
-                    const hasImage = b.imageLinks && b.imageLinks.thumbnail; // Є обкладинка
-                    const isBook = b.pageCount && b.pageCount > 50; // Більше 50 сторінок
+                    const hasDesc = b.description && b.description.length > 60;
+                    const hasImage = b.imageLinks && b.imageLinks.thumbnail;
+                    const isBook = b.pageCount && b.pageCount > 50; 
                     
                     return langOk && hasDesc && hasImage && isBook;
                 });
@@ -882,7 +882,7 @@
                 }
                 
                 if (addedBooks === 0) {
-                    html += `<div class="p-8 text-center text-slate-400 text-sm">Не знайшли нових якісних книг за цим критерієм. Спробуйте перемкнути вкладку туди-сюди!</div>`;
+                    html += `<div class="p-8 text-center text-slate-400 text-sm">Не знайшли нових якісних книг за цим сюжетом. Перейдіть на іншу вкладку і поверніться!</div>`;
                 }
                 
                 list.innerHTML = html;
