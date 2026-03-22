@@ -391,6 +391,7 @@
             openSheet('detailsSheet');
         }
 
+        // КАРТКА ДЕТАЛЕЙ (З помітними датами)
         function showBookDetails(bookData, isNewFromSearch = false) {
             const libBook = myLibrary.find(b => (b.googleId && b.googleId === bookData.googleId) || b.id === bookData.id) || bookData;
             tempSelectedBook = isNewFromSearch ? bookData : null;
@@ -412,14 +413,15 @@
                                     <option value="finished" ${libBook.status === 'finished' ? 'selected' : ''}>✅ Прочитано</option>
                                 </select>
                                 
-                                <div class="mt-3 p-3 bg-white border border-slate-100 rounded-xl space-y-2 shadow-sm">
+                                <div class="mt-3 p-3 bg-slate-50/50 border border-slate-200 rounded-xl space-y-2 shadow-sm">
+                                    <h4 class="text-[9px] font-black uppercase text-indigo-400 tracking-wider mb-1">🗓 Змінити дати</h4>
                                     <div class="flex justify-between items-center">
-                                        <span class="text-[10px] font-bold uppercase text-slate-400">Почато:</span>
-                                        <input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="date-input w-[120px]">
+                                        <span class="text-[10px] font-bold text-slate-500">Почато:</span>
+                                        <input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="date-input w-[120px] shadow-sm">
                                     </div>
                                     <div class="flex justify-between items-center">
-                                        <span class="text-[10px] font-bold uppercase text-slate-400">Закінчено:</span>
-                                        <input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="date-input w-[120px]">
+                                        <span class="text-[10px] font-bold text-slate-500">Закінчено:</span>
+                                        <input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="date-input w-[120px] shadow-sm">
                                     </div>
                                 </div>
                             ` : ''}
@@ -525,8 +527,8 @@
         function saveManualDate(id, field, dateEl) { 
             updateBookInFirestore(id, { [field]: dateEl.value }); 
             const book = myLibrary.find(b => b.id === id);
-            if (book) book[field] = dateEl.value; // локально міняємо
-            render(); // миттєво перемальовуємо бібліотеку, щоб книга перелетіла в новий рік
+            if (book) book[field] = dateEl.value; // міняємо локально
+            render(); // миттєво перемальовуємо, щоб книга "перестрибнула" у вірний рік на фоні
         }
 
         function startTimer() {
@@ -693,6 +695,15 @@
             if (currentLibraryTab === 'reading') { container.innerHTML = `<div class="${wrapperClass}">${reading.map(renderBookCard).join('')}</div>`; }
             else if (currentLibraryTab === 'planned') { container.innerHTML = `<div class="${wrapperClass}">${planned.map(renderBookCard).join('')}</div>`; }
             else if (currentLibraryTab === 'finished') {
+                
+                // 1. СОРТУВАННЯ ЗА МІСЯЦЯМИ ТА ДНЯМИ (ВІД НОВИХ ДО СТАРИХ)
+                finished.sort((a, b) => {
+                    const dateA = a.dateFinished || '1970-01-01';
+                    const dateB = b.dateFinished || '1970-01-01';
+                    return dateB.localeCompare(dateA); // Сортуємо по спаданню
+                });
+
+                // 2. ГРУПУВАННЯ ПО РОКАХ
                 const grouped = {};
                 finished.forEach(b => {
                     let year = 'Без дати';
@@ -734,7 +745,7 @@
             }
         }
 
-        // РОЗУМНІ ДИНАМІЧНІ РЕКОМЕНДАЦІЇ
+        // ВІДРЕМОНТОВАНІ РЕКОМЕНДАЦІЇ (Вільний пошук)
         async function loadRealRecommendations() {
             const list = document.getElementById('recommendationsList');
             
@@ -742,14 +753,14 @@
                 list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Додайте хоча б 1 книгу, щоб ми зрозуміли ваші смаки! ☕</div>`; return;
             }
 
-            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Аналізуємо вашу бібліотеку... 🧠</div>`;
+            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Шукаємо щось особливе для вас... 🧠</div>`;
 
             try {
                 const genreCounts = {};
                 const authorCounts = {};
                 
                 myLibrary.forEach(b => {
-                    if (b.genre && b.genre !== 'Fiction' && b.genre.length > 3) { genreCounts[b.genre] = (genreCounts[b.genre] || 0) + 1; }
+                    if (b.genre && b.genre.length > 3 && b.genre !== 'Fiction') { genreCounts[b.genre] = (genreCounts[b.genre] || 0) + 1; }
                     if (b.author && b.author !== 'Невідомий' && b.author !== 'Автор невідомий') {
                         authorCounts[b.author] = (authorCounts[b.author] || 0) + 1;
                     }
@@ -761,29 +772,31 @@
                 let searchQuery = '';
                 let reasonText = '';
 
-                // Обираємо випадково: шукати за автором чи за жанром
+                // Обираємо випадково: шукати за улюбленим автором чи за жанром
                 const searchByAuthor = sortedAuthors.length > 0 && Math.random() > 0.5;
 
                 if (searchByAuthor) {
-                    const topAuthors = sortedAuthors.slice(0, 5);
+                    const topAuthors = sortedAuthors.slice(0, 10);
                     const randomAuthor = topAuthors[Math.floor(Math.random() * topAuthors.length)];
-                    searchQuery = `inauthor:"${randomAuthor}"`;
+                    searchQuery = randomAuthor; // Прямий пошук по тексту (без inauthor)
                     reasonText = `Бо ви читали: <b>${randomAuthor}</b>`;
                 } else if (sortedGenres.length > 0) {
-                    const topGenres = sortedGenres.slice(0, 5);
+                    const topGenres = sortedGenres.slice(0, 10);
                     const randomGenre = topGenres[Math.floor(Math.random() * topGenres.length)];
-                    searchQuery = `"${randomGenre}"`;
+                    searchQuery = randomGenre; // Прямий пошук по тексту (без subject)
                     reasonText = `За вашим улюбленим жанром: <b>${randomGenre}</b>`;
                 } else {
-                    searchQuery = 'subject:fiction';
+                    searchQuery = 'фантастика романы';
                     reasonText = `Популярні книги для вас`;
                 }
 
+                // Робимо загальний запит на 40 книг
                 const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=40`);
                 const data = await res.json();
                 
                 if (!data.items || data.items.length === 0) throw new Error("Немає даних");
 
+                // Фільтруємо лише українську та російську
                 const allowedLangs = ['uk', 'ru'];
                 const filteredItems = data.items.filter(item => {
                     const lang = item.volumeInfo?.language;
@@ -795,7 +808,7 @@
                 let html = `<p class="text-xs text-slate-400 mb-3 fade-in ml-1">${reasonText}</p>`;
                 let addedBooks = 0;
                 
-                // Перемішуємо результати, щоб не показувати одне й те саме
+                // Перемішуємо результати, щоб показувати різне
                 const shuffledItems = filteredItems.sort(() => 0.5 - Math.random());
                 
                 for (let item of shuffledItems) {
@@ -823,12 +836,12 @@
                 }
                 
                 if (addedBooks === 0) {
-                    html += `<div class="p-8 text-center text-slate-400 text-sm">Не знайшли нових книг за цим критерієм. Спробуйте оновити сторінку!</div>`;
+                    html += `<div class="p-8 text-center text-slate-400 text-sm">Не знайшли нових книг за цим критерієм. Перейдіть на іншу вкладку і поверніться, щоб спробувати інший жанр!</div>`;
                 }
                 
                 list.innerHTML = html;
             } catch (e) {
-                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Пошук нових рекомендацій... Оновіть сторінку, щоб спробувати інший жанр.</div>`;
+                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Шукаємо нові рекомендації... Спробуйте оновити сторінку.</div>`;
             }
         }
 
