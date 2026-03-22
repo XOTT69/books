@@ -1,4 +1,4 @@
-const CACHE_NAME = "chitayko-cache-v9";
+const CACHE_NAME = "chitayko-cache-v10";
 
 const urlsToCache = [
   "./",
