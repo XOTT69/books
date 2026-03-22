@@ -305,18 +305,18 @@
             catch (error) { showErrorMsg("Помилка: " + error.message); } finally { btn.innerText = originalText; }
         }
 
-        // РОЗУМНА АВТОРИЗАЦІЯ GOOGLE (Обхід блокувань Safari)
+        // РОЗУМНА АВТОРИЗАЦІЯ GOOGLE (Спливаюче вікно для ПК, Редирект для мобілок)
         async function signInWithGoogle(btn) { 
             const originalHtml = btn.innerHTML; 
             btn.innerText = "З'єднання з Google...";
             const provider = new firebase.auth.GoogleAuthProvider();
             
             try { 
-                // Спочатку пробуємо безпечне спливаюче вікно (найкраще працює)
+                // Спочатку пробуємо безпечне спливаюче вікно (найкраще працює на ПК)
                 await auth.signInWithPopup(provider); 
             } 
             catch (error) { 
-                // Якщо iPhone (Safari) блокує спливаюче вікно, вмикаємо запасний план:
+                // Якщо iPhone/Safari блокує Popup, вмикаємо перенаправлення
                 if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
                     btn.innerText = "Перенаправлення...";
                     await auth.signInWithRedirect(provider);
@@ -327,14 +327,11 @@
             }
         }
         
-        // Ловимо результат, якщо спрацював запасний план (перенаправлення)
         auth.getRedirectResult().then((result) => {
-            if(result && result.user) {
-                console.log("Успішний вхід після перенаправлення");
-            }
+            if(result && result.user) console.log("Успішний вхід після перенаправлення");
         }).catch((error) => {
             if (error && error.code === 'auth/unauthorized-domain') {
-                showErrorMsg("Помилка домену! Додайте цей домен у Firebase.");
+                showErrorMsg("Помилка домену! Додайте цей домен у Firebase -> Authentication -> Settings -> Authorized domains");
             } else if (error && error.code !== 'auth/redirect-cancelled-by-user') {
                 showErrorMsg("Помилка входу: " + error.message);
             }
@@ -353,6 +350,7 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
+        // ПОШУК З ФІЛЬТРАЦІЄЮ МОВИ ТА HTTPS
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 3) { searchItems.innerHTML = ''; return; }
@@ -360,15 +358,24 @@
 
             timeoutId = setTimeout(async () => {
                 try {
-                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=15`);
+                    // Збільшуємо запит до 40, щоб мати вибір після фільтрації
+                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40`);
                     const data = await res.json(); searchItems.innerHTML = '';
                     if (!data.items) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    data.items.forEach(item => {
+                    // Відсіюємо книги інших мов (залишаємо тільки uk і ru)
+                    const allowedLangs = ['uk', 'ru'];
+                    const filteredItems = data.items.filter(item => {
+                        const lang = item.volumeInfo?.language;
+                        return allowedLangs.includes(lang);
+                    }).slice(0, 15); // Беремо перші 15 відфільтрованих
+
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг українською або російською мовою</div>';
+
+                    filteredItems.forEach(item => {
                         const b = item.volumeInfo, div = document.createElement('div');
                         const genre = b.categories && b.categories.length > 0 ? b.categories[0] : '';
                         
-                        // Примусово HTTPS
                         const safeImage = (b.imageLinks?.thumbnail || '').replace(/^http:\/\//i, 'https://');
                         
                         const book = { googleId: item.id, title: b.title || '', author: b.authors ? b.authors[0] : 'Автор невідомий', pagesTotal: b.pageCount || 300, image: safeImage || PLACEHOLDER_IMG, description: b.description || 'Анотація відсутня.', genre: genre };
@@ -714,6 +721,7 @@
             }
         }
 
+        // РЕКОМЕНДАЦІЇ З ФІЛЬТРАЦІЄЮ МОВИ
         async function loadRealRecommendations() {
             const list = document.getElementById('recommendationsList');
             
@@ -751,17 +759,25 @@
                     reasonText = `Популярні новинки для вас`;
                 }
 
-                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=15&langRestrict=uk`);
+                // Збільшуємо maxResults до 40 для фільтрації
+                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=40`);
                 const data = await res.json();
                 
                 if (!data.items || data.items.length === 0) throw new Error("Немає даних");
+
+                // Відсіюємо книги інших мов
+                const allowedLangs = ['uk', 'ru'];
+                const filteredItems = data.items.filter(item => {
+                    const lang = item.volumeInfo?.language;
+                    return allowedLangs.includes(lang);
+                });
 
                 const existingTitles = new Set(myLibrary.map(b => b.title.trim().toLowerCase()));
 
                 let html = `<p class="text-xs text-slate-400 mb-3 fade-in ml-1">${reasonText}</p>`;
                 let addedBooks = 0;
                 
-                for (let item of data.items) {
+                for (let item of filteredItems) {
                     if (addedBooks >= 6) break; 
                     
                     const b = item.volumeInfo;
@@ -786,12 +802,12 @@
                 }
                 
                 if (addedBooks === 0) {
-                    html += `<div class="p-8 text-center text-slate-400 text-sm">Не знайшли нових книг. Спробуйте додати нові жанри!</div>`;
+                    html += `<div class="p-8 text-center text-slate-400 text-sm">Не знайшли нових книг українською/російською мовами. Спробуйте додати нові жанри!</div>`;
                 }
                 
                 list.innerHTML = html;
             } catch (e) {
-                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Не вдалося завантажити рекомендації 😔. Можливо, для цього жанру немає результатів.</div>`;
+                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Не вдалося завантажити рекомендації 😔. Можливо, для цього жанру немає результатів потрібною мовою.</div>`;
             }
         }
 
