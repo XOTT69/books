@@ -27,6 +27,7 @@
         body.dark .text-slate-500 { color: #cbd5e1; }
         body.dark .bg-slate-50, body.dark .bg-slate-100 { background-color: #0f172a; }
         body.dark .border-slate-100, body.dark .border-slate-200 { border-color: #334155; }
+
         body.dark .dark-inactive-tab { background-color: #334155 !important; color: #94a3b8 !important; }
 
         .fade-in { animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
@@ -261,10 +262,10 @@
         }
 
         function updateViewButtons() {
-            const actCls = 'px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-900 bg-white shadow-sm transition-all';
-            const inactCls = 'px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-all';
-            document.getElementById('view_list').className = viewMode === 'list' ? actCls : inactCls;
-            document.getElementById('view_grid').className = viewMode === 'grid' ? actCls : inactCls;
+            const activeClass = 'px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-900 bg-white shadow-sm transition-all';
+            const inactiveClass = 'px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-all';
+            document.getElementById('view_list').className = viewMode === 'list' ? activeClass : inactiveClass;
+            document.getElementById('view_grid').className = viewMode === 'grid' ? activeClass : inactiveClass;
         }
 
         const searchInput = document.getElementById('searchInput'), searchItems = document.getElementById('searchItems');
@@ -304,15 +305,29 @@
             catch (error) { showErrorMsg("Помилка: " + error.message); } finally { btn.innerText = originalText; }
         }
 
+        // РОЗУМНА АВТОРИЗАЦІЯ GOOGLE (Спливаюче вікно для ПК, Редирект для мобілок)
         async function signInWithGoogle(btn) { 
-            const originalHtml = btn.innerHTML; btn.innerText = "Перенаправлення...";
-            try { await auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()); } 
-            catch (error) { showErrorMsg("Помилка: " + error.message); btn.innerHTML = originalHtml; }
+            const originalHtml = btn.innerHTML; 
+            btn.innerText = "З'єднання з Google...";
+            try { 
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                
+                if (isMobile) {
+                    await auth.signInWithRedirect(provider);
+                } else {
+                    await auth.signInWithPopup(provider);
+                }
+            } 
+            catch (error) { 
+                showErrorMsg("Помилка: " + error.message); 
+                btn.innerHTML = originalHtml; 
+            }
         }
         
         auth.getRedirectResult().catch((error) => {
             if (error && error.code === 'auth/unauthorized-domain') {
-                showErrorMsg("Помилка! Додайте цей домен у Firebase -> Authentication -> Settings -> Authorized domains");
+                showErrorMsg("Помилка домену! Додайте цей домен у Firebase -> Authentication -> Settings -> Authorized domains");
             } else if (error && error.code !== 'auth/redirect-cancelled-by-user') {
                 showErrorMsg("Помилка входу: " + error.message);
             }
@@ -331,7 +346,7 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // ВИПРАВЛЕНИЙ ПОШУК (Шукає і за назвою, і за автором)
+        // ПОШУК З HTTPS
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 3) { searchItems.innerHTML = ''; return; }
@@ -339,7 +354,6 @@
 
             timeoutId = setTimeout(async () => {
                 try {
-                    // Змінив q=intitle: на просто q=
                     const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=15`);
                     const data = await res.json(); searchItems.innerHTML = '';
                     if (!data.items) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
