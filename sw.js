@@ -1,9 +1,10 @@
-const CACHE_NAME = "chitayko-cache-v4"; // Змінюй цифру тут, коли кардинально оновлюєш код на GitHub
+const CACHE_NAME = "chitayko-cache-v9";
 
 const urlsToCache = [
   "./",
   "./index.html",
-  "./manifest.json"
+  "./manifest.json",
+  "./icon.png"
 ];
 
 // Встановлення і кешування файлів
@@ -17,7 +18,7 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// Активація і видалення старого кешу (ЩОБ НЕ ВИСІЛИ СТАРІ ВЕРСІЇ)
+// Активація і видалення старого кешу (щоб на телефонах завжди була свіжа версія)
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -40,11 +41,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Для наших локальних файлів (index.html) беремо з кешу, або йдемо в інтернет
+  // Для наших локальних файлів беремо з кешу, або йдемо в інтернет
   event.respondWith(
     caches.match(event.request).then((response) => {
       return response || fetch(event.request);
     }).catch(() => {
+      // Якщо взагалі немає інтернету і файл не знайдено, показуємо головну сторінку
       return caches.match('./index.html');
     })
   );
