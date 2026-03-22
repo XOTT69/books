@@ -31,12 +31,10 @@
         body.dark .text-slate-500 { color: #cbd5e1; }
         body.dark .bg-slate-50, body.dark .bg-slate-100 { background-color: #0f172a; }
         body.dark .border-slate-100, body.dark .border-slate-200 { border-color: #334155; }
-
         body.dark .dark-inactive-tab { background-color: #334155 !important; color: #94a3b8 !important; }
 
         .fade-in { animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
         @keyframes fadeIn { 0% { opacity: 0; transform: translateY(5px); } 100% { opacity: 1; transform: translateY(0); } }
-
         .bottom-sheet { transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1); }
         .bottom-sheet.open { transform: translateY(0); }
         .backdrop { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
@@ -148,6 +146,7 @@
                 <span class="font-bold">Темна тема застосунку</span>
                 <button onclick="toggleAppTheme()" class="text-2xl p-1 bg-white rounded-full shadow-sm border border-slate-200 active:scale-95 transition-transform">🌓</button>
             </div>
+            <button onclick="clearAppCache()" class="w-full p-4 bg-amber-50 text-amber-600 font-bold rounded-2xl active:scale-95 transition-transform">🔄 Очистити кеш (Оновити)</button>
             <button onclick="logout()" class="w-full p-4 bg-red-50 text-red-600 font-bold rounded-2xl active:scale-95 transition-transform">🚪 Вийти з акаунту</button>
         </div>
     </div>
@@ -251,6 +250,22 @@
         let readerTheme = localStorage.getItem('readerTheme') || 'light';
         let readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
+
+        // ФУНКЦІЯ ДЛЯ ЖОРСТКОГО ОЧИЩЕННЯ КЕШУ
+        function clearAppCache() {
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    for (let name of names) caches.delete(name);
+                });
+            }
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(regs => {
+                    for (let reg of regs) reg.unregister();
+                });
+            }
+            alert('Кеш очищено! Застосунок буде перезавантажено.');
+            setTimeout(() => { window.location.reload(true); }, 500);
+        }
 
         if(localStorage.getItem('appTheme') === 'dark') document.body.classList.add('dark');
         function toggleAppTheme() {
@@ -391,7 +406,7 @@
             openSheet('detailsSheet');
         }
 
-        // КАРТКА ДЕТАЛЕЙ (З помітними датами)
+        // КАРТКА ДЕТАЛЕЙ З ГАРНИМ ВИБОРОМ ДАТИ
         function showBookDetails(bookData, isNewFromSearch = false) {
             const libBook = myLibrary.find(b => (b.googleId && b.googleId === bookData.googleId) || b.id === bookData.id) || bookData;
             tempSelectedBook = isNewFromSearch ? bookData : null;
@@ -412,24 +427,29 @@
                                     <option value="reading" ${libBook.status === 'reading' ? 'selected' : ''}>📖 Читаю зараз</option>
                                     <option value="finished" ${libBook.status === 'finished' ? 'selected' : ''}>✅ Прочитано</option>
                                 </select>
-                                
-                                <div class="mt-3 p-3 bg-slate-50/50 border border-slate-200 rounded-xl space-y-2 shadow-sm">
-                                    <h4 class="text-[9px] font-black uppercase text-indigo-400 tracking-wider mb-1">🗓 Змінити дати</h4>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-[10px] font-bold text-slate-500">Почато:</span>
-                                        <input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="date-input w-[120px] shadow-sm">
-                                    </div>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-[10px] font-bold text-slate-500">Закінчено:</span>
-                                        <input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="date-input w-[120px] shadow-sm">
-                                    </div>
-                                </div>
                             ` : ''}
                         </div>
                     </div>
                 </div>`;
             
             if (!isNewFromSearch) {
+                
+                // ВЕЛИКИЙ БЛОК ДЛЯ ДАТ
+                html += `
+                <div class="mb-4 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 fade-in">
+                    <h4 class="text-[10px] font-black uppercase text-indigo-500 tracking-wider mb-2 flex items-center gap-1.5">🗓 Дати читання</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-100">
+                            <span class="text-xs font-bold text-slate-500">Початок:</span>
+                            <input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="text-sm text-slate-800 font-medium bg-transparent outline-none cursor-pointer">
+                        </div>
+                        <div class="flex justify-between items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-100">
+                            <span class="text-xs font-bold text-slate-500">Кінець:</span>
+                            <input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="text-sm text-slate-800 font-medium bg-transparent outline-none cursor-pointer">
+                        </div>
+                    </div>
+                </div>`;
+
                 let starsHtml = '';
                 const currentRating = libBook.rating || 0;
                 for(let i=1; i<=5; i++) {
@@ -523,12 +543,11 @@
             setLibraryTab(newStatus); 
         }
 
-        // ЗБЕРЕЖЕННЯ ДАТИ ТА МИТТЄВЕ ОНОВЛЕННЯ
         function saveManualDate(id, field, dateEl) { 
             updateBookInFirestore(id, { [field]: dateEl.value }); 
             const book = myLibrary.find(b => b.id === id);
             if (book) book[field] = dateEl.value; // міняємо локально
-            render(); // миттєво перемальовуємо, щоб книга "перестрибнула" у вірний рік на фоні
+            render(); // миттєво перемальовуємо, щоб книга перестрибнула у вірний рік
         }
 
         function startTimer() {
@@ -696,14 +715,13 @@
             else if (currentLibraryTab === 'planned') { container.innerHTML = `<div class="${wrapperClass}">${planned.map(renderBookCard).join('')}</div>`; }
             else if (currentLibraryTab === 'finished') {
                 
-                // 1. СОРТУВАННЯ ЗА МІСЯЦЯМИ ТА ДНЯМИ (ВІД НОВИХ ДО СТАРИХ)
+                // ВНУТРІШНЄ СОРТУВАННЯ (Від нових до старих за місяцями)
                 finished.sort((a, b) => {
                     const dateA = a.dateFinished || '1970-01-01';
                     const dateB = b.dateFinished || '1970-01-01';
-                    return dateB.localeCompare(dateA); // Сортуємо по спаданню
+                    return dateB.localeCompare(dateA); 
                 });
 
-                // 2. ГРУПУВАННЯ ПО РОКАХ
                 const grouped = {};
                 finished.forEach(b => {
                     let year = 'Без дати';
@@ -745,7 +763,7 @@
             }
         }
 
-        // ВІДРЕМОНТОВАНІ РЕКОМЕНДАЦІЇ (Вільний пошук)
+        // РЕКОМЕНДАЦІЇ З "ВИПАДКОВИМИ СТОРІНКАМИ" ДЛЯ "ТЯЖКИХ" ЧИТАЧІВ
         async function loadRealRecommendations() {
             const list = document.getElementById('recommendationsList');
             
@@ -753,7 +771,7 @@
                 list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Додайте хоча б 1 книгу, щоб ми зрозуміли ваші смаки! ☕</div>`; return;
             }
 
-            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Шукаємо щось особливе для вас... 🧠</div>`;
+            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Аналізуємо вашу бібліотеку... 🧠</div>`;
 
             try {
                 const genreCounts = {};
@@ -771,32 +789,37 @@
 
                 let searchQuery = '';
                 let reasonText = '';
+                let startIndex = Math.floor(Math.random() * 20); // Стрибаємо по сторінках Google Books
 
-                // Обираємо випадково: шукати за улюбленим автором чи за жанром
-                const searchByAuthor = sortedAuthors.length > 0 && Math.random() > 0.5;
+                const searchByAuthor = sortedAuthors.length > 0 && Math.random() > 0.4;
 
                 if (searchByAuthor) {
-                    const topAuthors = sortedAuthors.slice(0, 10);
+                    const topAuthors = sortedAuthors.slice(0, 15);
                     const randomAuthor = topAuthors[Math.floor(Math.random() * topAuthors.length)];
-                    searchQuery = randomAuthor; // Прямий пошук по тексту (без inauthor)
+                    searchQuery = `inauthor:"${randomAuthor}"`;
                     reasonText = `Бо ви читали: <b>${randomAuthor}</b>`;
                 } else if (sortedGenres.length > 0) {
-                    const topGenres = sortedGenres.slice(0, 10);
+                    const topGenres = sortedGenres.slice(0, 15);
                     const randomGenre = topGenres[Math.floor(Math.random() * topGenres.length)];
-                    searchQuery = randomGenre; // Прямий пошук по тексту (без subject)
-                    reasonText = `За вашим улюбленим жанром: <b>${randomGenre}</b>`;
+                    
+                    // Очищаємо жанр від слів типу "Зарубежное" чи "Современное", бо Google цього не розуміє
+                    let cleanGenre = randomGenre.replace(/Зарубежн[а-я]+|Современн[а-я]+|Русск[а-я]+/gi, '').trim().split(',')[0].trim();
+                    if(!cleanGenre) cleanGenre = "фантастика"; // Запасний варіант
+                    
+                    searchQuery = `subject:${cleanGenre}`;
+                    reasonText = `За жанром: <b>${randomGenre}</b>`;
+                    startIndex = Math.floor(Math.random() * 40); // Для жанрів можна стрибати ще далі
                 } else {
-                    searchQuery = 'фантастика романы';
-                    reasonText = `Популярні книги для вас`;
+                    searchQuery = 'subject:fiction';
+                    reasonText = `Популярні книги`;
                 }
 
-                // Робимо загальний запит на 40 книг
-                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=40`);
+                // Шукаємо зі зміщенням startIndex
+                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=40&startIndex=${startIndex}`);
                 const data = await res.json();
                 
                 if (!data.items || data.items.length === 0) throw new Error("Немає даних");
 
-                // Фільтруємо лише українську та російську
                 const allowedLangs = ['uk', 'ru'];
                 const filteredItems = data.items.filter(item => {
                     const lang = item.volumeInfo?.language;
