@@ -76,7 +76,9 @@
                 <h1 class="text-3xl font-black tracking-tight text-slate-950">ЧитайКо</h1>
                 <p class="text-slate-500 mt-1 font-medium">Ваша хмарна бібліотека</p>
             </div>
+            
             <div id="authError" class="text-center text-sm text-white bg-red-500 font-medium p-3 rounded-xl mb-4 hidden shadow-sm fade-in"></div>
+            
             <div id="emailAuthBlock" class="space-y-4">
                 <input type="email" id="authEmail" placeholder="Email" class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-medium transition-shadow">
                 <input type="password" id="authPassword" placeholder="Пароль (мін. 6 символів)" class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-medium transition-shadow">
@@ -129,6 +131,7 @@
                 <button onclick="setRecTab('триллер')" id="rtab_триллер" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">🔪 Трилер</button>
                 <button onclick="setRecTab('мистика')" id="rtab_мистика" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">🧟 Жахи / Містика</button>
             </div>
+            
             <div id="recommendationsList" class="space-y-4 overflow-y-auto pb-24 flex-1"></div>
         </div>
     </div>
@@ -252,9 +255,9 @@
         let tempSelectedBook = null; 
         let currentLibraryTab = 'reading'; 
         let viewMode = localStorage.getItem('viewMode') || 'list'; 
-        let currentRecTab = 'auto';
+        let currentRecTab = 'auto'; 
         
-        // ГЛОБАЛЬНІ МАСИВИ ДЛЯ УНИКНЕННЯ ПОЛОМОК HTML
+        // ГЛОБАЛЬНІ МАСИВИ ДЛЯ БЕЗПЕЧНОГО РЕНДЕРИНГУ БЕЗ ПОЛОМОК HTML
         window.tempSearchBooks = [];
         window.tempRecBooks = [];
         
@@ -262,6 +265,17 @@
         let readerTheme = localStorage.getItem('readerTheme') || 'light';
         let readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
+
+        // БЕЗПЕЧНА ФУНКЦІЯ ЕКРАНУВАННЯ ТЕКСТУ
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
 
         // СВАЙП ВНИЗ ДЛЯ ЗАКРИТТЯ КАРТКИ КНИГИ
         let touchStartY = 0;
@@ -355,7 +369,6 @@
             const originalHtml = btn.innerHTML; 
             btn.innerText = "З'єднання з Google...";
             const provider = new firebase.auth.GoogleAuthProvider();
-            
             try { await auth.signInWithPopup(provider); } 
             catch (error) { 
                 if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
@@ -391,6 +404,7 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
+        // ВИДАЛЕННЯ З БУДЬ-ЯКОГО МІСЦЯ
         function deleteBookFromDetails(id) {
             if(confirm("Ви впевнені, що хочете видалити цю книгу?")) {
                 db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete();
@@ -399,7 +413,7 @@
         }
         function deleteBook(id, event) { event.stopPropagation(); deleteBookFromDetails(id); }
 
-        // ГЛОБАЛЬНИЙ ПОШУК (БЕЗПЕЧНИЙ)
+        // БЕЗПЕЧНИЙ ПОШУК (Через DOM)
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 3) { searchItems.innerHTML = ''; return; }
@@ -431,7 +445,7 @@
                         
                         const div = document.createElement('div');
                         div.className = "p-3 mx-2 my-1 hover:bg-slate-100 rounded-2xl cursor-pointer flex items-center gap-4 active:bg-slate-200 fade-in";
-                        div.innerHTML = `<img src="${book.image}" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-2"><div class="font-bold text-slate-900 truncate">${book.title}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${book.author}</div></div>`;
+                        div.innerHTML = `<img src="${book.image}" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-2"><div class="font-bold text-slate-900 truncate">${escapeHtml(book.title)}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${escapeHtml(book.author)}</div></div>`;
                         div.onclick = () => showBookDetails(window.tempSearchBooks[i], true); 
                         searchItems.appendChild(div);
                     });
@@ -446,13 +460,13 @@
             openSheet('detailsSheet');
         }
 
-        // БЕЗПЕЧНИЙ ВИКЛИК ПО ID
+        // БЕЗПЕЧНИЙ ВИКЛИК ДЕТАЛЕЙ З ПОЛИЦІ ЧИ СПИСКУ
         function showBookDetailsById(id) {
             const book = myLibrary.find(b => b.id === id);
             if (book) showBookDetails(book, false);
         }
 
-        // КАРТКА КНИГИ
+        // БЕЗПЕЧНА КАРТКА КНИГИ З ВЕЛИКИМ ОПИСОМ ТА ВЕЛИКОЮ КНОПКОЮ ВИДАЛЕННЯ
         function showBookDetails(bookData, isNewFromSearch = false) {
             const libBook = myLibrary.find(b => (b.googleId && b.googleId === bookData.googleId) || b.id === bookData.id) || bookData;
             tempSelectedBook = isNewFromSearch ? bookData : null;
@@ -463,8 +477,8 @@
                     <div class="flex gap-4 w-full">
                         <img src="${libBook.image || PLACEHOLDER_IMG}" class="w-28 h-40 object-cover rounded-xl shadow-md border border-slate-100 flex-shrink-0">
                         <div class="flex flex-col justify-center min-w-0 flex-1 pr-8">
-                            <h3 class="text-lg font-bold text-slate-900 leading-tight mb-1 break-words">${libBook.title}</h3>
-                            <p class="text-sm font-medium text-slate-500 mb-3 truncate">${libBook.author}</p>
+                            <h3 class="text-lg font-bold text-slate-900 leading-tight mb-1 break-words">${escapeHtml(libBook.title)}</h3>
+                            <p class="text-sm font-medium text-slate-500 mb-3 truncate">${escapeHtml(libBook.author)}</p>
                             <span class="px-2.5 py-1 w-fit rounded-md bg-slate-100 text-[11px] font-semibold text-slate-600 mb-3">📄 ${libBook.pagesTotal} стор.</span>
                             
                             ${!isNewFromSearch ? `
@@ -514,10 +528,10 @@
                 
                 <div class="mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 fade-in">
                     <h4 class="text-xs font-bold uppercase text-slate-500 mb-2 flex justify-between items-center">Нотатки <button onclick="saveReview('${libBook.id}')" class="text-indigo-600 bg-indigo-100 px-3 py-1.5 rounded-lg text-[10px] font-bold active:scale-95 transition-transform">Зберегти</button></h4>
-                    <textarea id="reviewText_${libBook.id}" class="w-full bg-transparent text-sm text-slate-700 outline-none resize-none min-h-[60px]">${libBook.review || ''}</textarea>
+                    <textarea id="reviewText_${libBook.id}" class="w-full bg-transparent text-sm text-slate-700 outline-none resize-none min-h-[60px]">${escapeHtml(libBook.review)}</textarea>
                 </div>`;
             }
-            html += `<div class="desc-scroll fade-in pb-10"><h4 class="text-xs font-bold uppercase text-slate-400 mb-2">Анотація</h4><p class="text-sm text-slate-700 leading-relaxed text-justify">${libBook.description || 'Немає опису.'}</p></div>`;
+            html += `<div class="desc-scroll fade-in pb-10"><h4 class="text-xs font-bold uppercase text-slate-400 mb-2">Анотація</h4><p class="text-sm text-slate-700 leading-relaxed text-justify">${escapeHtml(libBook.description) || 'Немає опису.'}</p></div>`;
             
             document.getElementById('detailsContent').innerHTML = html;
             if (isNewFromSearch) document.getElementById('statusButtons').classList.remove('hidden'); else document.getElementById('statusButtons').classList.add('hidden');
@@ -689,19 +703,21 @@
             render(); 
         }
 
-        // БЕЗПЕЧНИЙ РЕНДЕРИНГ КАРТКИ (БЕЗ JSON)
+        // БЕЗПЕЧНИЙ РЕНДЕРИНГ БЕЗ JSON.stringify
         function renderBookCard(book) {
             const percent = Math.round((book.pagesRead / book.pagesTotal) * 100) || 0;
             const isFinished = book.status === 'finished'; const isPlanned = book.status === 'planned'; const isReading = book.status === 'reading';
 
             if (viewMode === 'grid') {
                 return `
-                <div onclick="showBookDetailsById('${book.id}')" class="flex flex-col items-center cursor-pointer fade-in active:scale-[0.98] transition-transform ${isFinished ? 'opacity-80' : ''}">
+                <div onclick="showBookDetailsById('${book.id}')" class="flex flex-col items-center cursor-pointer fade-in active:scale-[0.98] transition-transform ${isFinished ? 'opacity-80' : ''} relative">
                     <div class="relative w-full aspect-[2/3]">
                         <img src="${book.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-full h-full rounded-xl shadow-md object-cover border border-slate-200">
                         ${isFinished && book.rating ? `<div class="absolute -bottom-2 -right-2 bg-white text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-sm border border-slate-100">★${book.rating}</div>` : ''}
+                        
+                        <button onclick="deleteBook('${book.id}', event)" class="absolute top-1.5 right-1.5 bg-red-500/90 text-white rounded-md size-6 flex items-center justify-center text-xs shadow-sm backdrop-blur-md active:scale-90 transition-transform">✕</button>
                     </div>
-                    <h3 class="font-bold text-slate-900 text-[11px] leading-tight mt-2 w-full text-center truncate px-1">${book.title}</h3>
+                    <h3 class="font-bold text-slate-900 text-[11px] leading-tight mt-2 w-full text-center truncate px-1">${escapeHtml(book.title)}</h3>
                 </div>`;
             }
 
@@ -710,7 +726,7 @@
                 <img src="${book.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-16 h-24 rounded-xl shadow-sm object-cover flex-shrink-0 border border-slate-100">
                 <div class="flex-1 min-w-0">
                     <div class="flex justify-between items-start gap-2">
-                        <div class="min-w-0"><h3 class="font-bold text-slate-900 text-[15px] leading-snug truncate">${book.title}</h3><p class="text-[13px] text-slate-500 mt-0.5 truncate">${book.author}</p></div>
+                        <div class="min-w-0"><h3 class="font-bold text-slate-900 text-[15px] leading-snug truncate">${escapeHtml(book.title)}</h3><p class="text-[13px] text-slate-500 mt-0.5 truncate">${escapeHtml(book.author)}</p></div>
                         <button onclick="deleteBook('${book.id}', event)" class="text-slate-300 hover:text-red-500 flex-shrink-0 transition-colors">✕</button>
                     </div>
 
@@ -822,9 +838,8 @@
             loadRealRecommendations();
         }
 
-        // РЕКОМЕНДАЦІЇ: МАСОВИЙ ПАРАЛЕЛЬНИЙ ПОШУК
-        async function fetchGoogleBooks(query, lang) {
-            const startIndex = Math.floor(Math.random() * 2) * 40; 
+        // РЕКОМЕНДАЦІЇ: МАСОВИЙ ПАРАЛЕЛЬНИЙ ПОШУК (БЕЗПЕЧНИЙ РЕНДЕРИНГ)
+        async function fetchGoogleBooks(query, lang, startIndex) {
             const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&langRestrict=${lang}&printType=books&orderBy=relevance&startIndex=${startIndex}`;
             try {
                 const res = await fetch(url);
@@ -835,7 +850,7 @@
 
         async function loadRealRecommendations() {
             const list = document.getElementById('recommendationsList');
-            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Шукаємо десятки найкращих книг... 🧠 Зачекайте пару секунд.</div>`;
+            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Аналізуємо масив книг... 🧠 Зачекайте пару секунд.</div>`;
 
             let queries = [];
             let reasonText = '';
@@ -867,11 +882,13 @@
                 if(sorted.length === 0) sorted = ['фэнтези', 'детектив'];
                 
                 const top3 = sorted.slice(0, 3);
-                queries = top3.map(g => `subject:"${g}"`);
+                const banList = "-учебник -словарь -наука -вестник -проблема -журнал -диссертация -комикс -манга -стихи -пособие -право -підручник -словник -вісник";
+                queries = top3.map(g => `${g} художественная книга ${banList}`);
                 reasonText = `Мікс ваших улюблених жанрів: <b style="text-transform: capitalize;">${top3.join(', ')}</b>`;
                 
             } else {
-                queries = [`subject:"${currentRecTab}"`];
+                const banList = "-учебник -словарь -наука -вестник -проблема -журнал -диссертация -комикс -манга -стихи -пособие -право -підручник -словник -вісник";
+                queries = [`${currentRecTab} художественная книга ${banList}`];
                 reasonText = `Найкраще у жанрі: <b style="text-transform: capitalize;">${currentRecTab}</b>`;
             }
 
@@ -880,8 +897,9 @@
                 const fetchPromises = [];
                 
                 for (let q of queries) {
-                    fetchPromises.push(fetchGoogleBooks(q, 'uk'));
-                    fetchPromises.push(fetchGoogleBooks(q, 'ru'));
+                    fetchPromises.push(fetchGoogleBooks(q, 'uk', 0));
+                    fetchPromises.push(fetchGoogleBooks(q, 'ru', 0));
+                    fetchPromises.push(fetchGoogleBooks(q, 'ru', 40));
                 }
                 
                 const resultsArray = await Promise.all(fetchPromises);
@@ -927,9 +945,9 @@
                     <div onclick="showBookDetails(window.tempRecBooks[${index}], true)" class="bg-white p-4 rounded-xl flex gap-3 items-start border border-slate-100 cursor-pointer shadow-sm mb-3 fade-in active:scale-[0.98] transition-transform">
                         <img src="${book.image}" class="w-16 h-24 rounded shadow-sm object-cover flex-shrink-0">
                         <div class="flex-1 min-w-0">
-                            <div class="font-bold text-sm text-slate-900 leading-tight">${book.title}</div>
-                            <div class="text-xs text-slate-500 mt-0.5">${book.author}</div>
-                            <div class="text-[10px] text-slate-400 mt-1.5 line-clamp-2 leading-snug">${book.description}</div>
+                            <div class="font-bold text-sm text-slate-900 leading-tight">${escapeHtml(book.title)}</div>
+                            <div class="text-xs text-slate-500 mt-0.5">${escapeHtml(book.author)}</div>
+                            <div class="text-[10px] text-slate-400 mt-1.5 line-clamp-2 leading-snug">${escapeHtml(book.description)}</div>
                         </div>
                         <button class="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg text-xs font-bold shrink-0 mt-2 pointer-events-none">➕</button>
                     </div>`;
