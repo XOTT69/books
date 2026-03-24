@@ -96,14 +96,12 @@
                 <button onclick="setLibraryTab('planned')" id="tab_planned" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Хочу прочитати</button>
                 <button onclick="setLibraryTab('finished')" id="tab_finished" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Прочитано</button>
             </div>
-            
             <div class="flex justify-end mb-2 fade-in">
                 <div class="bg-slate-200/60 p-1 rounded-xl flex gap-1 items-center">
                     <button onclick="setViewMode('list')" id="view_list" class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-900 bg-white shadow-sm transition-all">☰ Списком</button>
                     <button onclick="setViewMode('grid')" id="view_grid" class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-all">⊞ Полицями</button>
                 </div>
             </div>
-
             <div id="myBooksContainer" class="pb-8"></div>
         </div>
         
@@ -186,7 +184,7 @@
     </div>
 
     <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="max-height: 92vh;">
-        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab active:cursor-grabbing" onclick="closeDetailsSheet()"><div class="w-12 h-1.5 bg-slate-200 rounded-full pointer-events-none"></div></div>
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab active:cursor-grabbing"><div class="w-12 h-1.5 bg-slate-200 rounded-full pointer-events-none"></div></div>
         <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
         <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-4 fade-in">
             <h3 class="text-xl font-bold mb-4">Редагувати книгу</h3>
@@ -300,18 +298,18 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // Нова фішка: Пошук за Автором
+        // ВИПРАВЛЕНО: Пошук по автору без глюків
         function searchAuthorBooks(authorName) {
-            closeDetailsSheet();
+            closeAllSheets(); // Гарантовано закриваємо все
             setTimeout(() => {
                 const input = document.getElementById('searchInput');
-                input.value = `inauthor:"${authorName}"`;
+                input.value = authorName; // Шукаємо просто за ім'ям, бо inauthor часто глючить з кирилицею
                 openSheet('searchSheet');
-                input.dispatchEvent(new Event('input')); // запускаємо пошук
-            }, 350);
+                input.dispatchEvent(new Event('input'));
+            }, 400); // Чекаємо трохи довше, поки закриється перша шторка
         }
 
-        // Пошук з блоком помилок і без обмеження на обкладинки
+        // ВИПРАВЛЕНО: Пошук без обов'язкової обкладинки і без англійських
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 2) { searchItems.innerHTML = ''; return; }
@@ -323,14 +321,26 @@
                     const data = await res.json(); searchItems.innerHTML = '';
                     if (!data.items || data.items.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    // ПРИБРАВ фільтр на обов'язкову обкладинку! Тепер знайде "Дюну"!
-                    const filteredItems = data.items.filter(item => item.volumeInfo && item.volumeInfo.title).slice(0, 40);
-                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг за цим запитом.</div>';
+                    const filteredItems = data.items.filter(item => {
+                        const b = item.volumeInfo;
+                        if (!b || !b.title) return false;
+                        
+                        // Відсікаємо книги з англійською мовою
+                        if (b.language === 'en') return false;
+                        
+                        // Якщо в назві більше половини літер - англійські, відсікаємо
+                        const engMatch = b.title.match(/[a-zA-Z]/g);
+                        if (engMatch && engMatch.length > b.title.length / 2) return false;
+
+                        return true; // Дозволяємо книги НАВІТЬ БЕЗ ОБКЛАДИНКИ!
+                    }).slice(0, 30);
+
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг за цим запитом (або вони англомовні).</div>';
 
                     filteredItems.forEach(item => {
                         const b = item.volumeInfo, div = document.createElement('div');
-                        const safeImage = (b.imageLinks?.thumbnail || '').replace(/^http:\/\//i, 'https://');
-                        const book = { googleId: item.id, title: b.title || '', author: b.authors ? b.authors[0] : 'Автор невідомий', pagesTotal: b.pageCount || 300, image: safeImage || PLACEHOLDER_IMG, description: b.description || 'Анотація відсутня.', genre: b.categories ? b.categories[0] : '' };
+                        const safeImage = (b.imageLinks?.thumbnail || PLACEHOLDER_IMG).replace(/^http:\/\//i, 'https://');
+                        const book = { googleId: item.id, title: b.title || '', author: b.authors ? b.authors[0] : 'Автор невідомий', pagesTotal: b.pageCount || 300, image: safeImage, description: b.description || 'Анотація відсутня.', genre: b.categories ? b.categories[0] : '' };
                         div.className = "p-3 mx-2 my-1 hover:bg-slate-100 rounded-2xl cursor-pointer flex items-center gap-4 active:bg-slate-200 fade-in";
                         div.innerHTML = `<img src="${book.image}" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-2"><div class="font-bold text-slate-900 truncate">${book.title}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${book.author}</div></div>`;
                         div.onclick = () => showBookDetails(book, true); searchItems.appendChild(div);
@@ -562,7 +572,6 @@
 
             try {
                 let fetchPromises = [];
-                // Робимо 3 запити по 40 = до 120 книг!
                 queries.forEach(q => { 
                     const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40`;
                     fetchPromises.push(fetch(url + '&startIndex=0').then(r => r.ok ? r.json() : {items: []})); 
