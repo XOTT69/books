@@ -407,19 +407,18 @@
 
             timeoutId = setTimeout(async () => {
                 try {
-                    // Використовуємо orderBy=relevance для кращого пошуку
-                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&printType=books&orderBy=relevance`);
+                    // Видалив &orderBy=relevance і мовні фільтри, щоб Google сам видав найточніший збіг.
+                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&printType=books`);
                     const data = await res.json(); searchItems.innerHTML = '';
                     if (!data.items) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    // Дозволяємо uk, ru, а також bg (болгарська часто плутається) і книги без мови (un)
-                    const allowedLangs = ['uk', 'ru', 'bg', 'un'];
+                    // Жодних жорстких фільтрів мови чи розміру опису для ручного пошуку!
                     const filteredItems = data.items.filter(item => {
-                        const lang = item.volumeInfo?.language;
-                        return !lang || allowedLangs.includes(lang);
-                    }).slice(0, 30); // Показуємо до 30 результатів
+                        const b = item.volumeInfo;
+                        return b.title && b.imageLinks?.thumbnail; 
+                    }).slice(0, 30);
 
-                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг за цим запитом. Спробуйте іншу мову.</div>';
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг за цим запитом.</div>';
 
                     filteredItems.forEach(item => {
                         const b = item.volumeInfo, div = document.createElement('div');
@@ -799,6 +798,16 @@
             }
         }
 
+        // КУРАТОРСЬКІ СПИСКИ ТОПОВИХ КНИГ ТА АВТОРІВ
+        const curatedCategories = {
+            'Фентезі': ['"фентезі" бестселер', '"фэнтези" бестселлер', 'Джон Толкин', 'Джордж Мартин', 'Анджей Сапковский', 'Терри Пратчетт', 'Робин Хобб'],
+            'Детектив': ['"детектив" бестселер', '"детектив" бестселлер', 'Агата Кристи', 'Артур Конан Дойл', 'Ю Несбё', 'Жан-Кристоф Гранже', 'Стиг Ларссон'],
+            'Трилер': ['"трилер" бестселер', '"триллер" бестселлер', 'Стивен Кинг', 'Джиллиан Флинн', 'Томас Харрис', 'Дэн Браун', 'Джон Маррс'],
+            'Романтика': ['"любовний роман" бестселер', '"любовный роман" бестселлер', 'Николас Спаркс', 'Джоджо Мойес', 'Колин Гувер', 'Джейн Остин', 'Эмили Бронте'],
+            'Саморозвиток': ['"саморозвиток" бестселер', '"саморазвитие" бестселлер', 'Роберт Кийосаки', 'Марк Мэнсон', 'Джо Диспенза', 'Джеймс Клир'],
+            'Фантастика': ['"наукова фантастика" бестселер', '"научная фантастика" бестселлер', 'Фрэнк Герберт Дюна', 'Айзек Азимов', 'Рэй Брэдбери', 'Джордж Оруэлл', 'Энди Вейер']
+        };
+
         async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
             const list = document.getElementById('recommendationsList');
             list.innerHTML = `<div class="p-8 flex flex-col items-center justify-center text-slate-400 text-sm fade-in animate-pulse"><span class="text-3xl mb-3">🔍</span>Шукаємо круті книги...</div>`;
@@ -809,28 +818,37 @@
             document.getElementById(btnId).className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95';
 
             let queries = [];
+            
             if (category === 'auto') {
-                const genreCounts = {};
-                myLibrary.forEach(b => {
-                    if ((b.status === 'finished' || b.rating >= 4) && b.genre) {
-                        let g = b.genre.toLowerCase().split(',')[0].trim();
-                        if(g.length > 3) genreCounts[g] = (genreCounts[g] || 0) + (b.rating >= 4 ? 2 : 1);
-                    }
-                });
-                let sorted = Object.keys(genreCounts).sort((a,b) => genreCounts[b] - genreCounts[a]).slice(0, 3);
-                if (sorted.length === 0) sorted = ["фентезі", "детектив", "саморозвиток", "трилер"];
-                queries = sorted;
+                // Збираємо авторів, яких користувач вже читав
+                let authors = myLibrary.map(b => b.author).filter(a => a && a.length > 2 && !a.toLowerCase().includes('невідомий') && !a.toLowerCase().includes('автор'));
+                
+                if (authors.length > 0) {
+                    let counts = {};
+                    authors.forEach(a => counts[a] = (counts[a] || 0) + 1);
+                    let topAuthors = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 3);
+                    
+                    // Шукаємо інші книги цих авторів!
+                    queries = topAuthors.map(a => `inauthor:"${a}"`);
+                } else {
+                    queries = ['Стивен Кинг', 'Агата Кристи', '"бестселер"'];
+                }
+                
+                // Додаємо випадковий топ-запит, щоб розбавити
+                const allCurated = Object.values(curatedCategories).flat();
+                queries.push(allCurated[Math.floor(Math.random() * allCurated.length)]);
+                
             } else {
-                queries = [category];
+                // Беремо 3 випадкові топові запити з обраної категорії
+                const listData = curatedCategories[category];
+                queries = listData.sort(() => 0.5 - Math.random()).slice(0, 3);
             }
 
             try {
                 let fetchPromises = [];
-                // Робимо по 2 запити на кожен жанр (startIndex 0 і 40), щоб отримати більше книг
+                // Робимо по 1-2 потужних запити на кожну фразу
                 queries.forEach(q => {
-                    const cleanQ = q.replace(/[^a-zA-Zа-яА-ЯіІїЇєЄґҐ0-9 ]/g, ''); 
-                    fetchPromises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQ)}&maxResults=40&printType=books&startIndex=0&orderBy=relevance`).then(r => r.ok ? r.json() : {items: []}));
-                    fetchPromises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQ)}&maxResults=40&printType=books&startIndex=40&orderBy=relevance`).then(r => r.ok ? r.json() : {items: []}));
+                    fetchPromises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&printType=books`).then(r => r.ok ? r.json() : {items: []}));
                 });
                 
                 const results = await Promise.all(fetchPromises);
@@ -839,30 +857,32 @@
 
                 if (allItems.length === 0) throw new Error("Порожньо");
 
-                const allowedLangs = ['uk', 'ru', 'bg', 'un'];
-                const banWords = ['учебник', 'словарь', 'журнал', 'комикс', 'манга', 'підручник', 'словник', 'вісник', 'сборник', 'збірник', 'посібник', 'пособие', 'том ', 'випуск', 'выпуск'];
+                const banWords = ['учебник', 'словарь', 'журнал', 'комикс', 'манга', 'підручник', 'словник', 'вісник', 'сборник', 'збірник', 'посібник', 'пособие', 'том ', 'випуск', 'выпуск', 'зошит', 'тетрадь', 'хрестоматия'];
                 const existingTitles = new Set(myLibrary.map(b => b.title.trim().toLowerCase()));
 
                 const filtered = allItems.filter(item => {
                     const b = item.volumeInfo;
-                    const lang = b.language;
-                    
-                    if (lang && !allowedLangs.includes(lang)) return false;
-                    if (!b.description || b.description.length < 50) return false;
+                    if (!b.description || b.description.length < 20) return false;
                     if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
                     
                     const tLower = (b.title || '').toLowerCase();
-                    // Відсіюємо шлак вже на рівні JavaScript
+                    // Блокуємо сміття
                     if (banWords.some(bw => tLower.includes(bw))) return false;
+                    // Блокуємо те, що вже є в бібліотеці
                     if (existingTitles.has(tLower)) return false;
+                    
+                    // Відсіюємо англійські/іноземні, залишаємо укр, рос або якщо мова не вказана
+                    if (b.language && ['en', 'es', 'fr', 'de', 'it', 'pl'].includes(b.language)) return false;
+
                     return true;
                 });
 
+                // Видаляємо дублікати за назвою
                 const uniqueMap = new Map();
                 filtered.forEach(item => uniqueMap.set(item.volumeInfo.title.toLowerCase(), item));
                 let finalBooks = Array.from(uniqueMap.values());
 
-                // Рандомізуємо і виводимо до 80 унікальних книг!
+                // Рандомізуємо та залишаємо до 80 книг
                 finalBooks.sort(() => 0.5 - Math.random());
                 finalBooks = finalBooks.slice(0, 80);
 
