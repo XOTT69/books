@@ -122,9 +122,18 @@
             <div id="myBooksContainer" class="pb-8"></div>
         </div>
         
-        <div id="recommendationsScreen" class="hidden space-y-4 mt-2">
-            <h2 class="text-xs font-bold uppercase text-slate-400 mb-4 ml-1 tracking-wide">Смарт-рекомендації для вас</h2>
-            <div id="recommendationsList" class="space-y-4"></div>
+        <div id="recommendationsScreen" class="hidden flex-col h-full mt-2 fade-in">
+            <h2 class="text-xs font-bold uppercase text-slate-400 mb-3 ml-1 tracking-wide">Категорії</h2>
+            <div class="flex gap-2 overflow-x-auto pb-3 mb-2 scrollbar-hide px-1" id="recTabs">
+                <button onclick="loadRealRecommendations('auto', 'rec_auto')" id="rec_auto" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95">✨ Для вас</button>
+                <button onclick="loadRealRecommendations('Фентезі', 'rec_fantasy')" id="rec_fantasy" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фентезі</button>
+                <button onclick="loadRealRecommendations('Детектив', 'rec_detective')" id="rec_detective" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Детектив</button>
+                <button onclick="loadRealRecommendations('Трилер', 'rec_thriller')" id="rec_thriller" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Трилер</button>
+                <button onclick="loadRealRecommendations('Романтика', 'rec_romance')" id="rec_romance" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Романтика</button>
+                <button onclick="loadRealRecommendations('Саморозвиток', 'rec_self')" id="rec_self" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Саморозвиток</button>
+                <button onclick="loadRealRecommendations('Фантастика', 'rec_scifi')" id="rec_scifi" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фантастика</button>
+            </div>
+            <div id="recommendationsList" class="space-y-4 pb-24 mt-2"></div>
         </div>
     </div>
 
@@ -140,7 +149,7 @@
     </nav>
 
     <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6">
-        <div class="w-full flex justify-center pb-4" onclick="closeAllSheets()"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+        <div class="drag-handle w-full flex justify-center pb-6 touch-none" onclick="closeAllSheets()"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <h2 class="text-2xl font-bold mb-6">Налаштування</h2>
         <div class="space-y-4">
             <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors">
@@ -188,8 +197,8 @@
     </div>
 
     <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="height: 85vh;">
-        <div class="w-full flex justify-center pt-3 pb-1" onclick="closeAllSheets()"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
-        <div class="px-5 pb-4 pt-2 shrink-0">
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none" onclick="closeAllSheets()"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+        <div class="px-5 pb-4 shrink-0">
             <h2 class="text-xl font-bold mb-4">Знайти книгу</h2>
             <div class="relative">
                 <span class="absolute left-4 top-3.5 size-5 text-slate-400">🔍</span>
@@ -203,9 +212,9 @@
     </div>
 
     <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="max-height: 92vh;">
-        <div class="w-full flex justify-center pt-3 pb-1" onclick="closeDetailsSheet()"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab active:cursor-grabbing" onclick="closeDetailsSheet()"><div class="w-12 h-1.5 bg-slate-200 rounded-full pointer-events-none"></div></div>
         
-        <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-2"></div>
+        <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
         
         <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-4 fade-in">
             <h3 class="text-xl font-bold mb-4">Редагувати книгу</h3>
@@ -251,6 +260,35 @@
         let readerTheme = localStorage.getItem('readerTheme') || 'light';
         let readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
+
+        // Ініціалізація свайпів для закриття шторок
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.bottom-sheet').forEach(sheet => {
+                const handle = sheet.querySelector('.drag-handle');
+                if (!handle) return;
+                
+                let startY = 0, currentY = 0;
+                handle.addEventListener('touchstart', e => { 
+                    startY = e.touches[0].clientY; 
+                    sheet.style.transition = 'none'; 
+                }, {passive: true});
+                
+                handle.addEventListener('touchmove', e => {
+                    currentY = e.touches[0].clientY;
+                    const deltaY = currentY - startY;
+                    if (deltaY > 0) sheet.style.transform = `translateY(${deltaY}px)`;
+                }, {passive: true});
+                
+                handle.addEventListener('touchend', e => {
+                    sheet.style.transition = 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)';
+                    if (currentY - startY > 70) {
+                        if (sheet.id === 'detailsSheet') closeDetailsSheet();
+                        else closeAllSheets();
+                    }
+                    sheet.style.transform = ''; 
+                });
+            });
+        });
 
         function clearAppCache() {
             if ('caches' in window) {
@@ -328,10 +366,7 @@
             const originalHtml = btn.innerHTML; 
             btn.innerText = "З'єднання з Google...";
             const provider = new firebase.auth.GoogleAuthProvider();
-            
-            try { 
-                await auth.signInWithPopup(provider); 
-            } 
+            try { await auth.signInWithPopup(provider); } 
             catch (error) { 
                 if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
                     btn.innerText = "Перенаправлення...";
@@ -412,7 +447,7 @@
             toggleEditMode(false);
 
             let html = `
-                <div class="flex justify-between items-start mb-4 fade-in">
+                <div class="flex justify-between items-start mb-4 fade-in mt-1">
                     <div class="flex gap-5 w-full">
                         <img src="${libBook.image || PLACEHOLDER_IMG}" class="w-28 h-40 object-cover rounded-xl shadow-md border border-slate-100 flex-shrink-0">
                         <div class="flex flex-col justify-center min-w-0 flex-1">
@@ -463,9 +498,26 @@
             }
             html += `<div class="desc-scroll fade-in"><h4 class="text-xs font-bold uppercase text-slate-400 mb-2">Анотація</h4><p class="text-sm text-slate-700 leading-relaxed text-justify">${libBook.description || 'Немає опису.'}</p></div>`;
             
+            // Додаємо кнопку видалення книги внизу деталей
+            if (!isNewFromSearch) {
+                html += `
+                <div class="mt-8 mb-2 flex justify-center fade-in">
+                    <button onclick="deleteBookFromDetails('${libBook.id}')" class="flex items-center gap-2 px-6 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm active:scale-95 transition-all shadow-sm">
+                        🗑️ Видалити книгу з бібліотеки
+                    </button>
+                </div>`;
+            }
+
             document.getElementById('detailsContent').innerHTML = html;
             if (isNewFromSearch) document.getElementById('statusButtons').classList.remove('hidden'); else document.getElementById('statusButtons').classList.add('hidden');
             openSheet('detailsSheet');
+        }
+
+        function deleteBookFromDetails(id) {
+            if(confirm("Ви впевнені, що хочете видалити цю книгу назавжди?")) {
+                db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete();
+                closeAllSheets();
+            }
         }
 
         function setRating(id, rating) {
@@ -492,14 +544,6 @@
         function toggleEditMode(isEditing) {
             if(isEditing) { document.getElementById('detailsContent').classList.add('hidden'); document.getElementById('editContent').classList.remove('hidden'); }
             else { document.getElementById('detailsContent').classList.remove('hidden'); document.getElementById('editContent').classList.add('hidden'); }
-        }
-
-        function startEditing(id) {
-            const book = myLibrary.find(b => b.id === id); tempSelectedBook = book;
-            document.getElementById('editTitle').value = book.title; document.getElementById('editAuthor').value = book.author;
-            document.getElementById('editPages').value = book.pagesTotal; document.getElementById('editImage').value = book.image || '';
-            document.getElementById('statusButtons').classList.add('hidden');
-            toggleEditMode(true);
         }
 
         function saveBookEdits() {
@@ -656,7 +700,7 @@
                 <div class="flex-1 min-w-0">
                     <div class="flex justify-between items-start gap-2">
                         <div class="min-w-0"><h3 class="font-bold text-slate-900 text-[15px] leading-snug truncate">${book.title}</h3><p class="text-[13px] text-slate-500 mt-0.5 truncate">${book.author}</p></div>
-                        <button onclick="deleteBook('${book.id}', event)" class="text-slate-300 hover:text-red-500 flex-shrink-0 transition-colors">✕</button>
+                        <button onclick="deleteBook('${book.id}', event)" class="text-slate-300 hover:text-red-500 flex-shrink-0 transition-colors p-1">✕</button>
                     </div>
 
                     ${isPlanned ? `<button onclick="changeStatus('${book.id}', 'reading', event)" class="w-full mt-4 py-2 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-lg active:scale-95 transition-transform">🚀 Почати читати</button>` : `
@@ -708,7 +752,6 @@
             if (currentLibraryTab === 'reading') { container.innerHTML = `<div class="${wrapperClass}">${reading.map(renderBookCard).join('')}</div>`; }
             else if (currentLibraryTab === 'planned') { container.innerHTML = `<div class="${wrapperClass}">${planned.map(renderBookCard).join('')}</div>`; }
             else if (currentLibraryTab === 'finished') {
-                
                 finished.sort((a, b) => {
                     const dateA = a.dateFinished || '1970-01-01';
                     const dateB = b.dateFinished || '1970-01-01';
@@ -752,133 +795,115 @@
                 const rec = document.getElementById('recommendationsScreen');
                 rec.classList.remove('hidden', 'fade-in'); void rec.offsetWidth; rec.classList.add('fade-in');
                 document.getElementById('librarySections').classList.add('hidden');
-                loadRealRecommendations(); 
+                loadRealRecommendations('auto', 'rec_auto'); 
             }
         }
 
-        // ДВОМОВНІ РЕКОМЕНДАЦІЇ (УКР + РОС)
-        async function loadRealRecommendations() {
+        // НОВА МУЛЬТИ-ЛОГІКА РЕКОМЕНДАЦІЙ
+        async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
             const list = document.getElementById('recommendationsList');
-            
-            if (myLibrary.length === 0) {
-                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Додайте хоча б 1 книгу, щоб ми зрозуміли ваші смаки! ☕</div>`; return;
-            }
+            list.innerHTML = `<div class="p-8 flex flex-col items-center justify-center text-slate-400 text-sm fade-in animate-pulse"><span class="text-3xl mb-3">🔍</span>Шукаємо круті книги...</div>`;
 
-            list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in animate-pulse">Аналізуємо ваші улюблені жанри... 🧠</div>`;
+            // Оновлюємо стилі вкладок
+            document.querySelectorAll('#recTabs button').forEach(btn => {
+                btn.className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95';
+            });
+            document.getElementById(btnId).className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95';
 
-            try {
+            let queries = [];
+            const banList = "-учебник -словарь -журнал -комикс -манга -підручник -словник -вісник";
+
+            if (category === 'auto') {
                 const genreCounts = {};
-                
                 myLibrary.forEach(b => {
-                    if ((b.status === 'finished' || b.rating >= 4) && b.genre && b.genre.length > 3) {
-                        let rawGenre = b.genre.split(',')[0].trim().toLowerCase();
-                        
-                        if (rawGenre.includes('комикс') || rawGenre.includes('манга') || rawGenre.includes('графическ') || rawGenre.includes('учебник')) {
-                            return;
-                        }
-                        
-                        let mainGenre = rawGenre;
-                        
-                        if (rawGenre.includes('романт') || rawGenre.includes('любовн')) mainGenre = 'любовный роман';
-                        else if (rawGenre.includes('академ') && rawGenre.includes('маг')) mainGenre = 'академия магии';
-                        else if (rawGenre.includes('попадан')) mainGenre = 'попаданцы';
-                        else if (rawGenre.includes('фэнтези') || rawGenre.includes('фантаст')) mainGenre = 'фэнтези';
-                        else if (rawGenre.includes('детектив') || rawGenre.includes('триллер')) mainGenre = 'детектив';
-                        else if (rawGenre.includes('мистика') || rawGenre.includes('ужасы')) mainGenre = 'мистика';
-                        else {
-                            mainGenre = rawGenre.replace(/(зарубежн[а-я]+|современн[а-я]+|русск[а-я]+|отечественн[а-я]+|литератур[а-я]*|проза|книги)/g, '').trim();
-                        }
-
-                        if (mainGenre.length > 2) {
-                            let weight = b.rating >= 4 ? 3 : 1; 
-                            genreCounts[mainGenre] = (genreCounts[mainGenre] || 0) + weight; 
+                    if ((b.status === 'finished' || b.rating >= 4) && b.genre) {
+                        let g = b.genre.toLowerCase().split(',')[0].trim();
+                        if(g.length > 3 && !banList.includes(g)) {
+                            genreCounts[g] = (genreCounts[g] || 0) + (b.rating >= 4 ? 2 : 1);
                         }
                     }
                 });
-
-                let sortedGenres = Object.keys(genreCounts).sort((a,b) => genreCounts[b] - genreCounts[a]);
-
-                if (sortedGenres.length === 0) {
-                    sortedGenres = ["фэнтези", "детектив", "любовный роман", "триллер"];
-                }
-
-                const topGenres = sortedGenres.slice(0, 3);
-                const randomGenre = topGenres[Math.floor(Math.random() * topGenres.length)];
-
-                // ВИБИРАЄМО МОВУ ПОШУКУ (50% на 50%)
-                const isUk = Math.random() > 0.5;
-
-                let keywords = randomGenre;
-                if (randomGenre === 'любовный роман') keywords = isUk ? 'любовний роман почуття' : 'любовный роман чувства';
-                else if (randomGenre === 'академия магии') keywords = isUk ? 'академія магії фентезі' : 'академия магии фэнтези';
-                else if (randomGenre === 'попаданцы') keywords = isUk ? 'попаданці фентезі магія' : 'попаданцы фэнтези магия';
-                else if (randomGenre === 'фэнтези') keywords = isUk ? 'фентезі магія пригоди' : 'фэнтези магия приключения';
-                else if (randomGenre === 'детектив') keywords = isUk ? 'детектив розслідування загадка' : 'детектив расследование загадка';
-                else if (randomGenre === 'мистика') keywords = isUk ? 'містика жахи' : 'мистика ужасы';
-                else keywords = randomGenre + (isUk ? " художня книга" : " художественная книга");
-
-                // БАН-ЛИСТ двома мовами
-                const banList = "-учебник -словарь -наука -вестник -проблема -журнал -диссертация -комикс -манга -стихи -пособие -право -підручник -словник -вісник -дисертація -посібник";
+                let sorted = Object.keys(genreCounts).sort((a,b) => genreCounts[b] - genreCounts[a]).slice(0, 3);
                 
-                const searchQuery = `${keywords} ${banList}`;
-                const reasonText = `Найкраще у жанрі: <b style="text-transform: capitalize;">${randomGenre}</b>`;
+                // Якщо бібліотека пуста або без жанрів, даємо дефолтні
+                if (sorted.length === 0) sorted = ["фентезі", "детектив", "саморозвиток", "трилер"];
+                
+                // Створюємо масив запитів
+                sorted.forEach(g => {
+                    queries.push(`${g} ${banList}`);
+                });
+            } else {
+                queries = [`${category} ${banList}`];
+            }
 
-                const startIndex = Math.floor(Math.random() * 4) * 10; 
+            try {
+                // Робимо кілька запитів паралельно, щоб зібрати різні книги
+                const fetchPromises = queries.map(q => 
+                    fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=25&printType=books`)
+                    .then(r => r.ok ? r.json() : {items: []})
+                );
                 
-                const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&maxResults=40&printType=books&startIndex=${startIndex}`);
-                const data = await res.json();
-                
-                if (!data.items || data.items.length === 0) throw new Error("Немає даних");
+                const results = await Promise.all(fetchPromises);
+                let allItems = [];
+                results.forEach(res => {
+                    if (res.items) allItems.push(...res.items);
+                });
+
+                if (allItems.length === 0) throw new Error("Порожньо");
 
                 const allowedLangs = ['uk', 'ru'];
                 const existingTitles = new Set(myLibrary.map(b => b.title.trim().toLowerCase()));
 
-                const filteredItems = data.items.filter(item => {
+                const filtered = allItems.filter(item => {
                     const b = item.volumeInfo;
                     if (!allowedLangs.includes(b.language)) return false;
-                    if (!b.description || b.description.length < 80) return false;
+                    if (!b.description || b.description.length < 50) return false;
                     if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
-                    if (b.pageCount && b.pageCount < 80) return false; 
+                    if (b.pageCount && b.pageCount < 50) return false;
                     
-                    const titleLower = (b.title || '').toLowerCase();
-                    if (titleLower.includes('проблема') || titleLower.includes('вестник') || titleLower.includes('учебник') || titleLower.includes('том ') || titleLower.includes('словарь') || titleLower.includes('комикс') || titleLower.includes('манга') || titleLower.includes('підручник') || titleLower.includes('словник')) return false;
-
-                    if (existingTitles.has(titleLower)) return false;
+                    const tLower = (b.title || '').toLowerCase();
+                    if (tLower.includes('проблема') || tLower.includes('учебник') || tLower.includes('словник') || tLower.includes('комикс')) return false;
+                    if (existingTitles.has(tLower)) return false;
                     return true;
                 });
 
-                let html = `<p class="text-xs text-slate-400 mb-3 fade-in ml-1">${reasonText}</p>`;
-                let addedBooks = 0;
-                
-                const shuffledItems = filteredItems.sort(() => 0.5 - Math.random());
-                
-                for (let item of shuffledItems) {
-                    if (addedBooks >= 6) break; 
-                    
-                    const b = item.volumeInfo;
-                    const safeImage = (b.imageLinks?.thumbnail || '').replace(/^http:\/\//i, 'https://');
-                    const book = { googleId: item.id, title: b.title || '', author: b.authors ? b.authors[0] : 'Невідомий', pagesTotal: b.pageCount || 300, image: safeImage || PLACEHOLDER_IMG, description: b.description || 'Немає опису.', genre: b.categories ? b.categories[0] : '' };
+                // Видаляємо дублікати за назвою
+                const uniqueMap = new Map();
+                filtered.forEach(item => uniqueMap.set(item.volumeInfo.title.toLowerCase(), item));
+                let finalBooks = Array.from(uniqueMap.values());
 
+                // Рандомізуємо та залишаємо 20 штук
+                finalBooks.sort(() => 0.5 - Math.random());
+                finalBooks = finalBooks.slice(0, 20);
+
+                if (finalBooks.length === 0) {
+                     list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm">Не знайшли нових книг 😔 Спробуйте іншу категорію.</div>`;
+                     return;
+                }
+
+                let html = '';
+                finalBooks.forEach(item => {
+                    const b = item.volumeInfo;
+                    const safeImg = (b.imageLinks.thumbnail).replace(/^http:\/\//i, 'https://');
+                    const bookObj = { googleId: item.id, title: b.title, author: b.authors ? b.authors[0] : 'Невідомий', pagesTotal: b.pageCount || 300, image: safeImg, description: b.description, genre: b.categories ? b.categories[0] : '' };
+                    
                     html += `
-                    <div onclick="showBookDetails(${JSON.stringify(book).replace(/"/g, '&quot;')}, true)" class="bg-white p-4 rounded-xl flex gap-3 items-start border border-slate-100 cursor-pointer shadow-sm mb-3 fade-in active:scale-[0.98] transition-transform">
-                        <img src="${book.image}" class="w-16 h-24 rounded shadow-sm object-cover flex-shrink-0">
+                    <div onclick="showBookDetails(${JSON.stringify(bookObj).replace(/"/g, '&quot;')}, true)" class="bg-white p-4 rounded-xl flex gap-3 items-start border border-slate-100 cursor-pointer shadow-sm mb-3 fade-in active:scale-[0.98] transition-transform">
+                        <img src="${bookObj.image}" class="w-16 h-24 rounded shadow-sm object-cover flex-shrink-0">
                         <div class="flex-1 min-w-0">
-                            <div class="font-bold text-sm text-slate-900 leading-tight">${book.title}</div>
-                            <div class="text-xs text-slate-500 mt-0.5">${book.author}</div>
-                            <div class="text-[10px] text-slate-400 mt-1.5 line-clamp-2 leading-snug">${book.description}</div>
+                            <div class="font-bold text-sm text-slate-900 leading-tight">${bookObj.title}</div>
+                            <div class="text-xs text-slate-500 mt-0.5">${bookObj.author}</div>
+                            <div class="text-[10px] text-slate-400 mt-1.5 line-clamp-2 leading-snug">${bookObj.description}</div>
                         </div>
                         <button class="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg text-xs font-bold shrink-0 mt-2 pointer-events-none">➕</button>
                     </div>`;
-                    addedBooks++;
-                }
-                
-                if (addedBooks === 0) {
-                    html += `<div class="p-8 text-center text-slate-400 text-sm">Шукаємо найкраще... Перемкніть вкладку туди-сюди для нового пошуку!</div>`;
-                }
-                
+                });
+
                 list.innerHTML = html;
-            } catch (e) {
-                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm fade-in">Шукаємо нові рекомендації... Спробуйте ще раз.</div>`;
+
+            } catch(e) {
+                console.error(e);
+                list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm">Помилка пошуку. Перевірте інтернет або спробуйте пізніше.</div>`;
             }
         }
 
