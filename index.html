@@ -4,21 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ЧитайКо — Хмарний Трекер</title>
+    
     <link rel="icon" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
     <style>
         body { -webkit-tap-highlight-color: transparent; transition: background-color 0.3s, color 0.3s; }
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
         body.dark { background-color: #0f172a; color: #f8fafc; }
         body.dark .bg-white { background-color: #1e293b; border-color: #334155; }
         body.dark .text-slate-900 { color: #f8fafc; }
@@ -26,6 +33,7 @@
         body.dark .bg-slate-50, body.dark .bg-slate-100 { background-color: #0f172a; }
         body.dark .border-slate-100, body.dark .border-slate-200 { border-color: #334155; }
         body.dark .dark-inactive-tab { background-color: #334155 !important; color: #94a3b8 !important; }
+
         .fade-in { animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
         @keyframes fadeIn { 0% { opacity: 0; transform: translateY(5px); } 100% { opacity: 1; transform: translateY(0); } }
         .bottom-sheet { transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1); }
@@ -35,6 +43,7 @@
         .progress-bar { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
         .desc-scroll { max-height: 25vh; overflow-y: auto; overscroll-behavior: contain; }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
         #readerOverlay { display: none; position: fixed; inset: 0; z-index: 200; background: #f8fafc; flex-direction: column; }
         body.dark #readerOverlay { background: #0f172a; }
         #viewer { flex: 1; width: 100%; height: 100%; overflow: hidden; }
@@ -43,6 +52,7 @@
         .nav-btn { background: #f1f5f9; padding: 12px 20px; border-radius: 12px; font-weight: bold; color: #475569; transition: transform 0.1s; }
         body.dark .nav-btn { background: #334155; color: #f8fafc; }
         .nav-btn:active { transform: scale(0.95); }
+
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; z-index: 30; border-top: 1px solid #f1f5f9; box-shadow: 0 -2px 10px rgba(0,0,0,0.02); }
         body.dark .bottom-nav { background: #1e293b; border-color: #334155; }
         .nav-item { flex: 1; text-align: center; color: #94a3b8; font-weight: bold; padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: color 0.2s; cursor: pointer; background: transparent; border: none; }
@@ -51,18 +61,23 @@
         body.dark .nav-item.active { color: #818cf8; }
         .nav-icon { font-size: 20px; margin-bottom: 3px; display: block; transition: transform 0.2s; }
         .nav-item:active .nav-icon { transform: scale(0.85); }
-        .date-input { border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; font-size: 11px; background: #fff; color: #334155; outline: none; transition: border-color 0.2s; }
-        .date-input:focus { border-color: #4f46e5; }
-        body.dark .date-input { background: #0f172a; border-color: #334155; color: #f8fafc; }
-        body.dark .date-input:focus { border-color: #818cf8; }
+        
+        .sortable-ghost { opacity: 0.4; transform: scale(0.95); }
+        .sortable-drag { cursor: grabbing !important; }
     </style>
 </head>
 <body class="bg-[#f5f5f7] font-sans pb-32 text-slate-900 antialiased selection:bg-indigo-100">
 
     <div id="authScreen" class="fixed inset-0 z-[100] bg-[#f5f5f7] flex items-center justify-center p-6 overflow-y-auto fade-in">
         <div class="w-full max-w-sm bg-white p-8 rounded-3xl shadow-xl border border-slate-100 my-auto">
-            <div class="text-center mb-6"><span class="text-6xl mb-4 block">📚</span><h1 class="text-3xl font-black tracking-tight text-slate-950">ЧитайКо</h1><p class="text-slate-500 mt-1 font-medium">Ваша хмарна бібліотека</p></div>
+            <div class="text-center mb-6">
+                <span class="text-6xl mb-4 block">📚</span>
+                <h1 class="text-3xl font-black tracking-tight text-slate-950">ЧитайКо</h1>
+                <p class="text-slate-500 mt-1 font-medium">Ваша хмарна бібліотека</p>
+            </div>
+            
             <div id="authError" class="text-center text-sm text-white bg-red-500 font-medium p-3 rounded-xl mb-4 hidden shadow-sm fade-in"></div>
+            
             <div id="emailAuthBlock" class="space-y-4">
                 <input type="email" id="authEmail" placeholder="Email" class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-medium transition-shadow">
                 <input type="password" id="authPassword" placeholder="Пароль (мін. 6 символів)" class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-medium transition-shadow">
@@ -82,8 +97,11 @@
 
     <div id="appScreen" class="max-w-xl mx-auto p-4 md:p-6 pt-8 hidden">
         <header class="mb-4 flex justify-between items-start fade-in">
-            <div><h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1><p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1"></p></div>
-            <button onclick="openSheet('settingsSheet')" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl hover:bg-slate-50 active:scale-95 transition-all">⚙️</button>
+            <div>
+                <h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1>
+                <p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1"></p>
+            </div>
+            <button onclick="openSheet('settingsSheet'); calculateStats();" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl hover:bg-slate-50 active:scale-95 transition-all">⚙️</button>
         </header>
         
         <div id="librarySections" class="space-y-2 fade-in">
@@ -107,6 +125,7 @@
             <h2 class="text-xs font-bold uppercase text-slate-400 mb-3 ml-1 tracking-wide">Категорії</h2>
             <div class="flex gap-2 overflow-x-auto pb-3 mb-2 scrollbar-hide px-1" id="recTabs">
                 <button onclick="loadRealRecommendations('auto', 'rec_auto')" id="rec_auto" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95">✨ Для вас</button>
+                <button onclick="loadRealRecommendations('Академія магії', 'rec_magic')" id="rec_magic" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">🔮 Академія магії</button>
                 <button onclick="loadRealRecommendations('Фентезі', 'rec_fantasy')" id="rec_fantasy" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фентезі</button>
                 <button onclick="loadRealRecommendations('Детектив', 'rec_detective')" id="rec_detective" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Детектив</button>
                 <button onclick="loadRealRecommendations('Трилер', 'rec_thriller')" id="rec_thriller" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Трилер</button>
@@ -119,6 +138,7 @@
     </div>
 
     <button id="searchFab" onclick="openSheet('searchSheet')" class="fixed bottom-24 right-6 z-40 size-14 bg-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-300 flex items-center justify-center text-2xl hover:scale-105 active:scale-95 transition-transform duration-200 hidden">➕</button>
+
     <div class="backdrop fixed inset-0 z-40 bg-black/50 backdrop-blur-sm hidden" onclick="closeAllSheets()"></div>
 
     <nav id="mainBottomNav" class="bottom-nav hidden fade-in">
@@ -128,16 +148,30 @@
         </div>
     </nav>
 
-    <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6">
-        <div class="drag-handle w-full flex justify-center pb-6 touch-none" onclick="closeAllSheets()"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
-        <h2 class="text-2xl font-bold mb-6">Налаштування</h2>
-        <div class="space-y-4">
+    <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 90vh; overflow-y: auto;">
+        <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+        <h2 class="text-2xl font-bold mb-4">Налаштування</h2>
+        
+        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-4">
+            <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400 mb-3">📊 Моя статистика</h3>
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-sm font-bold text-slate-700">Всього прочитано книг:</span>
+                <span id="statBooks" class="text-lg font-black text-indigo-600">0</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-sm font-bold text-slate-700">Прочитано сторінок:</span>
+                <span id="statPages" class="text-lg font-black text-indigo-600">0</span>
+            </div>
+        </div>
+
+        <div class="space-y-3">
             <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors">
-                <span class="font-bold">Темна тема застосунку</span>
+                <span class="font-bold text-sm">Темна тема</span>
                 <button onclick="toggleAppTheme()" class="text-2xl p-1 bg-white rounded-full shadow-sm border border-slate-200 active:scale-95 transition-transform">🌓</button>
             </div>
-            <button onclick="clearAppCache()" class="w-full p-4 bg-amber-50 text-amber-600 font-bold rounded-2xl active:scale-95 transition-transform">🔄 Очистити кеш (Оновити)</button>
-            <button onclick="logout()" class="w-full p-4 bg-red-50 text-red-600 font-bold rounded-2xl active:scale-95 transition-transform">🚪 Вийти з акаунту</button>
+            <button onclick="exportLibrary()" class="w-full p-4 bg-emerald-50 text-emerald-600 font-bold text-sm rounded-2xl active:scale-95 transition-transform">📥 Експортувати бібліотеку (JSON)</button>
+            <button onclick="clearAppCache()" class="w-full p-4 bg-amber-50 text-amber-600 font-bold text-sm rounded-2xl active:scale-95 transition-transform">🔄 Очистити кеш (Оновити)</button>
+            <button onclick="logout()" class="w-full p-4 bg-red-50 text-red-600 font-bold text-sm rounded-2xl active:scale-95 transition-transform">🚪 Вийти з акаунту</button>
         </div>
     </div>
 
@@ -176,7 +210,7 @@
     </div>
 
     <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="height: 85vh;">
-        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none" onclick="closeAllSheets()"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <div class="px-5 pb-4 shrink-0">
             <h2 class="text-xl font-bold mb-4">Знайти книгу</h2>
             <div class="relative">
@@ -191,8 +225,10 @@
     </div>
 
     <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="max-height: 92vh;">
-        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab active:cursor-grabbing" onclick="closeDetailsSheet()"><div class="w-12 h-1.5 bg-slate-200 rounded-full pointer-events-none"></div></div>
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full pointer-events-none"></div></div>
+        
         <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
+        
         <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-4 fade-in">
             <h3 class="text-xl font-bold mb-4">Редагувати книгу</h3>
             <input type="text" id="editTitle" placeholder="Назва" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium">
@@ -219,33 +255,66 @@
         const db = firebase.firestore();
         
         let currentUser = null, myLibrary = [], tempSelectedBook = null, timeoutId = null;
-        let currentLibraryTab = 'reading'; 
-        let viewMode = localStorage.getItem('viewMode') || 'list'; 
+        let currentLibraryTab = 'reading', viewMode = localStorage.getItem('viewMode') || 'list'; 
         let rendition = null, currentReaderBookId = null, currentBookInstance = null;
-        let readerTheme = localStorage.getItem('readerTheme') || 'light';
-        let readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
+        let readerTheme = localStorage.getItem('readerTheme') || 'light', readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
 
+        // Покращений Свайп для закриття шторок
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.bottom-sheet').forEach(sheet => {
-                const handle = sheet.querySelector('.drag-handle');
-                if (!handle) return;
-                let startY = 0, currentY = 0;
-                handle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; sheet.style.transition = 'none'; }, {passive: true});
-                handle.addEventListener('touchmove', e => { currentY = e.touches[0].clientY; const deltaY = currentY - startY; if (deltaY > 0) sheet.style.transform = `translateY(${deltaY}px)`; }, {passive: true});
-                handle.addEventListener('touchend', e => {
+                let startY = 0, currentY = 0, isDragging = false;
+                
+                sheet.addEventListener('touchstart', e => { 
+                    // Свайп працює тільки якщо ми на самому верху сторінки шторки
+                    const scrollable = sheet.querySelector('.overflow-y-auto');
+                    if (!scrollable || scrollable.scrollTop <= 0 || e.target.closest('.drag-handle')) {
+                        startY = e.touches[0].clientY; 
+                        isDragging = true;
+                        sheet.style.transition = 'none'; 
+                    }
+                }, {passive: true});
+                
+                sheet.addEventListener('touchmove', e => { 
+                    if (!isDragging) return;
+                    currentY = e.touches[0].clientY; 
+                    const deltaY = currentY - startY; 
+                    if (deltaY > 0) sheet.style.transform = `translateY(${deltaY}px)`; 
+                }, {passive: true});
+                
+                sheet.addEventListener('touchend', e => {
+                    if (!isDragging) return;
+                    isDragging = false;
                     sheet.style.transition = 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)';
-                    if (currentY - startY > 70) { if (sheet.id === 'detailsSheet') closeDetailsSheet(); else closeAllSheets(); }
+                    if (currentY - startY > 100) { // Треба потягнути сильніше, щоб закрити
+                        if (sheet.id === 'detailsSheet') closeDetailsSheet(); else closeAllSheets(); 
+                    }
                     sheet.style.transform = ''; 
                 });
             });
         });
 
+        // Статистика та Експорт
+        function calculateStats() {
+            const finished = myLibrary.filter(b => b.status === 'finished');
+            const totalPages = finished.reduce((sum, b) => sum + (parseInt(b.pagesTotal) || 0), 0);
+            document.getElementById('statBooks').innerText = finished.length;
+            document.getElementById('statPages').innerText = totalPages;
+        }
+
+        function exportLibrary() {
+            if (myLibrary.length === 0) return alert('Бібліотека порожня!');
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(myLibrary, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href",     dataStr     );
+            dlAnchorElem.setAttribute("download", "chitayko_backup.json");
+            dlAnchorElem.click();
+        }
+
         function clearAppCache() {
             if ('caches' in window) caches.keys().then(names => { for (let name of names) caches.delete(name); });
             if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(regs => { for (let reg of regs) reg.unregister(); });
-            alert('Кеш очищено! Застосунок буде перезавантажено.');
-            setTimeout(() => { window.location.reload(true); }, 500);
+            alert('Кеш очищено! Застосунок буде перезавантажено.'); setTimeout(() => { window.location.reload(true); }, 500);
         }
 
         if(localStorage.getItem('appTheme') === 'dark') document.body.classList.add('dark');
@@ -293,8 +362,6 @@
             }
         }
         
-        auth.getRedirectResult().then((result) => { if(result && result.user) console.log("Успішний вхід"); }).catch((error) => { if (error && error.code !== 'auth/redirect-cancelled-by-user') showErrorMsg("Помилка входу"); });
-        
         function logout() { auth.signOut(); closeAllSheets(); }
         function loadLibrary() { db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded', 'desc').onSnapshot(snap => { myLibrary = []; snap.forEach(doc => myLibrary.push({ id: doc.id, ...doc.data() })); render(); }); }
         async function updateBookInFirestore(id, updates) { if (currentUser) await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(updates); }
@@ -303,6 +370,7 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
+        // Пошук (Відв'язаний від мови, шукає все підряд)
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 2) { searchItems.innerHTML = ''; return; }
@@ -310,13 +378,14 @@
 
             timeoutId = setTimeout(async () => {
                 try {
-                    // Звичайний пошук без мовних фільтрів (знайде "Дюну" 100%)
-                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&printType=books`);
+                    // Жодних обмежень API! Знайдемо Дюну 100%
+                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40`);
                     const data = await res.json(); searchItems.innerHTML = '';
                     if (!data.items) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    const filteredItems = data.items.filter(item => item.volumeInfo.title && item.volumeInfo.imageLinks?.thumbnail).slice(0, 30);
-                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг за цим запитом.</div>';
+                    // Тільки перевірка на наявність обкладинки та назви
+                    const filteredItems = data.items.filter(item => item.volumeInfo && item.volumeInfo.title && item.volumeInfo.imageLinks?.thumbnail).slice(0, 30);
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг з обкладинками.</div>';
 
                     filteredItems.forEach(item => {
                         const b = item.volumeInfo, div = document.createElement('div');
@@ -378,7 +447,7 @@
             openSheet('detailsSheet');
         }
 
-        function deleteBookFromDetails(id) { if(confirm("Ви впевнені, що хочете видалити цю книгу назавжди?")) { db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); closeAllSheets(); } }
+        function deleteBookFromDetails(id) { if(confirm("Видалити цю книгу назавжди?")) { db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); closeAllSheets(); } }
         function setRating(id, rating) { updateBookInFirestore(id, { rating: rating }); setTimeout(() => { showBookDetails(myLibrary.find(b => b.id === id)); }, 100); }
         function changeStatusFromDetails(id, newStatus) {
             const updates = { status: newStatus }; const book = myLibrary.find(b => b.id === id);
@@ -407,15 +476,14 @@
 
         function saveManualDate(id, field, dateEl) { updateBookInFirestore(id, { [field]: dateEl.value }); const book = myLibrary.find(b => b.id === id); if (book) book[field] = dateEl.value; render(); }
 
+        // Читалка
         function startTimer() { readingStartTime = Date.now(); currentSessionSeconds = 0; document.getElementById('readerTimer').innerText = "00:00"; readingTimer = setInterval(() => { currentSessionSeconds = Math.floor((Date.now() - readingStartTime) / 1000); const m = String(Math.floor(currentSessionSeconds / 60)).padStart(2, '0'), s = String(currentSessionSeconds % 60).padStart(2, '0'), h = Math.floor(currentSessionSeconds / 3600); document.getElementById('readerTimer').innerText = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`; }, 1000); }
         function stopTimer() { if (readingTimer && currentReaderBookId) { clearInterval(readingTimer); readingTimer = null; const book = myLibrary.find(b => b.id === currentReaderBookId); if (book && currentSessionSeconds > 5) { const totalTime = (book.timeSpent || 0) + currentSessionSeconds; db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ timeSpent: totalTime }); } } }
         window.addEventListener('beforeunload', stopTimer);
-
         function toggleReaderSettings() { document.getElementById('readerSettingsMenu').classList.toggle('hidden'); }
         function applyReaderSettings() { if(!rendition) return; rendition.themes.fontSize(readerFontSize + "%"); rendition.themes.select(readerTheme); }
         function changeFontSize(delta) { readerFontSize = Math.max(50, Math.min(200, readerFontSize + delta)); localStorage.setItem('readerFontSize', readerFontSize); applyReaderSettings(); }
         function changeReaderTheme(theme) { readerTheme = theme; localStorage.setItem('readerTheme', theme); applyReaderSettings(); }
-
         function initSwipeGestures() { const viewerEl = document.getElementById('viewer'); if(!window.mc) { window.mc = new Hammer(viewerEl); window.mc.get('swipe').set({ direction: Hammer.DIRECTION_HORIZONTAL }); window.mc.on("swipeleft", () => { if (rendition) rendition.next(); }); window.mc.on("swiperight", () => { if (rendition) rendition.prev(); }); } }
 
         function handleFileSelect(event, bookId) {
@@ -460,11 +528,11 @@
             const isFinished = book.status === 'finished'; const isPlanned = book.status === 'planned'; const isReading = book.status === 'reading';
 
             if (viewMode === 'grid') {
-                return `<div onclick="showBookDetails(${JSON.stringify(book).replace(/"/g, '&quot;')})" class="flex flex-col items-center cursor-pointer fade-in active:scale-[0.98] transition-transform ${isFinished ? 'opacity-80' : ''}"><div class="relative w-full aspect-[2/3]"><img src="${book.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-full h-full rounded-xl shadow-md object-cover border border-slate-200">${isFinished && book.rating ? `<div class="absolute -bottom-2 -right-2 bg-white text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-sm border border-slate-100">★${book.rating}</div>` : ''}</div><h3 class="font-bold text-slate-900 text-[11px] leading-tight mt-2 w-full text-center truncate px-1">${book.title}</h3></div>`;
+                return `<div data-id="${book.id}" onclick="showBookDetails(${JSON.stringify(book).replace(/"/g, '&quot;')})" class="flex flex-col items-center cursor-pointer fade-in active:scale-[0.98] transition-transform ${isFinished ? 'opacity-80' : ''}"><div class="relative w-full aspect-[2/3]"><img src="${book.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-full h-full rounded-xl shadow-md object-cover border border-slate-200">${isFinished && book.rating ? `<div class="absolute -bottom-2 -right-2 bg-white text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-sm border border-slate-100">★${book.rating}</div>` : ''}</div><h3 class="font-bold text-slate-900 text-[11px] leading-tight mt-2 w-full text-center truncate px-1">${book.title}</h3></div>`;
             }
 
             return `
-            <div onclick="showBookDetails(${JSON.stringify(book).replace(/"/g, '&quot;')})" class="bg-white p-4 rounded-[1.25rem] shadow-sm flex gap-4 items-start cursor-pointer border border-slate-100 fade-in active:scale-[0.98] transition-transform ${isFinished ? 'opacity-80' : ''}">
+            <div data-id="${book.id}" onclick="showBookDetails(${JSON.stringify(book).replace(/"/g, '&quot;')})" class="bg-white p-4 rounded-[1.25rem] shadow-sm flex gap-4 items-start cursor-pointer border border-slate-100 fade-in active:scale-[0.98] transition-transform ${isFinished ? 'opacity-80' : ''}">
                 <img src="${book.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-16 h-24 rounded-xl shadow-sm object-cover flex-shrink-0 border border-slate-100">
                 <div class="flex-1 min-w-0">
                     <div class="flex justify-between items-start gap-2"><div class="min-w-0"><h3 class="font-bold text-slate-900 text-[15px] leading-snug truncate">${book.title}</h3><p class="text-[13px] text-slate-500 mt-0.5 truncate">${book.author}</p></div><button onclick="deleteBook('${book.id}', event)" class="text-slate-300 hover:text-red-500 flex-shrink-0 transition-colors p-1">✕</button></div>
@@ -488,9 +556,12 @@
             const reading = myLibrary.filter(b => b.status === 'reading'); const planned = myLibrary.filter(b => b.status === 'planned'); const finished = myLibrary.filter(b => b.status === 'finished');
             document.getElementById('tab_reading').innerText = `Читаю зараз (${reading.length})`; document.getElementById('tab_planned').innerText = `Хочу прочитати (${planned.length})`; document.getElementById('tab_finished').innerText = `Прочитано (${finished.length})`;
             const container = document.getElementById('myBooksContainer');
+            
             if ((currentLibraryTab === 'reading' && reading.length === 0) || (currentLibraryTab === 'planned' && planned.length === 0) || (currentLibraryTab === 'finished' && finished.length === 0)) { container.innerHTML = `<div class="mt-10 text-center px-6"><span class="text-4xl block mb-4">📚</span><h3 class="text-xl font-bold text-slate-900 mb-2">Тут поки порожньо</h3><p class="text-slate-500 text-sm">Додайте сюди книги!</p></div>`; return; }
+            
             container.classList.remove('fade-in'); void container.offsetWidth; container.classList.add('fade-in');
-            const wrapperClass = viewMode === 'grid' ? 'grid grid-cols-3 gap-4' : 'space-y-3';
+            const wrapperClass = viewMode === 'grid' ? 'grid grid-cols-3 gap-4 sortable-list' : 'space-y-3 sortable-list';
+            
             if (currentLibraryTab === 'reading') { container.innerHTML = `<div class="${wrapperClass}">${reading.map(renderBookCard).join('')}</div>`; }
             else if (currentLibraryTab === 'planned') { container.innerHTML = `<div class="${wrapperClass}">${planned.map(renderBookCard).join('')}</div>`; }
             else if (currentLibraryTab === 'finished') {
@@ -498,6 +569,18 @@
                 const grouped = {}; finished.forEach(b => { let year = 'Без дати'; try { if (b.dateFinished && typeof b.dateFinished === 'string') year = b.dateFinished.substring(0, 4); else if (b.dateFinished && typeof b.dateFinished === 'number') year = new Date(b.dateFinished).getFullYear().toString(); else if (b.dateAdded) year = new Date(b.dateAdded).getFullYear().toString(); } catch(e) {} if(!grouped[year]) grouped[year] = []; grouped[year].push(b); });
                 let html = ''; Object.keys(grouped).sort((a, b) => { if (a === 'Без дати') return 1; if (b === 'Без дати') return -1; return b - a; }).forEach(year => { html += `<h2 class="font-black text-slate-300 text-lg mt-6 mb-3 tracking-widest">${year}</h2><div class="${wrapperClass}">${grouped[year].map(renderBookCard).join('')}</div>`; });
                 container.innerHTML = html;
+            }
+
+            // Активуємо Drag and Drop
+            if (viewMode === 'grid') {
+                document.querySelectorAll('.sortable-list').forEach(list => {
+                    new Sortable(list, {
+                        delay: 300, // Затримка 0.3с, щоб відрізнити клік від свайпу
+                        delayOnTouchOnly: true,
+                        animation: 150,
+                        ghostClass: 'sortable-ghost'
+                    });
+                });
             }
         }
 
@@ -509,6 +592,7 @@
         }
 
         const curatedCategories = {
+            'Академія магії': ['"академия магии" фэнтези', '"магическая академия"', 'ромфант академия'],
             'Фентезі': ['"фентезі" бестселер', '"фэнтези" бестселлер', 'Джон Толкин', 'Джордж Мартин', 'Анджей Сапковский', 'Терри Пратчетт', 'Робин Хобб'],
             'Детектив': ['"детектив" бестселер', '"детектив" бестселлер', 'Агата Кристи', 'Артур Конан Дойл', 'Ю Несбё', 'Жан-Кристоф Гранже', 'Стиг Ларссон'],
             'Трилер': ['"трилер" бестселер', '"триллер" бестселлер', 'Стивен Кинг', 'Джиллиан Флинн', 'Томас Харрис', 'Дэн Браун', 'Джон Маррс'],
@@ -540,7 +624,7 @@
 
             try {
                 let fetchPromises = [];
-                queries.forEach(q => { fetchPromises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&printType=books`).then(r => r.ok ? r.json() : {items: []})); });
+                queries.forEach(q => { fetchPromises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40`).then(r => r.ok ? r.json() : {items: []})); });
                 
                 const results = await Promise.all(fetchPromises);
                 let allItems = []; results.forEach(res => { if (res.items) allItems.push(...res.items); });
