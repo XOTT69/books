@@ -214,13 +214,12 @@
         let readerTheme = localStorage.getItem('readerTheme') || 'light', readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
 
-        // ГЛОБАЛЬНІ ЗМІННІ ДЛЯ РЕКОМЕНДАЦІЙ
         let recStartIndex = 0;
         let currentRecQueries = [];
         let currentRecQueryIndex = 0;
         let isFetchingRecs = false;
         let currentRecCategory = null;
-        let shownRecTitles = new Set(); // Запам'ятовує всі показані книги, щоб не було дублів
+        let shownRecTitles = new Set();
 
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.bottom-sheet').forEach(sheet => {
@@ -242,7 +241,6 @@
                 });
             });
 
-            // Ініціалізація Infinite Scroll
             const recObserver = new IntersectionObserver((entries) => {
                 if(entries[0].isIntersecting && !document.getElementById('recommendationsScreen').classList.contains('hidden')) {
                     if (!isFetchingRecs && currentRecQueries.length > 0) {
@@ -338,26 +336,36 @@
                     const isAuthorSearch = query.startsWith('author:"') && query.endsWith('"');
                     const rawQuery = isAuthorSearch ? query.slice(8, -1) : query;
                     const safeQuery = encodeURIComponent(rawQuery);
+                    const safeQueryQuote = encodeURIComponent('"' + rawQuery + '"');
                     
                     let promises = [];
                     if (isAuthorSearch) {
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&maxResults=30`).catch(()=>({ok:false})));
-                        // Apple Books API для автора
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30`).catch(()=>({ok:false})));
+                        // 1. Google (точний пошук автора)
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=40`).catch(()=>({ok:false})));
+                        // 2. Google (якщо автор вказаний як звичайний текст, щоб обійти баги Google)
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQueryQuote}&printType=books&maxResults=40`).catch(()=>({ok:false})));
+                        // 3. Apple Books (ЛитРес, електронні книги)
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&entity=ebook&attribute=authorTerm&country=ua&limit=30`).catch(()=>({ok:false})));
                     } else {
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
-                        // Apple Books API загальний пошук
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=25`).catch(()=>({ok:false})));
+                        // 1. Google (точна назва)
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQueryQuote}&printType=books&maxResults=20`).catch(()=>({ok:false})));
+                        // 2. Google (загальний пошук)
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20`).catch(()=>({ok:false})));
+                        // 3. Apple Books (ЛитРес, електронні книги)
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&entity=ebook&country=ua&limit=25`).catch(()=>({ok:false})));
                     }
 
                     const responses = await Promise.all(promises);
 
-                    // Парсинг Google Books
-                    if (responses[0] && responses[0].ok) { const d = await responses[0].json(); if (d.items) allItems.push(...d.items); }
-                    if (!isAuthorSearch && responses[1] && responses[1].ok) { const d = await responses[1].json(); if (d.items) allItems.push(...d.items); }
+                    // Парсимо результати Google Books
+                    for (let i = 0; i < responses.length - 1; i++) {
+                        if (responses[i] && responses[i].ok) {
+                            const d = await responses[i].json();
+                            if (d.items) allItems.push(...d.items);
+                        }
+                    }
                     
-                    // Парсинг Apple Books (електронні книги ЛитРес та інші)
+                    // Парсимо результати Apple Books (завжди останній проміс)
                     const appleRes = responses[responses.length - 1];
                     if (appleRes && appleRes.ok) {
                         const dApple = await appleRes.json();
@@ -381,14 +389,14 @@
 
                     if (allItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    // Видалення дублікатів з різних API
+                    // Видаляємо дублікати з обох баз
                     const uniqueItems = [];
                     const seenKeys = new Set();
                     allItems.forEach(item => {
                         const b = item.volumeInfo;
                         if (!b || !b.title) return;
-                        // Ключ: Назва + Автор (тільки букви та цифри)
-                        const key = (b.title.toLowerCase() + (b.authors ? b.authors[0].toLowerCase() : '')).replace(/[^a-zа-я0-9]/gi, '');
+                        // Створюємо унікальний ключ: Назва + Автор (тільки літери та цифри)
+                        const key = (b.title.toLowerCase() + (b.authors ? b.authors[0].toLowerCase() : '')).replace(/[^a-zа-я0-9ієї]/gi, '');
                         if (!seenKeys.has(key)) {
                             seenKeys.add(key);
                             uniqueItems.push(item);
@@ -400,9 +408,15 @@
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
                         if (!b || !b.title) return false;
-                        if (isAuthorSearch) return true;
+                        
+                        if (isAuthorSearch) {
+                            // Якщо це пошук автора, перевіряємо, чи є його ім'я в авторах
+                            const authorStr = (b.authors || []).join(' ').toLowerCase();
+                            return authorStr.includes(rawQuery.toLowerCase());
+                        }
 
                         const isExactTitle = b.title.toLowerCase().includes(rawQuery.toLowerCase());
+                        
                         if (!isExactTitle && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
                         return true;
                     });
