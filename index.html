@@ -298,102 +298,59 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // Допоміжна функція: Перевірка на англійську назву
+        // Допоміжна функція для фільтрації англійських назв (відсіює якщо багато англ літер)
         function isEnglishTitle(title) {
             if (!title) return true;
-            const letters = title.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);
-            if (!letters) return false;
             const engLetters = title.match(/[a-zA-Z]/g);
-            // Якщо англійських літер більше 30% від усіх літер - вважаємо книгу іноземною
-            return (engLetters && engLetters.length > (letters.length * 0.3));
+            return (engLetters && engLetters.length > (title.length * 0.4));
         }
 
-        // МУЛЬТИ-АПІ ПОШУК (Google Books + Open Library) 
+        // Пошук з фільтрацією іноземних і брошур (менше 60 сторінок)
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
-            if (query.length < 2) { searchItems.innerHTML = ''; return; }
-            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаємо в кількох базах... 🔍</div>';
+            if (query.length < 3) { searchItems.innerHTML = ''; return; }
+            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю...</div>';
 
             timeoutId = setTimeout(async () => {
                 try {
-                    let results = [];
-                    
-                    // 1. Google Books (без обмежень на картинки!)
-                    const p1 = fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&orderBy=relevance`)
-                        .then(r => r.ok ? r.json() : {}).then(data => {
-                            if (data.items) {
-                                data.items.forEach(item => {
-                                    const b = item.volumeInfo;
-                                    if (!b || !b.title) return;
-                                    const safeImage = b.imageLinks?.thumbnail ? b.imageLinks.thumbnail.replace(/^http:\/\//i, 'https://') : null;
-                                    results.push({ googleId: item.id, title: b.title, author: b.authors ? b.authors[0] : 'Невідомий', pagesTotal: b.pageCount || 300, image: safeImage, description: b.description || '', genre: b.categories ? b.categories[0] : '' });
-                                });
-                            }
-                        }).catch(e => console.log('GB Err', e));
+                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&printType=books`);
+                    const data = await res.json(); searchItems.innerHTML = '';
+                    if (!data.items) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    // 2. Open Library (допомагає з обкладинками)
-                    const p2 = fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=20`)
-                        .then(r => r.ok ? r.json() : {}).then(data => {
-                            if (data.docs) {
-                                data.docs.forEach(d => {
-                                    if (!d.title) return;
-                                    const safeImage = d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null;
-                                    results.push({ googleId: 'ol_' + (d.key || '').replace(/[^a-zA-Z0-9]/g, ''), title: d.title, author: d.author_name ? d.author_name[0] : 'Невідомий', pagesTotal: d.number_of_pages_median || 300, image: safeImage, description: '', genre: d.subject ? d.subject[0] : '' });
-                                });
-                            }
-                        }).catch(e => console.log('OL Err', e));
+                    const filteredItems = data.items.filter(item => {
+                        const b = item.volumeInfo;
+                        if (!b || !b.title) return false;
+                        if (isEnglishTitle(b.title)) return false;
+                        if (b.pageCount && b.pageCount < 60) return false; // Відсіюємо брошури
+                        return true;
+                    }).slice(0, 15);
 
-                    await Promise.all([p1, p2]);
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено підходящих книг (або це брошури/англійські видання)</div>';
 
-                    if (results.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">На жаль, нічого не знайдено 😔</div>';
-
-                    const uniqueMap = new Map();
-                    const queryIsCyrillic = /[а-яА-ЯіІїЇєЄґҐ]/.test(query);
-
-                    results.forEach(book => {
-                        const tLower = book.title.toLowerCase().trim();
+                    filteredItems.forEach(item => {
+                        const b = item.volumeInfo, div = document.createElement('div');
+                        const genre = b.categories && b.categories.length > 0 ? b.categories[0] : '';
+                        const safeImage = (b.imageLinks?.thumbnail || PLACEHOLDER_IMG).replace(/^http:\/\//i, 'https://');
                         
-                        // Фільтр мови: Якщо запит кириличний, жорстко відкидаємо англомовні назви
-                        if (queryIsCyrillic && isEnglishTitle(book.title)) return;
-
-                        if (!uniqueMap.has(tLower)) {
-                            uniqueMap.set(tLower, book);
-                        } else {
-                            const existing = uniqueMap.get(tLower);
-                            // Злиття даних: якщо в одного АПІ є обкладинка/опис, а в іншого нема
-                            if (!existing.image && book.image) existing.image = book.image;
-                            if (!existing.description && book.description) existing.description = book.description;
-                            if (existing.author === 'Невідомий' && book.author !== 'Невідомий') existing.author = book.author;
-                        }
-                    });
-
-                    let finalItems = Array.from(uniqueMap.values());
-                    
-                    // Сортування: з обкладинкою завжди вище!
-                    finalItems.sort((a, b) => {
-                        if (a.image && !b.image) return -1;
-                        if (!a.image && b.image) return 1;
-                        return 0;
-                    });
-
-                    finalItems = finalItems.slice(0, 40);
-                    if (finalItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Знайдено тільки англомовні видання. Спробуйте інший запит.</div>';
-
-                    searchItems.innerHTML = '';
-                    finalItems.forEach(book => {
-                        const div = document.createElement('div');
+                        const book = { 
+                            googleId: item.id || Math.random().toString(), 
+                            title: b.title || 'Без назви', 
+                            author: b.authors ? b.authors[0] : 'Автор невідомий', 
+                            pagesTotal: b.pageCount || 300, 
+                            image: safeImage, 
+                            description: b.description || 'Анотація відсутня.', 
+                            genre: genre 
+                        };
+                        
                         div.className = "p-3 mx-2 my-1 hover:bg-slate-100 rounded-2xl cursor-pointer flex items-center gap-4 active:bg-slate-200 fade-in";
-                        div.innerHTML = `<img src="${book.image || PLACEHOLDER_IMG}" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-2"><div class="font-bold text-slate-900 truncate">${book.title}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${book.author}</div></div>`;
+                        div.innerHTML = `<img src="${book.image}" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-2"><div class="font-bold text-slate-900 truncate">${book.title}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${book.author}</div></div>`;
                         div.onclick = () => showBookDetails(book, true); searchItems.appendChild(div);
                     });
-                } catch (e) { 
-                    console.error(e); 
-                    searchItems.innerHTML = `<div class="p-8 text-red-500 text-sm text-center">Помилка мережі. Зачекайте хвилинку і спробуйте знову.</div>`; 
-                }
+                } catch (e) { searchItems.innerHTML = `<div class="p-8 text-red-500 text-sm text-center">Перевірте підключення</div>`; }
             }, 600);
         });
 
-        // Пошук за автором (перероблено, щоб не зависало)
+        // Пошук за автором
         window.searchAuthorBooks = function(authorName) {
             closeAllSheets(); 
             setTimeout(() => {
@@ -407,8 +364,7 @@
         function openManualForm() { tempSelectedBook = 'manual'; toggleEditMode(true); document.getElementById('editTitle').value = ''; document.getElementById('editAuthor').value = ''; document.getElementById('editPages').value = ''; document.getElementById('editImage').value = ''; document.getElementById('statusButtons').classList.remove('hidden'); openSheet('detailsSheet'); }
 
         function showBookDetails(bookData, isNewFromSearch = false) {
-            // Безпечно обробляємо можливі відсутні дані
-            if (!bookData || !bookData.id && !bookData.googleId) return;
+            if (!bookData || !bookData.title) return;
 
             const libBook = myLibrary.find(b => (b.googleId && b.googleId === bookData.googleId) || b.id === bookData.id) || bookData;
             tempSelectedBook = isNewFromSearch ? bookData : null;
@@ -607,7 +563,7 @@
             'Фантастика': ['"наукова фантастика" бестселер', '"научная фантастика" бестселлер', 'Фрэнк Герберт Дюна', 'Айзек Азимов', 'Рэй Брэдбери', 'Джордж Оруэлл', 'Энди Вейер']
         };
 
-        // Рекомендації також з фільтром англійської
+        // Рекомендації з відсіюванням англійських і брошур
         async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
             const list = document.getElementById('recommendationsList');
             list.innerHTML = `<div class="p-8 flex flex-col items-center justify-center text-slate-400 text-sm fade-in animate-pulse"><span class="text-3xl mb-3">🔍</span>Шукаємо круті книги...</div>`;
@@ -647,10 +603,9 @@
 
                 const filtered = allItems.filter(item => {
                     const b = item.volumeInfo;
-                    if (!b.title) return false;
-                    
-                    // Блокуємо іноземні
+                    if (!b.title || !b.description || b.description.length < 20) return false;
                     if (isEnglishTitle(b.title)) return false;
+                    if (b.pageCount && b.pageCount < 60) return false; // Відсіюємо брошури
 
                     const tLower = b.title.toLowerCase();
                     if (banWords.some(bw => tLower.includes(bw))) return false;
@@ -658,16 +613,16 @@
                     return true;
                 });
 
-                const uniqueMap = new Map(); filtered.forEach(item => uniqueMap.set(item.volumeInfo.title.toLowerCase().split(' ')[0], item)); // Більш жорстке видалення дублів (по першому слову назви)
+                const uniqueMap = new Map(); filtered.forEach(item => uniqueMap.set(item.volumeInfo.title.toLowerCase().split(' ')[0], item));
                 let finalBooks = Array.from(uniqueMap.values());
-                finalBooks.sort(() => 0.5 - Math.random()); finalBooks = finalBooks.slice(0, 80);
+                finalBooks.sort(() => 0.5 - Math.random()); finalBooks = finalBooks.slice(0, 120);
 
                 if (finalBooks.length === 0) { list.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm">Не знайшли нових книг 😔 Спробуйте іншу категорію.</div>`; return; }
 
                 let html = '';
                 finalBooks.forEach(item => {
                     const b = item.volumeInfo; const safeImg = (b.imageLinks?.thumbnail || PLACEHOLDER_IMG).replace(/^http:\/\//i, 'https://');
-                    const bookObj = { googleId: item.id, title: b.title, author: b.authors ? b.authors[0] : 'Невідомий', pagesTotal: b.pageCount || 300, image: safeImg, description: b.description || 'Опис відсутній.', genre: b.categories ? b.categories[0] : '' };
+                    const bookObj = { googleId: item.id || Math.random().toString(), title: b.title, author: b.authors ? b.authors[0] : 'Невідомий', pagesTotal: b.pageCount || 300, image: safeImg, description: b.description || 'Опис відсутній.', genre: b.categories ? b.categories[0] : '' };
                     html += `
                     <div onclick="showBookDetails(${JSON.stringify(bookObj).replace(/"/g, '&quot;')}, true)" class="bg-white p-4 rounded-xl flex gap-3 items-start border border-slate-100 cursor-pointer shadow-sm mb-3 fade-in active:scale-[0.98] transition-transform">
                         <img src="${bookObj.image}" class="w-16 h-24 rounded shadow-sm object-cover flex-shrink-0">
