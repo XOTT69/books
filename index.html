@@ -115,8 +115,8 @@
                 <button onclick="loadRealRecommendations('Саморозвиток', 'rec_self')" id="rec_self" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Саморозвиток</button>
                 <button onclick="loadRealRecommendations('Фантастика', 'rec_scifi')" id="rec_scifi" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фантастика</button>
             </div>
-            <div id="recommendationsList" class="space-y-4 mt-2"></div>
-            <div id="recScrollTarget" class="h-10 w-full pb-24"></div> 
+            <div id="recommendationsList" class="space-y-4 pb-2 mt-2"></div>
+            <div id="recScrollTarget" class="h-10 w-full pb-24"></div>
         </div>
     </div>
 
@@ -214,6 +214,7 @@
         let readerTheme = localStorage.getItem('readerTheme') || 'light', readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
 
+        // Глобальні змінні для нескінченного скролу
         let recStartIndex = 0;
         let currentRecQueries = [];
         let isFetchingRecs = false;
@@ -239,12 +240,17 @@
                 });
             });
 
+            // Ініціалізація Infinite Scroll для рекомендацій
             const recObserver = new IntersectionObserver((entries) => {
                 if(entries[0].isIntersecting && !document.getElementById('recommendationsScreen').classList.contains('hidden')) {
-                    if (!isFetchingRecs && currentRecQueries.length > 0) fetchMoreRecommendations();
+                    if (!isFetchingRecs && currentRecQueries.length > 0) {
+                        fetchMoreRecommendations();
+                    }
                 }
             }, { rootMargin: '300px' });
-            recObserver.observe(document.getElementById('recScrollTarget'));
+            
+            const scrollTarget = document.getElementById('recScrollTarget');
+            if(scrollTarget) recObserver.observe(scrollTarget);
         });
 
         function calculateStats() {
@@ -309,7 +315,16 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // ВИПРАВЛЕНИЙ ПОШУК: Без жорстких лапок у API, з розумним сортуванням результатів та захистом картинок
+        function isEnglishTitle(title) {
+            if (!title) return true;
+            const letters = title.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);
+            if (!letters) return false;
+            const engLetters = title.match(/[a-zA-Z]/g);
+            return (engLetters && engLetters.length > (letters.length * 0.4));
+        }
+        function isCyrillic(str) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(str); }
+
+        // ПОШУК ТА АВТОРСЬКИЙ ПОШУК
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 2) { searchItems.innerHTML = ''; return; }
@@ -322,14 +337,17 @@
                     
                     if (isAuthorSearch) {
                         const authorName = query.slice(8, -1);
-                        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(authorName)}"&printType=books&maxResults=40`).catch(()=>({ok:false}));
-                        if (res.ok) { const data = await res.json(); if (data.items) allItems = data.items; }
+                        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(authorName)}"&printType=books&maxResults=40`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.items) allItems = data.items;
+                        }
                     } else {
-                        const queryURI = encodeURIComponent(query);
-                        // Робимо м'які запити без жорстких лапок, щоб API знаходило "Академия Стихий. Избранница грозы"
+                        const safeQuery = encodeURIComponent(query);
+                        // Робимо два запити: з intitle (для точного співпадіння) та загальний
                         const [resTitle, resGen] = await Promise.all([
-                            fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${queryURI}&printType=books&maxResults=20`).catch(()=>({ok:false, json:()=>({items:[]})})),
-                            fetch(`https://www.googleapis.com/books/v1/volumes?q=${queryURI}&printType=books&maxResults=20`).catch(()=>({ok:false, json:()=>({items:[]})}))
+                            fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&printType=books&maxResults=20`).catch(()=>({ok:false})),
+                            fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20`).catch(()=>({ok:false}))
                         ]);
 
                         if (resTitle.ok) { const d = await resTitle.json(); if (d.items) allItems.push(...d.items); }
@@ -338,30 +356,36 @@
 
                     if (allItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    // Видаляємо дублікати
+                    // Видалення дублікатів
                     const uniqueItems = [];
                     const seenIds = new Set();
-                    allItems.forEach(item => { if (!seenIds.has(item.id)) { seenIds.add(item.id); uniqueItems.push(item); } });
+                    allItems.forEach(item => {
+                        if (!seenIds.has(item.id)) {
+                            seenIds.add(item.id);
+                            uniqueItems.push(item);
+                        }
+                    });
 
                     const badCategories = ['Science', 'Technology', 'Computers', 'Medical', 'Law', 'Business & Economics', 'Mathematics', 'Education', 'Study Aids', 'Religion'];
 
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
                         if (!b || !b.title) return false;
+                        
                         if (isAuthorSearch) return true;
+
+                        const isExactTitle = b.title.toLowerCase().includes(query.toLowerCase());
                         
-                        // Відсікаємо тільки явні брошури/відривки, якщо сторінок менше 5. (електронні часто не мають сторінок)
-                        if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 5) return false;
+                        // Відсіюємо брошури (але пропускаємо книги без вказаних сторінок)
+                        if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 10) return false;
                         
-                        // Якщо категорія погана, і назва взагалі не збігається — тоді в топку.
-                        if (b.categories && b.categories.some(c => badCategories.includes(c))) {
-                            const isExactTitle = b.title.toLowerCase().includes(query.toLowerCase());
-                            if (!isExactTitle) return false;
-                        }
+                        // Фільтруємо підручники, якщо це не точний збіг назви
+                        if (!isExactTitle && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
+
                         return true;
                     });
 
-                    // ІДЕАЛЬНЕ СОРТУВАННЯ (щоб точні збіги були завжди першими)
+                    // Сортування
                     if (isAuthorSearch) {
                         filteredItems.sort((a, b) => {
                             const dateA = a.volumeInfo.publishedDate || '9999';
@@ -374,24 +398,21 @@
                             const tB = (b.volumeInfo.title || '').toLowerCase();
                             const qLower = query.toLowerCase();
                             
-                            // 1. Точний збіг назви
                             const exactA = tA === qLower;
                             const exactB = tB === qLower;
                             if (exactA && !exactB) return -1;
                             if (!exactA && exactB) return 1;
-                            
-                            // 2. Назва починається з запиту
+
                             const startsA = tA.startsWith(qLower + ' ') || tA.startsWith(qLower + ':');
                             const startsB = tB.startsWith(qLower + ' ') || tB.startsWith(qLower + ':');
                             if (startsA && !startsB) return -1;
                             if (!startsA && startsB) return 1;
 
-                            // 3. Назва просто містить запит
                             const inclA = tA.includes(qLower);
                             const inclB = tB.includes(qLower);
                             if (inclA && !inclB) return -1;
                             if (!inclA && inclB) return 1;
-
+                            
                             return 0;
                         });
                     }
@@ -400,6 +421,7 @@
 
                     if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено художніх книг за цим запитом.</div>';
 
+                    searchItems.innerHTML = ''; 
                     filteredItems.forEach(item => {
                         const b = item.volumeInfo, div = document.createElement('div');
                         const genre = b.categories && b.categories.length > 0 ? b.categories[0] : '';
@@ -413,13 +435,13 @@
                             image: safeImage, 
                             description: b.description || 'Анотація відсутня.', 
                             genre: genre,
-                            publishedDate: b.publishedDate || '' 
+                            publishedDate: b.publishedDate || ''
                         };
                         
                         div.className = "p-3 mx-2 my-1 hover:bg-slate-100 rounded-2xl cursor-pointer flex items-center gap-4 active:bg-slate-200 fade-in relative";
                         const yearHtml = (isAuthorSearch && book.publishedDate) ? `<div class="absolute top-2 right-3 text-[10px] font-bold text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded">${book.publishedDate.substring(0,4)}</div>` : '';
-
-                        // КЛЮЧОВИЙ ФІКС БИТИХ КАРТИНОК: додано onerror
+                        
+                        // Додано onerror для битих картинок
                         div.innerHTML = `<img src="${book.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-6"><div class="font-bold text-slate-900 truncate">${book.title}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${book.author}</div></div>${yearHtml}`;
                         div.onclick = () => showBookDetails(book, true); searchItems.appendChild(div);
                     });
@@ -665,7 +687,7 @@
             'Фантастика': ['"наукова фантастика" бестселер', '"научная фантастика" бестселлер', 'Фрэнк Герберт Дюна', 'Айзек Азимов', 'Рэй Брэдбери', 'Джордж Оруэлл', 'Энди Вейер']
         };
 
-        // КЛЮЧОВИЙ ФІКС ПОМИЛКИ РЕКОМЕНДАЦІЙ: додано перехоплення помилок (.catch) для кожного запиту окремо
+        // Нескінченний скрол і перехоплення помилок API
         async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
             if (currentRecCategory === category) return;
             currentRecCategory = category;
@@ -676,7 +698,7 @@
             list.innerHTML = `<div class="p-8 flex flex-col items-center justify-center text-slate-400 text-sm fade-in animate-pulse w-full"><span class="text-3xl mb-3">🔍</span>Шукаємо круті книги...</div>`;
 
             document.querySelectorAll('#recTabs button').forEach(btn => { btn.className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95'; });
-            if (btnId) document.getElementById(btnId).className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95';
+            if (document.getElementById(btnId)) document.getElementById(btnId).className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95';
 
             let queries = [];
             if (category === 'auto') {
@@ -715,7 +737,6 @@
                 let fetchPromises = [];
                 currentRecQueries.forEach(q => {
                     const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}`;
-                    // ТУТ ФІКС: якщо Google заблокує один запит через занадто часті звернення, ми не обвалюємо все, а просто повертаємо порожній масив
                     fetchPromises.push(
                         fetch(url)
                             .then(r => r.ok ? r.json() : {items: []})
@@ -746,7 +767,7 @@
                     const b = item.volumeInfo;
                     if (!b.title || !b.description || b.description.length < 20) return false;
                     
-                    if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 50) return false;
+                    if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 30) return false;
                     if (!isCyrillic(b.title)) return false;
                     if (isEnglishTitle(b.title)) return false;
 
