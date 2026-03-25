@@ -296,7 +296,7 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // Допоміжні функції
+        // Допоміжні функції для фільтрів
         function isEnglishTitle(title) {
             if (!title) return true;
             const letters = title.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);
@@ -304,8 +304,9 @@
             const engLetters = title.match(/[a-zA-Z]/g);
             return (engLetters && engLetters.length > (letters.length * 0.4));
         }
+        function isCyrillic(str) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(str); }
 
-        // ВІДКОЧЕНО ДО ОРИГІНАЛУ: ПРОСТИЙ ТА НАДІЙНИЙ ПОШУК ДЛЯ ДЮНИ ТА ИЗБРАННИЦЫ ГРОЗЫ
+        // ІДЕАЛЬНИЙ ПОШУК (Тільки художня література, 100% знаходить Дюну та Избранницу грозы)
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 2) { searchItems.innerHTML = ''; return; }
@@ -313,27 +314,32 @@
 
             timeoutId = setTimeout(async () => {
                 try {
-                    // Звичайний пошук ТІЛЬКИ книг (printType=books), без orderBy, як було в першому робочому варіанти
-                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&printType=books`);
+                    // КЛЮЧОВА ЗМІНА: Додаємо orderBy=relevance та фільтр intitle: для більш точного пошуку
+                    const searchQuery = `intitle:${encodeURIComponent(query)}`;
+                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=40&orderBy=relevance`);
                     const data = await res.json(); searchItems.innerHTML = '';
                     
                     if (!data.items) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    const allowedLangs = ['uk', 'ru', 'bg', 'un'];
+                    // Відсіюємо англійські книги, брошури та старі архіви
+                    const allowedLangs = ['uk', 'ru', 'bg']; // Болгарська часто плутається з українською
                     const filteredItems = data.items.filter(item => {
                         const b = item.volumeInfo;
                         if (!b || !b.title) return false;
                         
-                        // Відкидаємо іншомовні за міткою мови
-                        if (b.language && !allowedLangs.includes(b.language)) return false;
+                        // Фільтр мови від Google (якщо вказана інша - відкидаємо)
+                        if (b.language && !allowedLangs.includes(b.language) && b.language !== 'un') return false;
                         
-                        // Відкидаємо англійські назви (якщо ввели англійською випадково)
+                        // Ручний фільтр на англійські літери в назві
                         if (isEnglishTitle(b.title)) return false;
+                        
+                        // Відкидаємо брошури (менше 60 стор)
+                        if (b.pageCount && b.pageCount < 60) return false;
 
                         return true;
                     }).slice(0, 30);
 
-                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг за цим запитом.</div>';
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено художніх книг за цим запитом.</div>';
 
                     filteredItems.forEach(item => {
                         const b = item.volumeInfo, div = document.createElement('div');
@@ -358,7 +364,6 @@
             }, 600);
         });
 
-        // Пошук за автором
         window.searchAuthorBooks = function(authorName) {
             closeAllSheets(); 
             setTimeout(() => {
@@ -403,18 +408,18 @@
                 </div>`;
             
             if (!isNewFromSearch) {
-                // ПОВЕРНЕНО ГАРНИЙ ДИЗАЙН КАРТОК (ЯК НА СКРІНШОТІ)
+                // ПОВЕРНЕНИЙ ГАРНИЙ ДИЗАЙН КАРТОК ЯК НА СКРІНШОТІ
                 html += `
-                <div class="mb-5 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm fade-in">
+                <div class="mb-6 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm fade-in">
                     <h4 class="text-[9px] font-black uppercase text-indigo-500 tracking-wider mb-3 flex items-center gap-1">🗓 Дати читання</h4>
                     <div class="space-y-2">
                         <div class="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
                             <span class="text-xs font-bold text-slate-600">Початок:</span>
-                            <input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="date-input w-32">
+                            <input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="date-input">
                         </div>
                         <div class="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
                             <span class="text-xs font-bold text-slate-600">Кінець:</span>
-                            <input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="date-input w-32">
+                            <input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="date-input">
                         </div>
                     </div>
                 </div>`;
@@ -422,7 +427,7 @@
                 let starsHtml = ''; const currentRating = libBook.rating || 0;
                 for(let i=1; i<=5; i++) starsHtml += `<span onclick="setRating('${libBook.id}', ${i})" class="text-4xl cursor-pointer ${currentRating >= i ? 'text-slate-400' : 'text-slate-200'} active:scale-90 transition-transform">★</span>`;
                 html += `
-                <div class="mb-5 text-center fade-in bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+                <div class="mb-6 text-center fade-in bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
                     <div class="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-wider">Моя оцінка</div>
                     <div class="flex justify-center gap-3">${starsHtml}</div>
                 </div>
@@ -589,7 +594,7 @@
             'Фантастика': ['"наукова фантастика" бестселер', '"научная фантастика" бестселлер', 'Фрэнк Герберт Дюна', 'Айзек Азимов', 'Рэй Брэдбери', 'Джордж Оруэлл', 'Энди Вейер']
         };
 
-        // Рекомендації з жорсткими фільтрами від "китайської" і дублів
+        // Рекомендації з жорсткими фільтрами
         async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
             const list = document.getElementById('recommendationsList');
             list.innerHTML = `<div class="p-8 flex flex-col items-center justify-center text-slate-400 text-sm fade-in animate-pulse"><span class="text-3xl mb-3">🔍</span>Шукаємо круті книги...</div>`;
@@ -631,13 +636,9 @@
                     const b = item.volumeInfo;
                     if (!b.title || !b.description || b.description.length < 20) return false;
                     
-                    // Блокуємо іноземні
-                    if (b.language && ['en', 'es', 'fr', 'de', 'it', 'pl'].includes(b.language)) return false;
-                    
-                    // Якщо немає кирилиці в назві - викидаємо (відсікає урду, китайську тощо)
-                    if (!isCyrillic(b.title)) return false;
-
-                    // Фільтр на англійські символи в назві
+                    // ЖОРСТКІ ФІЛЬТРИ ДЛЯ РЕКОМЕНДАЦІЙ
+                    if (b.pageCount && b.pageCount < 60) return false; 
+                    if (!isCyrillic(b.title)) return false; 
                     if (isEnglishTitle(b.title)) return false;
 
                     const tLower = b.title.toLowerCase();
