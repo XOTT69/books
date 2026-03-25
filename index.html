@@ -326,42 +326,71 @@
         }
         function isCyrillic(str) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(str); }
 
-        // ПОШУК ТА АВТОРСЬКИЙ ПОШУК
+        // ПАРАЛЕЛЬНИЙ ПОШУК: GOOGLE BOOKS + APPLE BOOKS (iTunes API)
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 2) { searchItems.innerHTML = ''; return; }
-            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю...</div>';
+            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у всіх базах (Google + Apple)...</div>';
 
             timeoutId = setTimeout(async () => {
                 try {
                     let allItems = [];
                     const isAuthorSearch = query.startsWith('author:"') && query.endsWith('"');
+                    const rawQuery = isAuthorSearch ? query.slice(8, -1) : query;
+                    const safeQuery = encodeURIComponent(rawQuery);
                     
+                    let promises = [];
                     if (isAuthorSearch) {
-                        const authorName = query.slice(8, -1);
-                        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(authorName)}"&printType=books&maxResults=40`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data.items) allItems = data.items;
-                        }
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&maxResults=30`).catch(()=>({ok:false})));
+                        // Apple Books API для автора
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30`).catch(()=>({ok:false})));
                     } else {
-                        const safeQuery = encodeURIComponent(query);
-                        const [resTitle, resGen] = await Promise.all([
-                            fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&printType=books&maxResults=20`).catch(()=>({ok:false})),
-                            fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20`).catch(()=>({ok:false}))
-                        ]);
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
+                        // Apple Books API загальний пошук
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=25`).catch(()=>({ok:false})));
+                    }
 
-                        if (resTitle.ok) { const d = await resTitle.json(); if (d.items) allItems.push(...d.items); }
-                        if (resGen.ok) { const d = await resGen.json(); if (d.items) allItems.push(...d.items); }
+                    const responses = await Promise.all(promises);
+
+                    // Парсинг Google Books
+                    if (responses[0] && responses[0].ok) { const d = await responses[0].json(); if (d.items) allItems.push(...d.items); }
+                    if (!isAuthorSearch && responses[1] && responses[1].ok) { const d = await responses[1].json(); if (d.items) allItems.push(...d.items); }
+                    
+                    // Парсинг Apple Books (електронні книги ЛитРес та інші)
+                    const appleRes = responses[responses.length - 1];
+                    if (appleRes && appleRes.ok) {
+                        const dApple = await appleRes.json();
+                        if (dApple.results) {
+                            dApple.results.forEach(book => {
+                                allItems.push({
+                                    id: 'apple_' + book.trackId,
+                                    volumeInfo: {
+                                        title: book.trackName,
+                                        authors: [book.artistName || 'Автор невідомий'],
+                                        pageCount: 300,
+                                        description: book.description ? book.description.replace(/(<([^>]+)>)/gi, "") : 'Знайдено в Apple Books.',
+                                        publishedDate: book.releaseDate ? book.releaseDate.substring(0, 4) : '',
+                                        imageLinks: { thumbnail: book.artworkUrl100 ? book.artworkUrl100.replace('100x100bb', '400x400bb') : null },
+                                        categories: book.genres || []
+                                    }
+                                });
+                            });
+                        }
                     }
 
                     if (allItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
+                    // Видалення дублікатів з різних API
                     const uniqueItems = [];
-                    const seenIds = new Set();
+                    const seenKeys = new Set();
                     allItems.forEach(item => {
-                        if (!seenIds.has(item.id)) {
-                            seenIds.add(item.id);
+                        const b = item.volumeInfo;
+                        if (!b || !b.title) return;
+                        // Ключ: Назва + Автор (тільки букви та цифри)
+                        const key = (b.title.toLowerCase() + (b.authors ? b.authors[0].toLowerCase() : '')).replace(/[^a-zа-я0-9]/gi, '');
+                        if (!seenKeys.has(key)) {
+                            seenKeys.add(key);
                             uniqueItems.push(item);
                         }
                     });
@@ -371,13 +400,10 @@
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
                         if (!b || !b.title) return false;
-                        
                         if (isAuthorSearch) return true;
 
-                        const isExactTitle = b.title.toLowerCase().includes(query.toLowerCase());
-                        if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 10) return false;
+                        const isExactTitle = b.title.toLowerCase().includes(rawQuery.toLowerCase());
                         if (!isExactTitle && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
-
                         return true;
                     });
 
@@ -392,7 +418,7 @@
                         filteredItems.sort((a, b) => {
                             const tA = (a.volumeInfo.title || '').toLowerCase();
                             const tB = (b.volumeInfo.title || '').toLowerCase();
-                            const qLower = query.toLowerCase();
+                            const qLower = rawQuery.toLowerCase();
                             
                             const exactA = tA === qLower;
                             const exactB = tB === qLower;
@@ -672,7 +698,6 @@
             }
         }
 
-        // ВЕЛЕТЕНСЬКА БАЗА КЛЮЧОВИХ СЛІВ ДЛЯ НЕСКІНЧЕННОГО ПОШУКУ
         const curatedCategories = {
             'Академія магії': ['"академия магии" фэнтези', '"магическая академия"', 'ромфант академия', 'академия волшебства', 'студентка академии магии', '"академия" фэнтези'],
             'Фентезі': ['"фентезі" бестселер', '"фэнтези" бестселлер', 'эпическое фэнтези', 'попаданцы фэнтези', 'Джон Толкин', 'Джордж Мартин', 'Анджей Сапковский', 'Терри Пратчетт', 'Робин Хобб', 'Брэндон Сандерсон', 'Роберт Джордан', 'Ник Перумов', 'Алексей Пехов', 'Макс Фрай', 'боевое фэнтези', 'героическое фэнтези'],
@@ -733,7 +758,6 @@
             let finalBooks = [];
             let consecutiveEmptyFetches = 0;
 
-            // Продовжуємо шукати, доки не знайдемо мінімум 5 книг, або доки не перевіримо 3 пусті запити підряд
             while (finalBooks.length < 5 && currentRecQueryIndex < currentRecQueries.length && consecutiveEmptyFetches < 3) {
                 const q = currentRecQueries[currentRecQueryIndex];
                 const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}`;
