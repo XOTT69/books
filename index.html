@@ -298,14 +298,7 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // Допоміжна функція для фільтрації англійських назв (відсіює якщо багато англ літер)
-        function isEnglishTitle(title) {
-            if (!title) return true;
-            const engLetters = title.match(/[a-zA-Z]/g);
-            return (engLetters && engLetters.length > (title.length * 0.4));
-        }
-
-        // Пошук з фільтрацією іноземних і брошур (менше 60 сторінок)
+        // ОРИГІНАЛЬНИЙ ПОШУК (той самий, що стовідсотково знаходив Дюну і Вибраницю)
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 3) { searchItems.innerHTML = ''; return; }
@@ -317,21 +310,21 @@
                     const data = await res.json(); searchItems.innerHTML = '';
                     if (!data.items) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
+                    // Жодних обмежень на обкладинки! Тільки мовний фільтр
+                    const allowedLangs = ['uk', 'ru'];
                     const filteredItems = data.items.filter(item => {
-                        const b = item.volumeInfo;
-                        if (!b || !b.title) return false;
-                        if (isEnglishTitle(b.title)) return false;
-                        if (b.pageCount && b.pageCount < 60) return false; // Відсіюємо брошури
-                        return true;
+                        const lang = item.volumeInfo?.language;
+                        return allowedLangs.includes(lang);
                     }).slice(0, 15);
 
-                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено підходящих книг (або це брошури/англійські видання)</div>';
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг українською або російською мовою</div>';
 
                     filteredItems.forEach(item => {
                         const b = item.volumeInfo, div = document.createElement('div');
                         const genre = b.categories && b.categories.length > 0 ? b.categories[0] : '';
                         const safeImage = (b.imageLinks?.thumbnail || PLACEHOLDER_IMG).replace(/^http:\/\//i, 'https://');
                         
+                        // Додав безпечне діставання даних, щоб уникнути помилок при кліку
                         const book = { 
                             googleId: item.id || Math.random().toString(), 
                             title: b.title || 'Без назви', 
@@ -389,24 +382,41 @@
                                     <option value="reading" ${libBook.status === 'reading' ? 'selected' : ''}>📖 Читаю зараз</option>
                                     <option value="finished" ${libBook.status === 'finished' ? 'selected' : ''}>✅ Прочитано</option>
                                 </select>
-                                <div class="mt-3 p-3 bg-slate-50/50 border border-slate-200 rounded-xl space-y-2 shadow-sm">
-                                    <h4 class="text-[9px] font-black uppercase text-indigo-400 tracking-wider mb-1">🗓 Дати читання</h4>
-                                    <div class="flex justify-between items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-100"><span class="text-xs font-bold text-slate-500">Початок:</span><input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="text-sm text-slate-800 font-medium bg-transparent outline-none cursor-pointer"></div>
-                                    <div class="flex justify-between items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-100"><span class="text-xs font-bold text-slate-500">Кінець:</span><input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="text-sm text-slate-800 font-medium bg-transparent outline-none cursor-pointer"></div>
-                                </div>
                             ` : ''}
                         </div>
                     </div>
                 </div>`;
             
             if (!isNewFromSearch) {
-                let starsHtml = ''; const currentRating = libBook.rating || 0;
-                for(let i=1; i<=5; i++) starsHtml += `<span onclick="setRating('${libBook.id}', ${i})" class="text-3xl cursor-pointer ${currentRating >= i ? 'text-amber-400' : 'text-slate-200'} active:scale-90 transition-transform">★</span>`;
+                // Блок з датами
                 html += `
-                <div class="mb-4 text-center fade-in bg-white border border-slate-100 rounded-xl p-2 shadow-sm"><div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Моя оцінка</div><div class="flex justify-center gap-2">${starsHtml}</div></div>
-                <div class="mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 fade-in"><h4 class="text-xs font-bold uppercase text-slate-500 mb-2 flex justify-between items-center">Нотатки <button onclick="saveReview('${libBook.id}')" class="text-indigo-600 bg-indigo-100 px-3 py-1.5 rounded-lg text-[10px] font-bold active:scale-95 transition-transform">Зберегти</button></h4><textarea id="reviewText_${libBook.id}" class="w-full bg-transparent text-sm text-slate-700 outline-none resize-none min-h-[60px]">${libBook.review || ''}</textarea></div>`;
+                <div class="mt-3 p-3 bg-white border border-slate-100 rounded-2xl space-y-2 shadow-sm fade-in">
+                    <h4 class="text-[9px] font-black uppercase text-indigo-500 tracking-wider mb-1 flex items-center gap-1">🗓 Дати читання</h4>
+                    <div class="flex justify-between items-center bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-100">
+                        <span class="text-xs font-bold text-slate-500">Початок:</span>
+                        <input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="text-sm text-slate-800 font-medium bg-transparent outline-none cursor-pointer">
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-100">
+                        <span class="text-xs font-bold text-slate-500">Кінець:</span>
+                        <input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="text-sm text-slate-800 font-medium bg-transparent outline-none cursor-pointer">
+                    </div>
+                </div>`;
+
+                // Блок з оцінкою
+                let starsHtml = ''; const currentRating = libBook.rating || 0;
+                for(let i=1; i<=5; i++) starsHtml += `<span onclick="setRating('${libBook.id}', ${i})" class="text-4xl cursor-pointer ${currentRating >= i ? 'text-indigo-500' : 'text-slate-200'} active:scale-90 transition-transform">★</span>`;
+                html += `
+                <div class="mt-4 mb-4 text-center fade-in bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+                    <div class="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-wider">Моя оцінка</div>
+                    <div class="flex justify-center gap-3">${starsHtml}</div>
+                </div>
+                
+                <div class="mb-6 bg-slate-50 p-5 rounded-3xl border border-slate-100 fade-in shadow-sm">
+                    <h4 class="text-[10px] font-black uppercase text-slate-500 mb-3 flex justify-between items-center tracking-wider">Нотатки <button onclick="saveReview('${libBook.id}')" class="text-indigo-600 bg-indigo-100 px-4 py-2 rounded-xl text-[10px] font-bold active:scale-95 transition-transform shadow-sm">Зберегти</button></h4>
+                    <textarea id="reviewText_${libBook.id}" class="w-full bg-transparent text-sm text-slate-700 outline-none resize-none min-h-[80px]" placeholder="Напишіть свої враження тут...">${libBook.review || ''}</textarea>
+                </div>`;
             }
-            html += `<div class="desc-scroll fade-in"><h4 class="text-xs font-bold uppercase text-slate-400 mb-2">Анотація</h4><p class="text-sm text-slate-700 leading-relaxed text-justify">${safeDesc}</p></div>`;
+            html += `<div class="desc-scroll fade-in"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-2 tracking-wider">Анотація</h4><p class="text-sm text-slate-700 leading-relaxed text-justify">${safeDesc}</p></div>`;
             if (!isNewFromSearch) {
                 html += `<div class="mt-8 mb-2 flex justify-center fade-in"><button onclick="deleteBookFromDetails('${libBook.id}')" class="flex items-center gap-2 px-6 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm active:scale-95 transition-all shadow-sm">🗑️ Видалити книгу з бібліотеки</button></div>`;
             }
@@ -563,7 +573,14 @@
             'Фантастика': ['"наукова фантастика" бестселер', '"научная фантастика" бестселлер', 'Фрэнк Герберт Дюна', 'Айзек Азимов', 'Рэй Брэдбери', 'Джордж Оруэлл', 'Энди Вейер']
         };
 
-        // Рекомендації з відсіюванням англійських і брошур
+        // Функція для перевірки, чи книга не на якихось дивних мовах
+        function isCyrillic(str) {
+            if (!str) return false;
+            // Якщо є хоч одна кирилична літера - окей
+            return /[а-яА-ЯіІїЇєЄґҐ]/.test(str);
+        }
+
+        // Рекомендації з жорсткими фільтрами
         async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
             const list = document.getElementById('recommendationsList');
             list.innerHTML = `<div class="p-8 flex flex-col items-center justify-center text-slate-400 text-sm fade-in animate-pulse"><span class="text-3xl mb-3">🔍</span>Шукаємо круті книги...</div>`;
@@ -604,8 +621,11 @@
                 const filtered = allItems.filter(item => {
                     const b = item.volumeInfo;
                     if (!b.title || !b.description || b.description.length < 20) return false;
-                    if (isEnglishTitle(b.title)) return false;
-                    if (b.pageCount && b.pageCount < 60) return false; // Відсіюємо брошури
+                    
+                    // ЖОРСТКІ ФІЛЬТРИ ДЛЯ РЕКОМЕНДАЦІЙ
+                    if (b.pageCount && b.pageCount < 60) return false; // Відкидаємо брошури
+                    if (!isCyrillic(b.title)) return false; // Відкидаємо "китайську/урду", якщо в назві немає кирилиці
+                    if (b.language && !['uk', 'ru'].includes(b.language)) return false; // Дозволяємо тільки ці мови (якщо вказані)
 
                     const tLower = b.title.toLowerCase();
                     if (banWords.some(bw => tLower.includes(bw))) return false;
@@ -613,7 +633,7 @@
                     return true;
                 });
 
-                const uniqueMap = new Map(); filtered.forEach(item => uniqueMap.set(item.volumeInfo.title.toLowerCase().split(' ')[0], item));
+                const uniqueMap = new Map(); filtered.forEach(item => uniqueMap.set(item.volumeInfo.title.toLowerCase().split(' ')[0], item)); // Видалення дублів
                 let finalBooks = Array.from(uniqueMap.values());
                 finalBooks.sort(() => 0.5 - Math.random()); finalBooks = finalBooks.slice(0, 120);
 
