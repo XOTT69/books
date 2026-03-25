@@ -36,6 +36,7 @@
         body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
         .progress-bar { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
         .desc-scroll { max-height: 25vh; overflow-y: auto; overscroll-behavior: contain; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         #readerOverlay { display: none; position: fixed; inset: 0; z-index: 200; background: #f8fafc; flex-direction: column; }
         body.dark #readerOverlay { background: #0f172a; }
         #viewer { flex: 1; width: 100%; height: 100%; overflow: hidden; }
@@ -43,13 +44,18 @@
         body.dark .reader-controls { background: #1e293b; }
         .nav-btn { background: #f1f5f9; padding: 12px 20px; border-radius: 12px; font-weight: bold; color: #475569; transition: transform 0.1s; }
         body.dark .nav-btn { background: #334155; color: #f8fafc; }
+        .nav-btn:active { transform: scale(0.95); }
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; z-index: 30; border-top: 1px solid #f1f5f9; box-shadow: 0 -2px 10px rgba(0,0,0,0.02); }
         body.dark .bottom-nav { background: #1e293b; border-color: #334155; }
         .nav-item { flex: 1; text-align: center; color: #94a3b8; font-weight: bold; padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: color 0.2s; cursor: pointer; background: transparent; border: none; }
         .nav-item.active { color: #4f46e5; }
+        body.dark .nav-item { color: #94a3b8; }
         body.dark .nav-item.active { color: #818cf8; }
-        .nav-icon { font-size: 20px; margin-bottom: 3px; display: block; }
-        .date-input { border: none; background: transparent; color: #334155; outline: none; font-size: 14px; font-weight: 500; text-align: right; }
+        .nav-icon { font-size: 20px; margin-bottom: 3px; display: block; transition: transform 0.2s; }
+        .nav-item:active .nav-icon { transform: scale(0.85); }
+        .sortable-ghost { opacity: 0.4; transform: scale(0.95); }
+        .sortable-drag { cursor: grabbing !important; }
+        .date-input { border: none; background: transparent; color: #334155; outline: none; font-size: 14px; font-weight: 500; cursor: pointer; text-align: right; }
         body.dark .date-input { color: #f8fafc; }
     </style>
 </head>
@@ -61,30 +67,32 @@
             <div id="authError" class="text-center text-sm text-white bg-red-500 font-medium p-3 rounded-xl mb-4 hidden shadow-sm fade-in"></div>
             <div id="emailAuthBlock" class="space-y-4">
                 <input type="email" id="authEmail" placeholder="Email" class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-medium transition-shadow">
-                <input type="password" id="authPassword" placeholder="Пароль" class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-medium transition-shadow">
+                <input type="password" id="authPassword" placeholder="Пароль (мін. 6 символів)" class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-medium transition-shadow">
                 <div class="flex gap-3 pt-2">
                     <button onclick="handleAuth('login', this)" class="flex-1 p-4 text-white bg-indigo-600 rounded-xl font-bold active:scale-95 transition-all">Увійти</button>
                     <button onclick="handleAuth('signup', this)" class="flex-1 p-4 text-slate-700 bg-slate-100 rounded-xl font-bold active:scale-95 transition-all">Створити</button>
                 </div>
             </div>
             <div class="relative flex py-6 items-center"><div class="flex-grow border-t border-slate-200"></div><span class="flex-shrink-0 mx-4 text-slate-400 text-xs font-bold uppercase">Або</span><div class="flex-grow border-t border-slate-200"></div></div>
-            <button onclick="signInWithGoogle(this)" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 flex items-center justify-center gap-3 hover:bg-slate-50 active:scale-95 transition-all shadow-sm">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5"> Google
-            </button>
+            <div class="space-y-3">
+                <button onclick="signInWithGoogle(this)" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 flex items-center justify-center gap-3 hover:bg-slate-50 active:scale-95 transition-all shadow-sm">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5"> Увійти через Google
+                </button>
+            </div>
         </div>
     </div>
 
     <div id="appScreen" class="max-w-xl mx-auto p-4 md:p-6 pt-8 hidden">
         <header class="mb-4 flex justify-between items-start fade-in">
             <div><h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1><p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1"></p></div>
-            <button onclick="openSheet('settingsSheet'); calculateStats();" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl active:scale-95 transition-all">⚙️</button>
+            <button onclick="openSheet('settingsSheet'); calculateStats();" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl hover:bg-slate-50 active:scale-95 transition-all">⚙️</button>
         </header>
         
         <div id="librarySections" class="space-y-2 fade-in">
             <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="libraryTabs">
-                <button onclick="setLibraryTab('reading')" id="tab_reading" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md active:scale-95 transition-all">Читаю зараз</button>
-                <button onclick="setLibraryTab('planned')" id="tab_planned" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95 transition-all">В планах</button>
-                <button onclick="setLibraryTab('finished')" id="tab_finished" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95 transition-all">Прочитано</button>
+                <button onclick="setLibraryTab('reading')" id="tab_reading" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-indigo-600 text-white shadow-md active:scale-95">Читаю зараз</button>
+                <button onclick="setLibraryTab('planned')" id="tab_planned" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Хочу прочитати</button>
+                <button onclick="setLibraryTab('finished')" id="tab_finished" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Прочитано</button>
             </div>
             <div class="flex justify-end mb-2 fade-in">
                 <div class="bg-slate-200/60 p-1 rounded-xl flex gap-1 items-center">
@@ -98,39 +106,18 @@
         <div id="recommendationsScreen" class="hidden flex-col h-full mt-2 fade-in">
             <h2 class="text-xs font-bold uppercase text-slate-400 mb-3 ml-1 tracking-wide">Категорії</h2>
             <div class="flex gap-2 overflow-x-auto pb-3 mb-2 scrollbar-hide px-1" id="recTabs">
-                <button onclick="initRecs('auto', 'rec_auto')" id="rec_auto" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md active:scale-95 transition-all">✨ Для вас</button>
-                <button onclick="initRecs('Академія магії', 'rec_magic')" id="rec_magic" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95 transition-all">🔮 Академія магії</button>
-                <button onclick="initRecs('Фентезі', 'rec_fantasy')" id="rec_fantasy" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95 transition-all">Фентезі</button>
-                <button onclick="initRecs('Детектив', 'rec_detective')" id="rec_detective" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95 transition-all">Детектив</button>
-                <button onclick="initRecs('Фантастика', 'rec_scifi')" id="rec_scifi" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95 transition-all">Фантастика</button>
+                <button onclick="switchRecCategory('auto', 'rec_auto')" id="rec_auto" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95">✨ Для вас</button>
+                <button onclick="switchRecCategory('Академія магії', 'rec_magic')" id="rec_magic" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">🔮 Академія магії</button>
+                <button onclick="switchRecCategory('Фентезі', 'rec_fantasy')" id="rec_fantasy" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фентезі</button>
+                <button onclick="switchRecCategory('Детектив', 'rec_detective')" id="rec_detective" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Детектив</button>
+                <button onclick="switchRecCategory('Фантастика', 'rec_scifi')" id="rec_scifi" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фантастика</button>
             </div>
             <div id="recommendationsList" class="space-y-4 pb-12 mt-2"></div>
             <div id="recLoader" class="py-10 text-center text-slate-400 text-xs hidden animate-pulse">Завантаження ще більше книг...</div>
         </div>
     </div>
 
-    <div id="readerOverlay">
-        <div class="reader-controls relative">
-            <button onclick="closeReader()" class="font-bold text-red-500 bg-red-50 px-4 py-2 rounded-lg active:scale-95 transition-transform">✕ Закрити</button>
-            <div class="flex flex-col items-center justify-center max-w-[50%]">
-                <div id="readerTitle" class="text-xs font-bold truncate text-slate-500 w-full text-center">...</div>
-                <div id="readerTimer" class="text-[10px] font-mono font-bold text-slate-400 tracking-widest mt-0.5">00:00</div>
-            </div>
-            <button onclick="toggleReaderSettings()" class="font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-lg">⚙️</button>
-            <div id="readerSettingsMenu" class="hidden absolute top-16 right-4 w-56 bg-white shadow-2xl rounded-2xl p-4 border border-slate-100 space-y-4 z-50">
-                <div><p class="text-[10px] font-bold uppercase text-slate-400 mb-2">Розмір тексту</p><div class="flex gap-2"><button onclick="changeFontSize(-10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold text-slate-800 transition-transform">A-</button><button onclick="changeFontSize(10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold text-slate-800 transition-transform">A+</button></div></div>
-                <div><p class="text-[10px] font-bold uppercase text-slate-400 mb-2">Колір сторінок</p><div class="flex gap-2 justify-between"><button onclick="changeReaderTheme('light')" class="size-10 rounded-full bg-[#f8fafc] border-2 border-slate-200"></button><button onclick="changeReaderTheme('sepia')" class="size-10 rounded-full bg-[#f4ecd8] border-2 border-slate-200"></button><button onclick="changeReaderTheme('dark')" class="size-10 rounded-full bg-[#0f172a] border-2 border-slate-500"></button></div></div>
-            </div>
-        </div>
-        <div id="viewer" onclick="document.getElementById('readerSettingsMenu').classList.add('hidden')"></div>
-        <div class="reader-controls border-t">
-            <button onclick="rendition?.prev()" class="nav-btn">← Назад</button>
-            <div id="readerProgress" class="text-[10px] font-black text-indigo-600 tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg text-center">0%</div>
-            <button onclick="rendition?.next()" class="nav-btn !bg-indigo-600 !text-white">Вперед →</button>
-        </div>
-    </div>
-
-    <button id="searchFab" onclick="openSheet('searchSheet')" class="fixed bottom-24 right-6 z-40 size-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center text-2xl active:scale-95 transition-transform hidden">➕</button>
+    <button id="searchFab" onclick="openSheet('searchSheet')" class="fixed bottom-24 right-6 z-40 size-14 bg-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-300 flex items-center justify-center text-2xl hover:scale-105 active:scale-95 transition-transform duration-200 hidden">➕</button>
     <div class="backdrop fixed inset-0 z-40 bg-black/50 backdrop-blur-sm hidden" onclick="closeAllSheets()"></div>
 
     <nav id="mainBottomNav" class="bottom-nav hidden fade-in">
@@ -140,48 +127,82 @@
         </div>
     </nav>
 
-    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white h-[85vh] flex flex-col max-w-xl mx-auto">
-        <div class="drag-handle w-full flex justify-center py-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+    <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 90vh; overflow-y: auto;">
+        <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+        <h2 class="text-2xl font-bold mb-4">Налаштування</h2>
+        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-4">
+            <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400 mb-3">📊 Моя статистика</h3>
+            <div class="flex justify-between items-center mb-2"><span class="text-sm font-bold text-slate-700">Всього прочитано книг:</span><span id="statBooks" class="text-lg font-black text-indigo-600">0</span></div>
+            <div class="flex justify-between items-center"><span class="text-sm font-bold text-slate-700">Прочитано сторінок:</span><span id="statPages" class="text-lg font-black text-indigo-600">0</span></div>
+        </div>
+        <div class="space-y-3">
+            <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors"><span class="font-bold text-sm">Темна тема</span><button onclick="toggleAppTheme()" class="text-2xl p-1 bg-white rounded-full shadow-sm border border-slate-200 active:scale-95 transition-transform">🌓</button></div>
+            <button onclick="exportLibrary()" class="w-full p-4 bg-emerald-50 text-emerald-600 font-bold text-sm rounded-2xl active:scale-95 transition-transform">📥 Експортувати бібліотеку (JSON)</button>
+            <button onclick="clearAppCache()" class="w-full p-4 bg-amber-50 text-amber-600 font-bold text-sm rounded-2xl active:scale-95 transition-transform">🔄 Очистити кеш (Оновити)</button>
+            <button onclick="logout()" class="w-full p-4 bg-red-50 text-red-600 font-bold text-sm rounded-2xl active:scale-95 transition-transform">🚪 Вийти з акаунту</button>
+        </div>
+    </div>
+
+    <div id="readerOverlay">
+        <div class="reader-controls relative">
+            <button onclick="closeReader()" class="font-bold text-red-500 bg-red-50 px-4 py-2 rounded-lg active:scale-95 transition-transform">✕ Закрити</button>
+            <div class="flex flex-col items-center justify-center max-w-[50%]">
+                <div id="readerTitle" class="text-xs font-bold truncate text-slate-500 w-full text-center">Назва книги</div>
+                <div id="readerTimer" class="text-[10px] font-mono font-bold text-slate-400 tracking-widest mt-0.5">00:00</div>
+            </div>
+            <button onclick="toggleReaderSettings()" class="font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-lg active:scale-95 transition-transform">⚙️</button>
+            <div id="readerSettingsMenu" class="hidden absolute top-16 right-4 w-56 bg-white shadow-2xl rounded-2xl p-4 border border-slate-100 space-y-4 z-50 fade-in">
+                <div><p class="text-[10px] font-bold uppercase text-slate-400 mb-2">Розмір тексту</p><div class="flex gap-2"><button onclick="changeFontSize(-10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold active:scale-95 text-slate-800 transition-transform">A-</button><button onclick="changeFontSize(10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold active:scale-95 text-slate-800 transition-transform">A+</button></div></div>
+                <div><p class="text-[10px] font-bold uppercase text-slate-400 mb-2">Колір сторінок</p><div class="flex gap-2 justify-between"><button onclick="changeReaderTheme('light')" class="size-10 rounded-full bg-[#f8fafc] border-2 border-slate-200 shadow-sm active:scale-90 transition-transform"></button><button onclick="changeReaderTheme('sepia')" class="size-10 rounded-full bg-[#f4ecd8] border-2 border-slate-200 shadow-sm active:scale-90 transition-transform"></button><button onclick="changeReaderTheme('dark')" class="size-10 rounded-full bg-[#0f172a] border-2 border-slate-500 shadow-sm active:scale-90 transition-transform"></button></div></div>
+            </div>
+        </div>
+        <div id="viewer" onclick="document.getElementById('readerSettingsMenu').classList.add('hidden')"></div>
+        <div class="reader-controls border-t">
+            <button onclick="rendition?.prev()" class="nav-btn">← Назад</button>
+            <div id="readerProgress" class="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg text-center min-w-[80px]">Відкриваємо...</div>
+            <button onclick="rendition?.next()" class="nav-btn !bg-indigo-600 !text-white">Вперед →</button>
+        </div>
+    </div>
+
+    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="height: 85vh;">
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <div class="px-5 pb-4 shrink-0">
             <h2 class="text-xl font-bold mb-4">Знайти книгу</h2>
             <div class="relative">
-                <span class="absolute left-4 top-3.5 text-slate-400">🔍</span>
+                <span class="absolute left-4 top-3.5 size-5 text-slate-400">🔍</span>
                 <input type="text" id="searchInput" placeholder="Назва або автор (напр. Избранница грозы)..." class="w-full pl-11 pr-4 py-3.5 bg-slate-100/80 rounded-2xl outline-none focus:bg-white focus:ring-2 ring-indigo-500 font-medium transition-all">
             </div>
         </div>
         <div id="searchResults" class="px-3 pb-6 overflow-y-auto flex-1">
-            <button onclick="openManualForm()" class="w-[calc(100%-24px)] mx-auto mb-2 p-3 text-center text-sm font-semibold text-indigo-600 bg-indigo-50 rounded-xl">✍️ Додати вручну</button>
+            <button onclick="openManualForm()" class="w-[calc(100%-24px)] mx-auto mb-2 p-3 text-center text-sm font-semibold text-indigo-600 bg-indigo-50 rounded-xl active:bg-indigo-100 transition-colors">✍️ Не знайшли? Додати вручну</button>
             <div id="searchItems" class="space-y-1"></div>
         </div>
     </div>
 
-    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white max-h-[92vh] flex flex-col max-w-xl mx-auto shadow-2xl">
-        <div class="drag-handle w-full flex justify-center py-4 touch-none cursor-grab"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
-        <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6"></div>
-        <div id="statusButtons" class="p-5 bg-white border-t grid grid-cols-3 gap-3 shrink-0 hidden">
-            <button onclick="addBookWithStatus('planned')" class="flex flex-col items-center p-3 bg-slate-50 rounded-xl text-indigo-600"><span class="text-xl mb-1">🕒</span><span class="text-[10px] font-bold uppercase">В плани</span></button>
-            <button onclick="addBookWithStatus('reading')" class="flex flex-col items-center p-3 bg-indigo-600 text-white rounded-xl"><span class="text-xl mb-1">📖</span><span class="text-[10px] font-bold uppercase">Читати</span></button>
-            <button onclick="addBookWithStatus('finished')" class="flex flex-col items-center p-3 bg-emerald-50 text-emerald-700 rounded-xl"><span class="text-xl mb-1">✅</span><span class="text-[10px] font-bold uppercase">Готово</span></button>
+    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="max-height: 92vh;">
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab active:cursor-grabbing"><div class="w-12 h-1.5 bg-slate-200 rounded-full pointer-events-none"></div></div>
+        <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
+        <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-4 fade-in">
+            <h3 class="text-xl font-bold mb-4">Редагувати книгу</h3>
+            <input type="text" id="editTitle" placeholder="Назва" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium">
+            <input type="text" id="editAuthor" placeholder="Автор" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium">
+            <input type="number" id="editPages" placeholder="Кількість сторінок" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium">
+            <input type="url" id="editImage" placeholder="URL обкладинки" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium text-sm">
+            <div class="flex gap-3 mt-4">
+                <button onclick="saveBookEdits()" class="flex-1 p-4 bg-indigo-600 text-white font-bold rounded-xl active:scale-95 transition-transform">Зберегти</button>
+                <button onclick="toggleEditMode(false)" class="flex-1 p-4 bg-slate-100 text-slate-700 font-bold rounded-xl active:scale-95 transition-transform">Скасувати</button>
+            </div>
         </div>
-    </div>
-
-    <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white p-6 max-w-xl mx-auto shadow-2xl">
-        <h2 class="text-2xl font-bold mb-4">Налаштування</h2>
-        <div class="bg-indigo-50 border rounded-2xl p-4 mb-4">
-            <h3 class="text-xs font-black uppercase text-indigo-400 mb-3">Статистика</h3>
-            <div class="flex justify-between items-center mb-2"><span class="text-sm font-bold">Прочитано книг:</span><span id="statBooks" class="text-lg font-black text-indigo-600">0</span></div>
-            <div class="flex justify-between items-center"><span class="text-sm font-bold">Прочитано сторінок:</span><span id="statPages" class="text-lg font-black text-indigo-600">0</span></div>
-        </div>
-        <div class="space-y-3">
-            <button onclick="toggleAppTheme()" class="w-full flex justify-between p-4 bg-slate-50 rounded-2xl font-bold text-sm">🌓 Темна тема <span>🌓</span></button>
-            <button onclick="exportLibrary()" class="w-full p-4 bg-emerald-50 text-emerald-600 font-bold rounded-2xl">📥 Експортувати JSON</button>
-            <button onclick="logout()" class="w-full p-4 bg-red-50 text-red-600 font-bold rounded-2xl">🚪 Вийти</button>
+        <div id="statusButtons" class="p-5 bg-white border-t border-slate-100 grid grid-cols-3 gap-3 shrink-0 rounded-t-2xl hidden">
+            <button onclick="addBookWithStatus('planned')" class="flex flex-col items-center justify-center p-3 bg-slate-50 rounded-xl hover:bg-slate-100 active:scale-95 transition-transform text-indigo-600"><span class="text-xl mb-1">🕒</span><span class="text-[11px] font-bold uppercase tracking-wide">В плани</span></button>
+            <button onclick="addBookWithStatus('reading')" class="flex flex-col items-center justify-center p-3 bg-indigo-600 text-white rounded-xl active:scale-95 transition-transform"><span class="text-xl mb-1">📖</span><span class="text-[11px] font-bold uppercase tracking-wide">Читати</span></button>
+            <button onclick="addBookWithStatus('finished')" class="flex flex-col items-center justify-center p-3 bg-emerald-50 text-emerald-700 rounded-xl active:scale-95 transition-transform"><span class="text-xl mb-1">✅</span><span class="text-[11px] font-bold uppercase tracking-wide">Прочитав</span></button>
         </div>
     </div>
 
     <script>
         const PLACEHOLDER_IMG = 'https://via.placeholder.com/128x192/f1f5f9/94a3b8?text=No+Cover';
-        const firebaseConfig = { apiKey: "AIzaSyAXgYW2_9ofKCvLoQFT6oMz0bCvbvldPGg", authDomain: "chitayko-pwa.firebaseapp.com", projectId: "chitayko-pwa", storageBucket: "chitayko-pwa.firebasestorage.app", messagingSenderId: "278531514478", appId: "1:278531514478:web:731dad47437f6aae2b067f" };
+        const firebaseConfig = { apiKey: "AIzaSyAXgYW2_9ofKCvLoQFT6oMz0bCvbvldPGg", authDomain: "chitayko-pwa.firebaseapp.com", projectId: "chitayko-pwa", storageBucket: "chitayko-pwa.firebasestorage.app", messagingSenderId: "278531514478", appId: "1:278531514478:web:731dad47437f6aae2b067f", measurementId: "G-1JN4FBQ13K" };
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth(), db = firebase.firestore();
 
@@ -194,6 +215,29 @@
         // Infinite Scroll
         let recCategory = 'auto', recIndex = 0, isLoadingRecs = false, hasMoreRecs = true;
 
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.bottom-sheet').forEach(sheet => {
+                let startY = 0, currentY = 0, isDragging = false;
+                sheet.addEventListener('touchstart', e => { 
+                    const scrollable = sheet.querySelector('.overflow-y-auto');
+                    if (!scrollable || scrollable.scrollTop <= 0 || e.target.closest('.drag-handle')) {
+                        startY = e.touches[0].clientY; isDragging = true; sheet.style.transition = 'none'; 
+                    }
+                }, {passive: true});
+                sheet.addEventListener('touchmove', e => { 
+                    if (!isDragging) return; currentY = e.touches[0].clientY; const deltaY = currentY - startY; 
+                    if (deltaY > 0) sheet.style.transform = `translateY(${deltaY}px)`; 
+                }, {passive: true});
+                sheet.addEventListener('touchend', e => {
+                    if (!isDragging) return; isDragging = false; sheet.style.transition = 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)';
+                    if (currentY - startY > 100) { if (sheet.id === 'detailsSheet') closeDetailsSheet(); else closeAllSheets(); }
+                    sheet.style.transform = ''; 
+                });
+            });
+            setupInfiniteScroll();
+        });
+
+        // --- Auth ---
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user; document.getElementById('authScreen').classList.add('hidden'); document.getElementById('appScreen').classList.remove('hidden');
@@ -206,61 +250,102 @@
 
         async function handleAuth(type, btn) {
             const email = document.getElementById('authEmail').value, pass = document.getElementById('authPassword').value;
+            if(email.length < 5 || pass.length < 6) return alert("Перевірте дані");
             try { if (type === 'login') await auth.signInWithEmailAndPassword(email, pass); else await auth.createUserWithEmailAndPassword(email, pass); } 
             catch (e) { alert(e.message); }
         }
         async function signInWithGoogle() { const provider = new firebase.auth.GoogleAuthProvider(); try { await auth.signInWithPopup(provider); } catch (e) { await auth.signInWithRedirect(provider); } }
         function logout() { auth.signOut(); closeAllSheets(); }
 
+        // --- Library ---
         function loadLibrary() { db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded', 'desc').onSnapshot(snap => { myLibrary = []; snap.forEach(doc => myLibrary.push({ id: doc.id, ...doc.data() })); render(); }); }
         async function updateBookInFirestore(id, updates) { if (currentUser) await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(updates); }
 
+        function calculateStats() {
+            const finished = myLibrary.filter(b => b.status === 'finished');
+            const totalPages = finished.reduce((sum, b) => sum + (parseInt(b.pagesTotal) || 0), 0);
+            document.getElementById('statBooks').innerText = finished.length; document.getElementById('statPages').innerText = totalPages;
+        }
+
         function render() {
             const container = document.getElementById('myBooksContainer');
-            const filtered = myLibrary.filter(b => b.status === currentLibraryTab);
-            document.getElementById('tab_reading').innerText = `Читаю (${myLibrary.filter(b=>b.status==='reading').length})`;
-            document.getElementById('tab_planned').innerText = `Плани (${myLibrary.filter(b=>b.status==='planned').length})`;
-            document.getElementById('tab_finished').innerText = `Готово (${myLibrary.filter(b=>b.status==='finished').length})`;
+            const reading = myLibrary.filter(b => b.status === 'reading');
+            const planned = myLibrary.filter(b => b.status === 'planned');
+            const finished = myLibrary.filter(b => b.status === 'finished');
+            
+            document.getElementById('tab_reading').innerText = `Читаю (${reading.length})`;
+            document.getElementById('tab_planned').innerText = `Плани (${planned.length})`;
+            document.getElementById('tab_finished').innerText = `Готово (${finished.length})`;
+
+            const filtered = currentLibraryTab === 'reading' ? reading : currentLibraryTab === 'planned' ? planned : finished;
+
             if (filtered.length === 0) { container.innerHTML = '<div class="mt-12 text-center text-slate-400">Тут порожньо</div>'; return; }
-            const wrapClass = viewMode === 'grid' ? 'grid grid-cols-3 gap-4' : 'space-y-4';
-            container.innerHTML = `<div class="${wrapClass}">${filtered.map(renderBookCard).join('')}</div>`;
+            
+            const wrapClass = viewMode === 'grid' ? 'grid grid-cols-3 gap-4 sortable-list' : 'space-y-4 sortable-list';
+            
+            if (currentLibraryTab === 'finished') {
+                finished.sort((a, b) => (b.dateFinished || '').localeCompare(a.dateFinished || ''));
+                const grouped = {};
+                finished.forEach(b => {
+                    const year = b.dateFinished ? b.dateFinished.substring(0, 4) : 'Без дати';
+                    if (!grouped[year]) grouped[year] = [];
+                    grouped[year].push(b);
+                });
+                let html = '';
+                Object.keys(grouped).sort((a, b) => b.localeCompare(a)).forEach(year => {
+                    html += `<h2 class="font-black text-slate-300 text-lg mt-6 mb-3 tracking-widest">${year}</h2><div class="${wrapClass}">${grouped[year].map(renderBookCard).join('')}</div>`;
+                });
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `<div class="${wrapClass}">${filtered.map(renderBookCard).join('')}</div>`;
+            }
+
+            if (viewMode === 'grid') {
+                document.querySelectorAll('.sortable-list').forEach(list => {
+                    new Sortable(list, { delay: 300, delayOnTouchOnly: true, animation: 150 });
+                });
+            }
         }
 
         function renderBookCard(book) {
             const pct = Math.round((book.pagesRead / (book.pagesTotal || 300)) * 100) || 0;
+            const isFinished = book.status === 'finished';
             if (viewMode === 'grid') {
-                return `<div onclick='showBookDetails(${JSON.stringify(book).replace(/'/g, "")})' class="flex flex-col items-center animate-fade-in"><img src="${book.image || PLACEHOLDER_IMG}" class="aspect-[2/3] w-full rounded-xl shadow-sm object-cover border"><h3 class="text-[10px] font-bold mt-2 truncate w-full text-center">${book.title}</h3></div>`;
+                return `<div data-id="${book.id}" onclick='showBookDetails(${JSON.stringify(book).replace(/'/g, "")})' class="flex flex-col items-center animate-fade-in relative">
+                    <img src="${book.image || PLACEHOLDER_IMG}" class="aspect-[2/3] w-full rounded-xl shadow-sm object-cover border">
+                    ${isFinished && book.rating ? `<div class="absolute -bottom-1 -right-1 bg-white text-amber-400 text-[9px] px-1 rounded shadow-sm">★${book.rating}</div>` : ''}
+                    <h3 class="text-[10px] font-bold mt-2 truncate w-full text-center">${book.title}</h3>
+                </div>`;
             }
             return `
-            <div onclick='showBookDetails(${JSON.stringify(book).replace(/'/g, "")})' class="bg-white p-4 rounded-2xl flex gap-4 border border-slate-100 shadow-sm animate-fade-in active:scale-[0.98] transition-all">
+            <div data-id="${book.id}" onclick='showBookDetails(${JSON.stringify(book).replace(/'/g, "")})' class="bg-white p-4 rounded-2xl flex gap-4 border border-slate-100 shadow-sm animate-fade-in active:scale-[0.98] transition-all">
                 <img src="${book.image || PLACEHOLDER_IMG}" class="w-16 h-24 rounded-xl object-cover shadow-sm flex-shrink-0">
                 <div class="flex-1 min-w-0">
                     <div class="flex justify-between items-start"><h3 class="font-bold text-slate-900 truncate">${book.title}</h3><button onclick="event.stopPropagation(); deleteBook('${book.id}')" class="text-slate-300">✕</button></div>
                     <p class="text-xs text-slate-500 truncate mb-3">${book.author}</p>
                     <div class="bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-indigo-600 h-full" style="width: ${pct}%"></div></div>
-                    <div class="flex justify-between text-[9px] font-black mt-2 text-slate-400 uppercase"><span>⏱️ ${formatTime(book.timeSpent)}</span><span>${pct}%</span></div>
+                    <div class="flex justify-between text-[9px] font-black mt-2 text-slate-400 uppercase tracking-widest"><span>⏱️ ${formatTime(book.timeSpent)}</span><span>${pct}%</span></div>
                     <div class="mt-3 flex gap-2">
-                        <input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')">
-                        <button onclick="event.stopPropagation(); document.getElementById('epubFile_${book.id}').click();" class="flex-1 py-1.5 bg-slate-800 text-white text-[9px] font-black rounded-lg">📁 ФАЙЛ</button>
+                        <input type="file" id="f_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')">
+                        <button onclick="event.stopPropagation(); document.getElementById('f_${book.id}').click();" class="flex-1 py-1.5 bg-slate-800 text-white text-[9px] font-black rounded-lg">📁 ФАЙЛ</button>
                         <button onclick="promptForEpubUrl('${book.id}', event)" class="flex-1 py-1.5 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg">🔗 URL</button>
                     </div>
                 </div>
             </div>`;
         }
 
-        // ПОШУК (ПОКРАЩЕНИЙ ДЛЯ "ИЗБРАННИЦА ГРОЗЫ")
+        // --- ПОШУК (ПОКРАЩЕНИЙ ДЛЯ "ИЗБРАННИЦА ГРОЗЫ") ---
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 2) return;
             searchItems.innerHTML = '<div class="p-8 text-center text-slate-400 text-sm">Шукаю...</div>';
             timeoutId = setTimeout(async () => {
                 try {
-                    // Подвійний запит для кращого результату
-                    const queries = [
+                    const urls = [
                         `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(query)}&maxResults=40&printType=books`,
                         `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&printType=books`
                     ];
-                    const responses = await Promise.all(queries.map(q => fetch(q).then(r => r.json())));
+                    const responses = await Promise.all(urls.map(q => fetch(q).then(r => r.json())));
                     let allItems = []; responses.forEach(r => { if(r.items) allItems.push(...r.items); });
                     const unique = Array.from(new Map(allItems.map(i => [i.id, i])).values());
                     searchItems.innerHTML = '';
@@ -276,8 +361,8 @@
             }, 600);
         });
 
-        // RECOMMENDATIONS & INFINITE SCROLL
-        function initRecs(cat, btnId) {
+        // --- RECOMMENDATIONS & INFINITE SCROLL ---
+        function switchRecCategory(cat, btnId) {
             recCategory = cat; recIndex = 0; hasMoreRecs = true;
             document.getElementById('recommendationsList').innerHTML = '';
             document.querySelectorAll('#recTabs button').forEach(b => b.className = 'px-4 py-2 rounded-full text-sm font-bold bg-slate-200 text-slate-600');
@@ -300,20 +385,29 @@
                         document.getElementById('recommendationsList').insertAdjacentHTML('beforeend', `
                             <div onclick='showBookDetails(${JSON.stringify(bookObj).replace(/'/g, "")}, true)' class="bg-white p-4 rounded-xl flex gap-3 border shadow-sm active:scale-95 transition-all mb-3">
                                 <img src="${bookObj.image}" class="w-16 h-24 rounded object-cover flex-shrink-0 shadow-sm">
-                                <div class="min-w-0 flex-1"><div class="font-bold text-sm truncate">${bookObj.title}</div><div class="text-xs text-slate-400">${bookObj.author}</div><div class="text-[10px] text-slate-400 mt-2 line-clamp-3 leading-snug">${bookObj.description}</div></div>
+                                <div class="min-w-0 flex-1"><div class="font-bold text-sm truncate">${bookObj.title}</div><div class="text-xs text-slate-500 mt-0.5">${bookObj.author}</div><div class="text-[10px] text-slate-400 mt-2 line-clamp-3 leading-snug">${bookObj.description}</div></div>
                             </div>`);
                     });
                 }
             } catch(e) {} finally { isLoadingRecs = false; document.getElementById('recLoader').classList.add('hidden'); }
         }
 
-        // READER CORE
+        function setupInfiniteScroll() {
+            window.onscroll = () => {
+                if (document.getElementById('recommendationsScreen').classList.contains('hidden')) return;
+                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) {
+                    if (!isLoadingRecs && hasMoreRecs) loadRecommendations();
+                }
+            };
+        }
+
+        // --- READER ---
         function startTimer() { readingStartTime = Date.now(); currentSessionSeconds = 0; readingTimer = setInterval(() => { currentSessionSeconds = Math.floor((Date.now() - readingStartTime)/1000); const m = String(Math.floor(currentSessionSeconds/60)).padStart(2, '0'), s = String(currentSessionSeconds%60).padStart(2, '0'); document.getElementById('readerTimer').innerText = `${m}:${s}`; }, 1000); }
         function stopTimer() { if(readingTimer && currentReaderBookId) { clearInterval(readingTimer); const b = myLibrary.find(x=>x.id===currentReaderBookId); if(b) db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ timeSpent: (b.timeSpent||0) + currentSessionSeconds }); } }
 
         function startReaderUI(book) {
             currentReaderBookId = book.id; document.getElementById('readerOverlay').style.display = 'flex';
-            document.getElementById('readerTitle').innerText = book.title; document.getElementById('appScreen').classList.add('hidden');
+            document.getElementById('readerTitle').innerText = book.title; document.getElementById('librarySections').classList.add('hidden');
             startTimer();
         }
 
@@ -326,36 +420,98 @@
 
         function handleFileSelect(e, id) { const file = e.target.files[0]; if(!file) return; const b = myLibrary.find(x=>x.id===id); startReaderUI(b); const r = new FileReader(); r.onload = (ev) => loadEpub(ev.target.result, b); r.readAsArrayBuffer(file); }
 
-        // UI HELPERS
+        // --- UI Logic ---
         function switchTab(t) {
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             if (t === 'library') { document.querySelectorAll('.nav-item')[0].classList.add('active'); document.getElementById('librarySections').classList.remove('hidden'); document.getElementById('recommendationsScreen').classList.add('hidden'); document.getElementById('searchFab').classList.remove('hidden'); }
             else { document.querySelectorAll('.nav-item')[1].classList.add('active'); document.getElementById('librarySections').classList.add('hidden'); document.getElementById('recommendationsScreen').classList.remove('hidden'); document.getElementById('searchFab').classList.add('hidden'); if (recIndex === 0) loadRecommendations(); }
         }
-        function openSheet(id) { document.body.classList.add('modal-open'); document.getElementById(id).classList.add('open'); document.querySelector('.backdrop').classList.remove('hidden'); }
-        function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); }
-        function closeReader() { stopTimer(); document.getElementById('readerOverlay').style.display='none'; document.getElementById('appScreen').classList.remove('hidden'); if(currentBookInstance) currentBookInstance.destroy(); }
-        function formatTime(s) { if(!s) return "0 хв"; return Math.floor(s/60) + " хв"; }
-        function isCyrillic(t) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(t); }
-        function setLibraryTab(t) { currentLibraryTab = t; render(); }
-        function setViewMode(m) { viewMode = m; localStorage.setItem('viewMode', m); render(); }
-        async function addBookWithStatus(s) { const d = { ...tempSelectedBook, status: s, dateAdded: Date.now(), pagesRead: s==='finished' ? tempSelectedBook.pagesTotal : 0, timeSpent: 0 }; await db.collection('users').doc(currentUser.uid).collection('books').add(d); closeAllSheets(); }
-        function deleteBook(id) { if(confirm("Видалити?")) db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); }
-        function promptForEpubUrl(id, e) { e.stopPropagation(); const url = prompt("URL книги (.epub):"); if(url) db.collection('users').doc(currentUser.uid).collection('books').doc(id).update({ epubUrl: url }); }
 
         function showBookDetails(b, isSearch = false) {
             tempSelectedBook = isSearch ? b : null;
-            document.getElementById('detailsContent').innerHTML = `
-                <div class="flex gap-5 mb-6 pt-2"><img src="${b.image}" class="w-28 h-40 rounded-2xl object-cover shadow-lg border"><div class="flex-1 py-1"><h3 class="text-xl font-bold leading-tight">${b.title}</h3><p class="text-indigo-600 font-bold mt-1">${b.author}</p><p class="text-xs text-slate-400 mt-4">${b.pagesTotal} сторінок</p></div></div>
-                <div class="mb-4"><h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Анотація</h4><p class="text-sm text-slate-700 leading-relaxed">${b.description || 'Немає опису'}</p></div>`;
+            const libBook = myLibrary.find(x => x.id === b.id || (x.googleId && x.googleId === b.googleId)) || b;
+            toggleEditMode(false);
+
+            let html = `
+                <div class="flex gap-5 mb-6 pt-2"><img src="${libBook.image}" class="w-28 h-40 rounded-2xl object-cover shadow-lg border">
+                <div class="flex-1 py-1"><h3 class="text-xl font-bold leading-tight">${libBook.title}</h3><p class="text-indigo-600 font-bold mt-1">${libBook.author}</p>
+                <p class="text-xs text-slate-400 mt-4">${libBook.pagesTotal} сторінок</p>
+                ${!isSearch ? `
+                    <select onchange="changeStatusFromDetails('${libBook.id}', this.value)" class="mt-4 w-full bg-slate-50 border p-2 rounded-lg text-xs outline-none">
+                        <option value="planned" ${libBook.status === 'planned' ? 'selected' : ''}>⏳ В планах</option>
+                        <option value="reading" ${libBook.status === 'reading' ? 'selected' : ''}>📖 Читаю зараз</option>
+                        <option value="finished" ${libBook.status === 'finished' ? 'selected' : ''}>✅ Прочитано</option>
+                    </select>
+                ` : ''}
+                </div></div>`;
+
+            if(!isSearch) {
+                html += `
+                <div class="mb-6 p-4 bg-slate-50 rounded-2xl">
+                    <h4 class="text-[9px] font-black uppercase text-slate-400 mb-3 tracking-widest">Дати читання</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center"><span class="text-xs font-bold text-slate-600">Почато:</span><input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="date-input"></div>
+                        <div class="flex justify-between items-center"><span class="text-xs font-bold text-slate-600">Закінчено:</span><input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="date-input"></div>
+                    </div>
+                </div>`;
+
+                let stars = '';
+                for(let i=1; i<=5; i++) stars += `<span onclick="setRating('${libBook.id}', ${i})" class="text-4xl cursor-pointer ${libBook.rating >= i ? 'text-amber-400' : 'text-slate-200'}">★</span>`;
+                html += `<div class="mb-6 text-center"><p class="text-[9px] font-black text-slate-400 uppercase mb-2">Оцінка</p><div class="flex justify-center gap-2">${stars}</div></div>`;
+                
+                html += `<div class="mb-6"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-2">Нотатки</h4><textarea id="rev_${libBook.id}" class="w-full p-4 bg-slate-50 rounded-2xl text-sm outline-none" placeholder="Враження..." onblur="saveReview('${libBook.id}')">${libBook.review || ''}</textarea></div>`;
+            }
+
+            html += `<div class="desc-scroll"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-2">Анотація</h4><p class="text-sm text-slate-700 leading-relaxed">${libBook.description || 'Немає опису'}</p></div>`;
+            
+            if(!isSearch) {
+                html += `<div class="mt-8 flex gap-3"><button onclick="toggleEditMode(true)" class="flex-1 p-4 bg-slate-100 font-bold rounded-xl">📝 Редагувати</button><button onclick="deleteBook('${libBook.id}')" class="flex-1 p-4 bg-red-50 text-red-500 font-bold rounded-xl">🗑️ Видалити</button></div>`;
+            }
+
+            document.getElementById('detailsContent').innerHTML = html;
             if(isSearch) document.getElementById('statusButtons').classList.remove('hidden'); else document.getElementById('statusButtons').classList.add('hidden');
             openSheet('detailsSheet');
         }
 
-        window.onscroll = () => {
-            if (document.getElementById('recommendationsScreen').classList.contains('hidden')) return;
-            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 800) loadRecommendations();
-        };
+        // --- Utils ---
+        function openSheet(id) { document.body.classList.add('modal-open'); document.getElementById(id).classList.add('open'); document.querySelector('.backdrop').classList.remove('hidden'); }
+        function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
+        function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
+        function toggleEditMode(e) { 
+            if(e) { 
+                const b = myLibrary.find(x => x.id === (tempSelectedBook?.id || currentReaderBookId));
+                if(b) {
+                    document.getElementById('editTitle').value = b.title;
+                    document.getElementById('editAuthor').value = b.author;
+                    document.getElementById('editPages').value = b.pagesTotal;
+                    document.getElementById('editImage').value = b.image;
+                }
+                document.getElementById('detailsContent').classList.add('hidden'); 
+                document.getElementById('editContent').classList.remove('hidden'); 
+            } else { 
+                document.getElementById('detailsContent').classList.remove('hidden'); 
+                document.getElementById('editContent').classList.add('hidden'); 
+            } 
+        }
+        function formatTime(s) { if(!s) return "0хв"; const h = Math.floor(s/3600); const m = Math.floor((s%3600)/60); return h > 0 ? `${h}г ${m}хв` : `${m}хв`; }
+        function isCyrillic(t) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(t); }
+        function isEnglishTitle(t) { if(!t) return true; const l = t.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g); const e = t.match(/[a-zA-Z]/g); return (e && l && e.length > (l.length * 0.4)); }
+        function setLibraryTab(t) { currentLibraryTab = t; document.querySelectorAll('#libraryTabs button').forEach(b => b.className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600'); document.getElementById('tab_'+t).className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md'; render(); }
+        function setViewMode(m) { viewMode = m; localStorage.setItem('viewMode', m); render(); }
+        function toggleAppTheme() { document.body.classList.toggle('dark'); localStorage.setItem('appTheme', document.body.classList.contains('dark') ? 'dark' : 'light'); }
+        
+        async function addBookWithStatus(s) { 
+            const d = { ...tempSelectedBook, status: s, dateAdded: Date.now(), pagesRead: s==='finished' ? tempSelectedBook.pagesTotal : 0, timeSpent: 0, dateStarted: s==='reading' ? new Date().toISOString().slice(0, 10) : null, dateFinished: s==='finished' ? new Date().toISOString().slice(0, 10) : null }; 
+            await db.collection('users').doc(currentUser.uid).collection('books').add(d); 
+            closeAllSheets(); 
+        }
+        function deleteBook(id) { if(confirm("Видалити?")) { db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); closeAllSheets(); } }
+        function saveManualDate(id, f, el) { updateBookInFirestore(id, { [f]: el.value }); }
+        function setRating(id, r) { updateBookInFirestore(id, { rating: r }); setTimeout(() => showBookDetails(myLibrary.find(x=>x.id===id)), 200); }
+        function saveReview(id) { updateBookInFirestore(id, { review: document.getElementById('rev_'+id).value }); }
+        function changeStatusFromDetails(id, s) { updateBookInFirestore(id, { status: s }); closeAllSheets(); }
+        function promptForEpubUrl(id, e) { e.stopPropagation(); const u = prompt("URL книги (.epub):"); if(u) updateBookInFirestore(id, { epubUrl: u }); }
+        function closeReader() { stopTimer(); document.getElementById('readerOverlay').style.display='none'; document.getElementById('appScreen').classList.remove('hidden'); if(currentBookInstance) currentBookInstance.destroy(); }
     </script>
 </body>
 </html>
