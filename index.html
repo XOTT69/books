@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
@@ -214,7 +214,6 @@
         let readerTheme = localStorage.getItem('readerTheme') || 'light', readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
 
-        // Глобальні змінні для нескінченного скролу рекомендацій
         let recStartIndex = 0;
         let currentRecQueries = [];
         let isFetchingRecs = false;
@@ -240,12 +239,9 @@
                 });
             });
 
-            // Налаштування Observer'а для Infinite Scroll рекомендацій
             const recObserver = new IntersectionObserver((entries) => {
                 if(entries[0].isIntersecting && !document.getElementById('recommendationsScreen').classList.contains('hidden')) {
-                    if (!isFetchingRecs && currentRecQueries.length > 0) {
-                        fetchMoreRecommendations();
-                    }
+                    if (!isFetchingRecs && currentRecQueries.length > 0) fetchMoreRecommendations();
                 }
             }, { rootMargin: '300px' });
             recObserver.observe(document.getElementById('recScrollTarget'));
@@ -313,17 +309,7 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // Допоміжні функції для фільтрів
-        function isEnglishTitle(title) {
-            if (!title) return true;
-            const letters = title.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);
-            if (!letters) return false;
-            const engLetters = title.match(/[a-zA-Z]/g);
-            return (engLetters && engLetters.length > (letters.length * 0.4));
-        }
-        function isCyrillic(str) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(str); }
-
-        // ВИПРАВЛЕНИЙ ПОШУК: Без жорсткого intitle:, який ламав пошук "Избранница грозы"
+        // ВИПРАВЛЕНИЙ ПОШУК: Окремо обробляємо авторів (хронологія) та розумний пошук з видаленням "сміття"
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 2) { searchItems.innerHTML = ''; return; }
@@ -331,30 +317,80 @@
 
             timeoutId = setTimeout(async () => {
                 try {
-                    // КЛЮЧОВА ЗМІНА: Ширший пошук, сортування за релевантністю
-                    const searchQuery = encodeURIComponent(query);
-                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=40&orderBy=relevance`);
-                    const data = await res.json(); searchItems.innerHTML = '';
+                    let allItems = [];
+                    const isAuthorSearch = query.startsWith('author:"') && query.endsWith('"');
                     
-                    if (!data.items) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
+                    if (isAuthorSearch) {
+                        // Режим: пошук тільки по автору + хронологія
+                        const authorName = query.slice(8, -1);
+                        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(authorName)}"&printType=books&maxResults=40`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.items) allItems = data.items;
+                        }
+                    } else {
+                        // Режим: розумний пошук (назва + загальний)
+                        const safeQuery = encodeURIComponent('"' + query + '"'); // Беремо в лапки для точного збігу фраз
+                        const [resTitle, resGen] = await Promise.all([
+                            fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&printType=books&maxResults=20`),
+                            fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&printType=books&maxResults=20`)
+                        ]);
 
-                    // Відсіюємо англійські книги та явне сміття
-                    const allowedLangs = ['uk', 'ru', 'bg']; 
-                    const filteredItems = data.items.filter(item => {
+                        if (resTitle.ok) { const d = await resTitle.json(); if (d.items) allItems.push(...d.items); }
+                        if (resGen.ok) { const d = await resGen.json(); if (d.items) allItems.push(...d.items); }
+                    }
+
+                    if (allItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
+
+                    // Видаляємо дублікати
+                    const uniqueItems = [];
+                    const seenIds = new Set();
+                    allItems.forEach(item => { if (!seenIds.has(item.id)) { seenIds.add(item.id); uniqueItems.push(item); } });
+
+                    const badCategories = ['Science', 'Technology', 'Computers', 'Medical', 'Law', 'Business & Economics', 'Mathematics', 'Education', 'Study Aids', 'Religion'];
+
+                    let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
                         if (!b || !b.title) return false;
                         
-                        // Фільтр мови від Google
-                        if (b.language && !allowedLangs.includes(b.language) && b.language !== 'un') return false;
-                        
-                        // Ручний фільтр на англійські літери в назві
-                        if (isEnglishTitle(b.title)) return false;
-                        
-                        // Відкидаємо явні брошури, але пропускаємо книги, де сторінки просто не вказані (як буває з електронними)
-                        if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 50) return false;
+                        // Якщо це пошук автора - пропускаємо майже все
+                        if (isAuthorSearch) return true;
 
+                        const isExactTitle = b.title.toLowerCase().includes(query.toLowerCase());
+                        
+                        // Якщо назва не збігається точно - жорстко фільтруємо "сміття"
+                        if (!isExactTitle) {
+                            if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 10) return false;
+                            if (b.categories && b.categories.some(c => badCategories.includes(c))) return false;
+                        }
                         return true;
-                    }).slice(0, 30);
+                    });
+
+                    // Сортування результатів
+                    if (isAuthorSearch) {
+                        // Сортуємо хронологічно (від найстарішої до найновішої)
+                        filteredItems.sort((a, b) => {
+                            const dateA = a.volumeInfo.publishedDate || '9999';
+                            const dateB = b.volumeInfo.publishedDate || '9999';
+                            return dateA.localeCompare(dateB);
+                        });
+                    } else {
+                        // Сортуємо за релевантністю (точний збіг назви -> нагору)
+                        filteredItems.sort((a, b) => {
+                            const tA = (a.volumeInfo.title || '').toLowerCase();
+                            const tB = (b.volumeInfo.title || '').toLowerCase();
+                            const qLower = query.toLowerCase();
+                            
+                            const exactTitleA = tA === qLower || tA.startsWith(qLower + ' ');
+                            const exactTitleB = tB === qLower || tB.startsWith(qLower + ' ');
+                            
+                            if (exactTitleA && !exactTitleB) return -1;
+                            if (!exactTitleA && exactTitleB) return 1;
+                            return 0;
+                        });
+                    }
+
+                    filteredItems = filteredItems.slice(0, 30);
 
                     if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено художніх книг за цим запитом.</div>';
 
@@ -370,22 +406,28 @@
                             pagesTotal: b.pageCount || 300, 
                             image: safeImage, 
                             description: b.description || 'Анотація відсутня.', 
-                            genre: genre 
+                            genre: genre,
+                            publishedDate: b.publishedDate || '' // Зберігаємо дату для відображення
                         };
                         
-                        div.className = "p-3 mx-2 my-1 hover:bg-slate-100 rounded-2xl cursor-pointer flex items-center gap-4 active:bg-slate-200 fade-in";
-                        div.innerHTML = `<img src="${book.image}" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-2"><div class="font-bold text-slate-900 truncate">${book.title}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${book.author}</div></div>`;
+                        div.className = "p-3 mx-2 my-1 hover:bg-slate-100 rounded-2xl cursor-pointer flex items-center gap-4 active:bg-slate-200 fade-in relative";
+                        // Показуємо рік публікації, якщо це пошук по автору
+                        const yearHtml = (isAuthorSearch && book.publishedDate) ? `<div class="absolute top-2 right-3 text-[10px] font-bold text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded">${book.publishedDate.substring(0,4)}</div>` : '';
+
+                        div.innerHTML = `<img src="${book.image}" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-6"><div class="font-bold text-slate-900 truncate">${book.title}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${book.author}</div></div>${yearHtml}`;
                         div.onclick = () => showBookDetails(book, true); searchItems.appendChild(div);
                     });
                 } catch (e) { searchItems.innerHTML = `<div class="p-8 text-red-500 text-sm text-center">Перевірте підключення</div>`; }
             }, 600);
         });
 
+        // НОВИЙ ФУНКЦІОНАЛ ПОШУКУ ПО АВТОРУ
         window.searchAuthorBooks = function(authorName) {
             closeAllSheets(); 
             setTimeout(() => {
                 const input = document.getElementById('searchInput');
-                input.value = authorName; 
+                // Використовуємо спец-синтаксис, який розпізнається в обробнику пошуку
+                input.value = `author:"${authorName}"`; 
                 openSheet('searchSheet');
                 input.dispatchEvent(new Event('input'));
             }, 350); 
@@ -619,7 +661,6 @@
             'Фантастика': ['"наукова фантастика" бестселер', '"научная фантастика" бестселлер', 'Фрэнк Герберт Дюна', 'Айзек Азимов', 'Рэй Брэдбери', 'Джордж Оруэлл', 'Энди Вейер']
         };
 
-        // НОВИЙ МЕХАНІЗМ РЕКОМЕНДАЦІЙ З INFINITE SCROLL
         async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
             if (currentRecCategory === category) return;
             currentRecCategory = category;
@@ -695,7 +736,6 @@
                     const b = item.volumeInfo;
                     if (!b.title || !b.description || b.description.length < 20) return false;
                     
-                    // Відсіюємо брошури, але пропускаємо книги без вказаної кількості сторінок
                     if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 50) return false;
                     if (!isCyrillic(b.title)) return false;
                     if (isEnglishTitle(b.title)) return false;
