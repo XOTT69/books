@@ -84,7 +84,11 @@
 
     <div id="appScreen" class="max-w-xl mx-auto p-4 md:p-6 pt-8 hidden">
         <header class="mb-4 flex justify-between items-start fade-in">
-            <div><h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1><p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1"></p></div>
+            <div>
+                <h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1>
+                <p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1 mb-2"></p>
+                <div id="goalWidget" class="hidden cursor-pointer" onclick="setYearlyGoal()"></div>
+            </div>
             <button onclick="openSheet('settingsSheet'); calculateStats();" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl hover:bg-slate-50 active:scale-95 transition-all">⚙️</button>
         </header>
         
@@ -215,12 +219,13 @@
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
 
         // Змінні для нескінченного скролу
-        let recStartIndex = 0;
-        let currentRecQueries = [];
-        let currentRecQueryIndex = 0;
-        let isFetchingRecs = false;
-        let currentRecCategory = null;
-        let shownRecTitles = new Set();
+        let recStartIndex = 0, currentRecQueries = [], currentRecQueryIndex = 0, isFetchingRecs = false, currentRecCategory = null, shownRecTitles = new Set();
+        
+        // Ініціалізація IndexedDB для офлайн книг
+        let localDB;
+        const idbReq = indexedDB.open("ChitaykoDB", 1);
+        idbReq.onupgradeneeded = (e) => { localDB = e.target.result; localDB.createObjectStore("epubs"); };
+        idbReq.onsuccess = (e) => { localDB = e.target.result; };
 
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.bottom-sheet').forEach(sheet => {
@@ -244,15 +249,20 @@
 
             const recObserver = new IntersectionObserver((entries) => {
                 if(entries[0].isIntersecting && !document.getElementById('recommendationsScreen').classList.contains('hidden')) {
-                    if (!isFetchingRecs && currentRecQueries.length > 0) {
-                        fetchMoreRecommendations();
-                    }
+                    if (!isFetchingRecs && currentRecQueries.length > 0) fetchMoreRecommendations();
                 }
             }, { rootMargin: '300px' });
             
             const scrollTarget = document.getElementById('recScrollTarget');
             if(scrollTarget) recObserver.observe(scrollTarget);
         });
+
+        // Встановлення цілі на рік
+        function setYearlyGoal() {
+            const currentYear = new Date().getFullYear();
+            const goal = prompt(`Скільки книг ви хочете прочитати у ${currentYear} році?`, localStorage.getItem('yearlyGoal') || 20);
+            if(goal && !isNaN(goal) && parseInt(goal) > 0) { localStorage.setItem('yearlyGoal', parseInt(goal)); render(); }
+        }
 
         function calculateStats() {
             const finished = myLibrary.filter(b => b.status === 'finished');
@@ -325,7 +335,6 @@
         }
         function isCyrillic(str) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(str); }
 
-        // ПАРАЛЕЛЬНИЙ ПОШУК ТА РОЗУМНИЙ ФІЛЬТР "АВТОР АБО НАЗВА"
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const rawQuery = e.target.value.trim();
             if (rawQuery.length < 2) { searchItems.innerHTML = ''; return; }
@@ -602,12 +611,38 @@
         function changeReaderTheme(theme) { readerTheme = theme; localStorage.setItem('readerTheme', theme); applyReaderSettings(); }
         function initSwipeGestures() { const viewerEl = document.getElementById('viewer'); if(!window.mc) { window.mc = new Hammer(viewerEl); window.mc.get('swipe').set({ direction: Hammer.DIRECTION_HORIZONTAL }); window.mc.on("swipeleft", () => { if (rendition) rendition.next(); }); window.mc.on("swiperight", () => { if (rendition) rendition.prev(); }); } }
 
+        // ОФЛАЙН ЧИТАННЯ (IndexedDB)
         function handleFileSelect(event, bookId) {
             const file = event.target.files[0]; if (!file) return; if (!file.name.toLowerCase().endsWith('.epub')) { alert("Будь ласка, виберіть файл у форматі .epub"); event.target.value = ''; return; }
             const bookData = myLibrary.find(b => b.id === bookId);
             if (bookData.lastFileName && bookData.lastFileName !== file.name) { const isSure = confirm(`⚠️ Увага!\nМинулого разу ви читали: "${bookData.lastFileName}"\nЗараз обрали: "${file.name}"\nЯкщо це інша книга, прогрес зіб'ється. Ви впевнені?`); if (!isSure) { event.target.value = ''; return; } }
+            
+            // Зберігаємо файл локально у IndexedDB
+            if(localDB) {
+                const tx = localDB.transaction("epubs", "readwrite");
+                tx.objectStore("epubs").put(file, bookId);
+            }
+
             if (bookData.lastFileName !== file.name) updateBookInFirestore(bookId, { lastFileName: file.name });
             startReaderUI(bookData); const reader = new FileReader(); reader.onload = function(e) { loadEpubData(e.target.result, bookData); }; reader.onerror = function() { alert("Помилка."); closeReader(); }; reader.readAsArrayBuffer(file); event.target.value = ''; 
+        }
+
+        function openOfflineEpub(bookId, event) {
+            event.stopPropagation();
+            if(!localDB) return alert('Помилка бази даних.');
+            const tx = localDB.transaction("epubs", "readonly");
+            const req = tx.objectStore("epubs").get(bookId);
+            req.onsuccess = () => {
+                if(req.result) {
+                    const bookData = myLibrary.find(b => b.id === bookId);
+                    startReaderUI(bookData);
+                    const reader = new FileReader();
+                    reader.onload = function(e) { loadEpubData(e.target.result, bookData); };
+                    reader.readAsArrayBuffer(req.result);
+                } else {
+                    alert('Файл не знайдено на цьому пристрої. Завантажте його знову (через кнопку 🔄)');
+                }
+            };
         }
 
         function promptForEpubUrl(bookId, event) { event.stopPropagation(); const url = prompt("Пряме веб-посилання на файл .epub:"); if(url) updateBookInFirestore(bookId, { epubUrl: url }); }
@@ -624,12 +659,25 @@
                 const safeCfi = (bookData.lastCfi && typeof bookData.lastCfi === 'string' && bookData.lastCfi.startsWith('epubcfi')) ? bookData.lastCfi : undefined;
                 rendition.display(safeCfi).catch(() => rendition.display());
                 currentBookInstance.ready.then(() => currentBookInstance.locations.generate(1600)).then(() => { const loc = rendition.currentLocation(); if(loc && loc.start) document.getElementById('readerProgress').innerText = Math.round(loc.start.percentage * 100) + "%"; else document.getElementById('readerProgress').innerText = "Відкрито"; }).catch(err => console.log(err));
+                
                 rendition.on("relocated", (location) => {
                     if (location && location.start) {
                         let percent = 0; if (location.start.percentage) percent = Math.round(location.start.percentage * 100); document.getElementById('readerProgress').innerText = percent > 0 ? percent + "%" : "Рахуємо...";
                         if (percent > 0) db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ lastCfi: location.start.cfi, pagesRead: Math.round((percent / 100) * (bookData.pagesTotal || 300)) }); else db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ lastCfi: location.start.cfi });
                     }
                 });
+
+                // ЗБЕРЕЖЕННЯ ЦИТАТ
+                rendition.on("selected", (cfiRange, contents) => {
+                    const text = rendition.getRange(cfiRange).toString();
+                    if(text && confirm("Зберегти виділений текст як цитату до ваших нотаток?")) {
+                        const book = myLibrary.find(b => b.id === currentReaderBookId);
+                        const newReview = (book.review || '') + `\n\n💬 "${text}"\n`;
+                        db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ review: newReview.trim() });
+                        contents.window.getSelection().removeAllRanges();
+                    }
+                });
+
             } catch (err) { console.error(err); document.getElementById('readerProgress').innerText = "Помилка"; stopTimer(); }
         }
 
@@ -664,7 +712,14 @@
                             
                             <button onclick="event.stopPropagation(); window.open('https://www.google.com/search?q=${encodeURIComponent(book.title + ' ' + book.author + ' epub скачати безкоштовно')}', '_blank')" class="w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">🔍 Знайти файл в інтернеті</button>
                             
-                            <div class="relative w-full"><input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')"><button onclick="event.stopPropagation(); document.getElementById('epubFile_${book.id}').click();" class="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">📁 Файл з пристрою</button></div>
+                            ${book.lastFileName ? `
+                                <div class="flex gap-2 w-full mt-1">
+                                    <button onclick="openOfflineEpub('${book.id}', event)" class="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">📖 Читати (Офлайн)</button>
+                                    <div class="relative"><input type="file" id="epf_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')"><button onclick="event.stopPropagation();document.getElementById('epf_${book.id}').click();" class="px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold active:scale-95 transition-transform" title="Оновити файл">🔄</button></div>
+                                </div>
+                            ` : `
+                                <div class="relative w-full"><input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')"><button onclick="event.stopPropagation(); document.getElementById('epubFile_${book.id}').click();" class="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">📁 Файл з пристрою</button></div>
+                            `}
                         </div>
                     `}
                 </div>
@@ -674,8 +729,20 @@
         function render() {
             const reading = myLibrary.filter(b => b.status === 'reading'); const planned = myLibrary.filter(b => b.status === 'planned'); const finished = myLibrary.filter(b => b.status === 'finished');
             document.getElementById('tab_reading').innerText = `Читаю зараз (${reading.length})`; document.getElementById('tab_planned').innerText = `Хочу прочитати (${planned.length})`; document.getElementById('tab_finished').innerText = `Прочитано (${finished.length})`;
-            const container = document.getElementById('myBooksContainer');
             
+            // ВІДМАЛЬОВУВАННЯ ЦІЛІ НА РІК (ГЕЙМІФІКАЦІЯ)
+            const currentYear = new Date().getFullYear();
+            const yearlyGoal = parseInt(localStorage.getItem('yearlyGoal')) || 20;
+            const booksThisYear = finished.filter(b => b.dateFinished && b.dateFinished.startsWith(currentYear.toString())).length;
+            const goalPercent = Math.min(100, Math.round((booksThisYear / yearlyGoal) * 100));
+            const goalWidget = document.getElementById('goalWidget');
+            goalWidget.innerHTML = `
+                <div class="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1"><span>🎯 Виклик ${currentYear}</span><span class="text-indigo-600">${booksThisYear} / ${yearlyGoal}</span></div>
+                <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden"><div class="bg-indigo-600 h-full transition-all duration-500" style="width: ${goalPercent}%"></div></div>
+            `;
+            goalWidget.classList.remove('hidden');
+
+            const container = document.getElementById('myBooksContainer');
             if ((currentLibraryTab === 'reading' && reading.length === 0) || (currentLibraryTab === 'planned' && planned.length === 0) || (currentLibraryTab === 'finished' && finished.length === 0)) { container.innerHTML = `<div class="mt-10 text-center px-6"><span class="text-4xl block mb-4">📚</span><h3 class="text-xl font-bold text-slate-900 mb-2">Тут поки порожньо</h3><p class="text-slate-500 text-sm">Додайте сюди книги!</p></div>`; return; }
             
             container.classList.remove('fade-in'); void container.offsetWidth; container.classList.add('fade-in');
