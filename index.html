@@ -343,7 +343,6 @@
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&maxResults=30`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30`).catch(()=>({ok:false})));
                     } else {
-                        // Якщо це звичайний рядок пошуку - шукаємо широко, щоб зловити і авторів, і книги
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=25`).catch(()=>({ok:false})));
@@ -351,12 +350,10 @@
 
                     const responses = await Promise.all(promises);
 
-                    // Збір результатів Google Books
                     for (let i = 0; i < responses.length - 1; i++) {
                         if (responses[i] && responses[i].ok) { const d = await responses[i].json(); if (d.items) allItems.push(...d.items); }
                     }
                     
-                    // Збір результатів Apple Books
                     const appleRes = responses[responses.length - 1];
                     if (appleRes && appleRes.ok) {
                         const dApple = await appleRes.json();
@@ -380,7 +377,6 @@
 
                     if (allItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    // Видаляємо дублікати
                     const uniqueItems = [];
                     const seenKeys = new Set();
                     allItems.forEach(item => {
@@ -395,7 +391,6 @@
 
                     const badCategories = ['Science', 'Technology', 'Computers', 'Medical', 'Law', 'Business & Economics', 'Mathematics', 'Education', 'Study Aids', 'Religion'];
 
-                    // РОЗУМНИЙ ФІЛЬТР: Не вбиваємо результати, якщо людина ввела автора у звичайний рядок
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
                         if (!b || !b.title) return false;
@@ -408,13 +403,11 @@
                         const isTitleMatch = tLower.includes(qLower);
                         const isAuthMatch = aLower.includes(qLower);
                         
-                        // Відкидаємо лише якщо і назва не та, і автор не той, АБО якщо це підручник
                         if (!isTitleMatch && !isAuthMatch && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
 
                         return true;
                     });
 
-                    // РОЗУМНЕ СОРТУВАННЯ
                     if (isAuthorSearch) {
                         filteredItems.sort((a, b) => {
                             const dateA = a.volumeInfo.publishedDate || '9999';
@@ -429,31 +422,26 @@
                             const aB = (b.volumeInfo.authors || []).join(' ').toLowerCase();
                             const qLower = cleanQuery.toLowerCase();
                             
-                            // 1. Точний збіг назви
                             const exactTitleA = tA === qLower;
                             const exactTitleB = tB === qLower;
                             if (exactTitleA && !exactTitleB) return -1;
                             if (!exactTitleA && exactTitleB) return 1;
 
-                            // 2. Точний збіг автора
                             const exactAuthA = aA === qLower;
                             const exactAuthB = aB === qLower;
                             if (exactAuthA && !exactAuthB) return -1;
                             if (!exactAuthA && exactAuthB) return 1;
 
-                            // 3. Назва починається з
                             const startsA = tA.startsWith(qLower + ' ') || tA.startsWith(qLower + ':');
                             const startsB = tB.startsWith(qLower + ' ') || tB.startsWith(qLower + ':');
                             if (startsA && !startsB) return -1;
                             if (!startsA && startsB) return 1;
 
-                            // 4. Автор містить
                             const authInclA = aA.includes(qLower);
                             const authInclB = aB.includes(qLower);
                             if (authInclA && !authInclB) return -1;
                             if (!authInclA && authInclB) return 1;
 
-                            // 5. Назва містить
                             const inclA = tA.includes(qLower);
                             const inclB = tB.includes(qLower);
                             if (inclA && !inclB) return -1;
@@ -673,6 +661,9 @@
                         </div>
                         <div class="mt-3 flex flex-col gap-1.5 border-t border-slate-50 pt-3">
                             ${book.epubUrl ? `<button onclick="openReaderFromUrl('${book.id}', '${book.epubUrl}', event)" class="w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">☁️ Читати онлайн</button><button onclick="promptForEpubUrl('${book.id}', event)" class="w-full text-[10px] text-slate-400">Змінити посилання</button>` : `<button onclick="promptForEpubUrl('${book.id}', event)" class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold active:scale-95 transition-transform">🔗 Додати URL (.epub)</button>`}
+                            
+                            <button onclick="event.stopPropagation(); window.open('https://www.google.com/search?q=${encodeURIComponent(book.title + ' ' + book.author + ' epub скачати безкоштовно')}', '_blank')" class="w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">🔍 Знайти файл в інтернеті</button>
+                            
                             <div class="relative w-full"><input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')"><button onclick="event.stopPropagation(); document.getElementById('epubFile_${book.id}').click();" class="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">📁 Файл з пристрою</button></div>
                         </div>
                     `}
