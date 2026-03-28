@@ -57,6 +57,41 @@
         .sortable-drag { cursor: grabbing !important; }
         .date-input { border: none; background: transparent; color: #334155; outline: none; font-size: 14px; font-weight: 500; cursor: pointer; text-align: right; }
         body.dark .date-input { color: #f8fafc; }
+        
+        /* Challenge Widget Styles */
+        .challenge-widget {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-radius: 1.5rem;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .challenge-widget::before {
+            content: '📚';
+            position: absolute;
+            right: -10px;
+            top: -10px;
+            font-size: 80px;
+            opacity: 0.15;
+            transform: rotate(15deg);
+        }
+        .challenge-progress-bg {
+            background: rgba(255,255,255,0.25);
+            border-radius: 999px;
+            height: 12px;
+            overflow: hidden;
+        }
+        .challenge-progress-fill {
+            background: white;
+            height: 100%;
+            border-radius: 999px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body.dark .challenge-widget {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        }
     </style>
 </head>
 <body class="bg-[#f5f5f7] font-sans pb-32 text-slate-900 antialiased selection:bg-indigo-100">
@@ -87,6 +122,24 @@
             <div><h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1><p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1"></p></div>
             <button onclick="openSheet('settingsSheet'); calculateStats();" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl hover:bg-slate-50 active:scale-95 transition-all">⚙️</button>
         </header>
+        
+        <!-- Challenge Widget 2026 -->
+        <div id="challengeWidget" class="challenge-widget fade-in cursor-pointer" onclick="openSheet('challengeSheet')">
+            <div class="flex justify-between items-start mb-3 relative z-10">
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider opacity-80">🎯 Виклик 2026</h3>
+                    <p class="text-2xl font-black mt-1"><span id="challengeRead">0</span> / <span id="challengeGoal">12</span> книг</p>
+                </div>
+                <div class="text-right">
+                    <span id="challengePercent" class="text-3xl font-black">0%</span>
+                    <p class="text-[10px] uppercase tracking-wide opacity-70 mt-1">виконано</p>
+                </div>
+            </div>
+            <div class="challenge-progress-bg relative z-10">
+                <div id="challengeProgressBar" class="challenge-progress-fill" style="width: 0%"></div>
+            </div>
+            <p class="text-[10px] mt-2 opacity-70 text-center relative z-10">Натисніть, щоб змінити ціль</p>
+        </div>
         
         <div id="librarySections" class="space-y-2 fade-in">
             <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="libraryTabs">
@@ -129,6 +182,38 @@
             <button onclick="switchTab('recommendations')" class="nav-item"><span class="nav-icon">⭐</span>Рекомендації</button>
         </div>
     </nav>
+
+    <!-- Challenge Sheet -->
+    <div id="challengeSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 70vh;">
+        <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+        <div class="text-center mb-6">
+            <span class="text-5xl mb-3 block">🎯</span>
+            <h2 class="text-2xl font-black text-slate-900">Виклик 2026</h2>
+            <p class="text-slate-500 text-sm mt-1">Скільки книг ви хочете прочитати цього року?</p>
+        </div>
+        <div class="flex items-center justify-center gap-4 mb-6">
+            <button onclick="adjustChallengeGoal(-1)" class="size-14 bg-slate-100 rounded-full text-2xl font-bold text-slate-600 active:scale-95 transition-transform hover:bg-slate-200">−</button>
+            <div class="text-center">
+                <input type="number" id="challengeGoalInput" value="12" min="1" max="365" class="w-24 text-5xl font-black text-indigo-600 text-center bg-transparent outline-none">
+                <p class="text-xs text-slate-400 uppercase tracking-wider mt-1">книг</p>
+            </div>
+            <button onclick="adjustChallengeGoal(1)" class="size-14 bg-slate-100 rounded-full text-2xl font-bold text-slate-600 active:scale-95 transition-transform hover:bg-slate-200">+</button>
+        </div>
+        <div class="bg-indigo-50 rounded-2xl p-4 mb-6">
+            <div class="flex justify-between text-sm mb-2">
+                <span class="text-slate-600 font-medium">Прочитано у 2026:</span>
+                <span id="challengeSheetRead" class="font-bold text-indigo-600">0 книг</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-slate-600 font-medium">Залишилось:</span>
+                <span id="challengeSheetLeft" class="font-bold text-slate-700">12 книг</span>
+            </div>
+        </div>
+        <button onclick="saveChallengeGoal()" class="w-full p-4 bg-indigo-600 text-white font-bold rounded-xl active:scale-95 transition-transform shadow-lg shadow-indigo-200">
+            💾 Зберегти ціль
+        </button>
+        <p class="text-center text-xs text-slate-400 mt-4">Книги рахуються автоматично за датою завершення у 2026 році</p>
+    </div>
 
     <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 90vh; overflow-y: auto;">
         <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
@@ -220,6 +305,10 @@
         let isFetchingRecs = false;
         let currentRecCategory = null;
         let shownRecTitles = new Set();
+        
+        // Challenge 2026
+        let challengeGoal = 12;
+        const CHALLENGE_YEAR = 2026;
 
         const idb = {
             db: null,
@@ -293,10 +382,70 @@
             if(scrollTarget) recObserver.observe(scrollTarget);
         });
 
+        // ============ CHALLENGE 2026 FUNCTIONS ============
+        function getBooksReadIn2026() {
+            return myLibrary.filter(b => {
+                if (b.status !== 'finished') return false;
+                if (!b.dateFinished) return false;
+                try {
+                    const year = parseInt(b.dateFinished.substring(0, 4));
+                    return year === CHALLENGE_YEAR;
+                } catch(e) { return false; }
+            });
+        }
+
+        function updateChallengeWidget() {
+            const booksRead = getBooksReadIn2026().length;
+            const percent = challengeGoal > 0 ? Math.min(100, Math.round((booksRead / challengeGoal) * 100)) : 0;
+            
+            document.getElementById('challengeRead').innerText = booksRead;
+            document.getElementById('challengeGoal').innerText = challengeGoal;
+            document.getElementById('challengePercent').innerText = percent + '%';
+            document.getElementById('challengeProgressBar').style.width = percent + '%';
+            
+            // Update sheet too
+            document.getElementById('challengeGoalInput').value = challengeGoal;
+            document.getElementById('challengeSheetRead').innerText = booksRead + ' книг';
+            document.getElementById('challengeSheetLeft').innerText = Math.max(0, challengeGoal - booksRead) + ' книг';
+        }
+
+        function adjustChallengeGoal(delta) {
+            const input = document.getElementById('challengeGoalInput');
+            let val = parseInt(input.value) || 12;
+            val = Math.max(1, Math.min(365, val + delta));
+            input.value = val;
+        }
+
+        async function saveChallengeGoal() {
+            const input = document.getElementById('challengeGoalInput');
+            challengeGoal = Math.max(1, Math.min(365, parseInt(input.value) || 12));
+            
+            if (currentUser) {
+                await db.collection('users').doc(currentUser.uid).set({
+                    challengeGoal2026: challengeGoal
+                }, { merge: true });
+            }
+            
+            updateChallengeWidget();
+            closeAllSheets();
+        }
+
+        async function loadChallengeGoal() {
+            if (currentUser) {
+                const doc = await db.collection('users').doc(currentUser.uid).get();
+                if (doc.exists && doc.data().challengeGoal2026) {
+                    challengeGoal = doc.data().challengeGoal2026;
+                }
+            }
+            updateChallengeWidget();
+        }
+        // ============ END CHALLENGE FUNCTIONS ============
+
         function calculateStats() {
             const finished = myLibrary.filter(b => b.status === 'finished');
             const totalPages = finished.reduce((sum, b) => sum + (parseInt(b.pagesTotal) || 0), 0);
-            document.getElementById('statBooks').innerText = finished.length; document.getElementById('statPages').innerText = totalPages;
+            document.getElementById('statBooks').innerText = finished.length; 
+            document.getElementById('statPages').innerText = totalPages;
         }
 
         function exportLibrary() {
@@ -327,7 +476,7 @@
             if (user) {
                 currentUser = user; authScrn.classList.add('hidden'); authScrn.classList.remove('flex'); appScrn.classList.remove('hidden');
                 document.getElementById('searchFab').classList.remove('hidden'); document.getElementById('mainBottomNav').classList.remove('hidden');
-                document.getElementById('userEmailDisplay').innerText = user.email || user.phoneNumber || "Користувач"; updateViewButtons(); loadLibrary(); 
+                document.getElementById('userEmailDisplay').innerText = user.email || user.phoneNumber || "Користувач"; updateViewButtons(); loadLibrary(); loadChallengeGoal();
             } else {
                 currentUser = null; myLibrary = []; authScrn.classList.remove('hidden'); authScrn.classList.add('flex'); appScrn.classList.add('hidden');
                 document.getElementById('searchFab').classList.add('hidden'); document.getElementById('mainBottomNav').classList.add('hidden');
@@ -349,25 +498,41 @@
         }
         
         function logout() { auth.signOut(); closeAllSheets(); }
-        function loadLibrary() { db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded', 'desc').onSnapshot(snap => { myLibrary = []; snap.forEach(doc => myLibrary.push({ id: doc.id, ...doc.data() })); render(); }); }
+        function loadLibrary() { 
+            db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded', 'desc').onSnapshot(snap => { 
+                myLibrary = []; 
+                snap.forEach(doc => myLibrary.push({ id: doc.id, ...doc.data() })); 
+                render(); 
+                updateChallengeWidget();
+            }); 
+        }
         async function updateBookInFirestore(id, updates) { if (currentUser) await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(updates); }
         function openSheet(id) { document.body.classList.add('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.getElementById(id).classList.add('open'); document.querySelector('.backdrop').classList.remove('hidden'); }
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
+        // ============ FIXED SEARCH FUNCTIONS ============
         function isEnglishTitle(title) {
             if (!title) return true;
             const letters = title.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);
-            if (!letters) return false;
-            const engLetters = title.match(/[a-zA-Z]/g);
-            return (engLetters && engLetters.length > (letters.length * 0.4));
+            if (!letters || letters.length < 3) return false;
+            const cyrillicLetters = title.match(/[а-яА-ЯіІїЇєЄґҐ]/g);
+            // Якщо є хоча б 30% кирилиці - це не англійська
+            return !(cyrillicLetters && cyrillicLetters.length >= letters.length * 0.3);
         }
+        
         function isCyrillic(str) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(str); }
+        
+        function hasCyrillicContent(str) {
+            if (!str) return false;
+            const cyrMatch = str.match(/[а-яА-ЯіІїЇєЄґҐ]/g);
+            return cyrMatch && cyrMatch.length >= 2;
+        }
 
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const rawQuery = e.target.value.trim();
             if (rawQuery.length < 2) { searchItems.innerHTML = ''; return; }
-            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у всіх базах (Google + Apple)...</div>';
+            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у всіх базах...</div>';
 
             timeoutId = setTimeout(async () => {
                 try {
@@ -378,20 +543,30 @@
                     
                     let promises = [];
                     if (isAuthorSearch) {
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&maxResults=30`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30`).catch(()=>({ok:false})));
+                        // Пошук по автору - без мовних обмежень
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&maxResults=40`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30&country=UA`).catch(()=>({ok:false})));
                     } else {
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=25`).catch(()=>({ok:false})));
+                        // Звичайний пошук - додаємо мовні запити
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&langRestrict=uk&maxResults=20`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&langRestrict=ru&maxResults=20`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&langRestrict=uk&maxResults=15`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&langRestrict=ru&maxResults=15`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&maxResults=15`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=25&country=UA`).catch(()=>({ok:false})));
                     }
 
                     const responses = await Promise.all(promises);
 
+                    // Google Books responses
                     for (let i = 0; i < responses.length - 1; i++) {
-                        if (responses[i] && responses[i].ok) { const d = await responses[i].json(); if (d.items) allItems.push(...d.items); }
+                        if (responses[i] && responses[i].ok) { 
+                            const d = await responses[i].json(); 
+                            if (d.items) allItems.push(...d.items); 
+                        }
                     }
                     
+                    // Apple Books response (last one)
                     const appleRes = responses[responses.length - 1];
                     if (appleRes && appleRes.ok) {
                         const dApple = await appleRes.json();
@@ -415,16 +590,17 @@
 
                     if (allItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
+                    // Дедуплікація
                     const uniqueItems = [];
                     const seenKeys = new Set();
                     allItems.forEach(item => {
                         const b = item.volumeInfo;
                         if (!b || !b.title) return;
-                        const key = (b.title.toLowerCase() + (b.authors ? b.authors[0].toLowerCase() : '')).replace(/[^a-zа-я0-9]/gi, '');
+                        const key = (b.title.toLowerCase() + (b.authors ? b.authors[0].toLowerCase() : '')).replace(/[^a-zа-яіїєґ0-9]/gi, '');
                         if (!seenKeys.has(key)) { seenKeys.add(key); uniqueItems.push(item); }
                     });
 
-                    const badCategories = ['Science', 'Technology', 'Computers', 'Medical', 'Law', 'Business & Economics', 'Mathematics', 'Education', 'Study Aids', 'Religion'];
+                    const badCategories = ['Science', 'Technology', 'Computers', 'Medical', 'Law', 'Business & Economics', 'Mathematics', 'Education', 'Study Aids'];
 
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
@@ -437,47 +613,51 @@
 
                         const isTitleMatch = tLower.includes(qLower);
                         const isAuthMatch = aLower.includes(qLower);
-                        
-                        if (!isTitleMatch && !isAuthMatch && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
+                                                if (!isTitleMatch && !isAuthMatch && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
                         return true;
                     });
 
-                    if (isAuthorSearch) {
-                        filteredItems.sort((a, b) => {
+                    // Сортування: кириличні вгору, потім по релевантності
+                    filteredItems.sort((a, b) => {
+                        const tA = (a.volumeInfo.title || '').toLowerCase();
+                        const tB = (b.volumeInfo.title || '').toLowerCase();
+                        const aA = (a.volumeInfo.authors || []).join(' ').toLowerCase();
+                        const aB = (b.volumeInfo.authors || []).join(' ').toLowerCase();
+                        const qLower = cleanQuery.toLowerCase();
+                        
+                        // Кириличні книги вгору
+                        const cyrA = hasCyrillicContent(a.volumeInfo.title);
+                        const cyrB = hasCyrillicContent(b.volumeInfo.title);
+                        if (cyrA && !cyrB) return -1;
+                        if (!cyrA && cyrB) return 1;
+                        
+                        if (isAuthorSearch) {
                             const dateA = a.volumeInfo.publishedDate || '9999';
                             const dateB = b.volumeInfo.publishedDate || '9999';
                             return dateA.localeCompare(dateB);
-                        });
-                    } else {
-                        filteredItems.sort((a, b) => {
-                            const tA = (a.volumeInfo.title || '').toLowerCase();
-                            const tB = (b.volumeInfo.title || '').toLowerCase();
-                            const aA = (a.volumeInfo.authors || []).join(' ').toLowerCase();
-                            const aB = (b.volumeInfo.authors || []).join(' ').toLowerCase();
-                            const qLower = cleanQuery.toLowerCase();
-                            
-                            const exactTitleA = tA === qLower; const exactTitleB = tB === qLower;
-                            if (exactTitleA && !exactTitleB) return -1; if (!exactTitleA && exactTitleB) return 1;
+                        }
+                        
+                        const exactTitleA = tA === qLower; const exactTitleB = tB === qLower;
+                        if (exactTitleA && !exactTitleB) return -1; if (!exactTitleA && exactTitleB) return 1;
 
-                            const exactAuthA = aA === qLower; const exactAuthB = aB === qLower;
-                            if (exactAuthA && !exactAuthB) return -1; if (!exactAuthA && exactAuthB) return 1;
+                        const exactAuthA = aA === qLower; const exactAuthB = aB === qLower;
+                        if (exactAuthA && !exactAuthB) return -1; if (!exactAuthA && exactAuthB) return 1;
 
-                            const startsA = tA.startsWith(qLower + ' ') || tA.startsWith(qLower + ':');
-                            const startsB = tB.startsWith(qLower + ' ') || tB.startsWith(qLower + ':');
-                            if (startsA && !startsB) return -1; if (!startsA && startsB) return 1;
+                        const startsA = tA.startsWith(qLower + ' ') || tA.startsWith(qLower + ':');
+                        const startsB = tB.startsWith(qLower + ' ') || tB.startsWith(qLower + ':');
+                        if (startsA && !startsB) return -1; if (!startsA && startsB) return 1;
 
-                            const authInclA = aA.includes(qLower); const authInclB = aB.includes(qLower);
-                            if (authInclA && !authInclB) return -1; if (!authInclA && authInclB) return 1;
+                        const authInclA = aA.includes(qLower); const authInclB = aB.includes(qLower);
+                        if (authInclA && !authInclB) return -1; if (!authInclA && authInclB) return 1;
 
-                            const inclA = tA.includes(qLower); const inclB = tB.includes(qLower);
-                            if (inclA && !inclB) return -1; if (!inclA && inclB) return 1;
-                            
-                            return 0;
-                        });
-                    }
+                        const inclA = tA.includes(qLower); const inclB = tB.includes(qLower);
+                        if (inclA && !inclB) return -1; if (!inclA && inclB) return 1;
+                        
+                        return 0;
+                    });
 
-                    filteredItems = filteredItems.slice(0, 30);
-                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено художніх книг за цим запитом.</div>';
+                    filteredItems = filteredItems.slice(0, 40);
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг за цим запитом.</div>';
 
                     searchItems.innerHTML = ''; 
                     filteredItems.forEach(item => {
@@ -502,7 +682,10 @@
                         div.innerHTML = `<img src="${book.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-6"><div class="font-bold text-slate-900 truncate">${book.title}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${book.author}</div></div>${yearHtml}`;
                         div.onclick = () => showBookDetails(book, true); searchItems.appendChild(div);
                     });
-                } catch (e) { searchItems.innerHTML = `<div class="p-8 text-red-500 text-sm text-center">Перевірте підключення</div>`; }
+                } catch (e) { 
+                    console.error(e);
+                    searchItems.innerHTML = `<div class="p-8 text-red-500 text-sm text-center">Перевірте підключення</div>`; 
+                }
             }, 600);
         });
 
@@ -586,7 +769,7 @@
                 </div>`;
 
                 let starsHtml = ''; const currentRating = libBook.rating || 0;
-                for(let i=1; i<=5; i++) starsHtml += `<span onclick="setRating('${libBook.id}', ${i})" class="text-4xl cursor-pointer ${currentRating >= i ? 'text-slate-400' : 'text-slate-200'} active:scale-90 transition-transform">★</span>`;
+                for(let i=1; i<=5; i++) starsHtml += `<span onclick="setRating('${libBook.id}', ${i})" class="text-4xl cursor-pointer ${currentRating >= i ? 'text-amber-400' : 'text-slate-200'} active:scale-90 transition-transform">★</span>`;
                 html += `
                 <div class="mb-6 text-center fade-in bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
                     <div class="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-wider">Моя оцінка</div>
@@ -638,7 +821,13 @@
             updateBookInFirestore(id, updates); setLibraryTab(newStatus); 
         }
 
-        function saveManualDate(id, field, dateEl) { updateBookInFirestore(id, { [field]: dateEl.value }); const book = myLibrary.find(b => b.id === id); if (book) book[field] = dateEl.value; render(); }
+        function saveManualDate(id, field, dateEl) { 
+            updateBookInFirestore(id, { [field]: dateEl.value }); 
+            const book = myLibrary.find(b => b.id === id); 
+            if (book) book[field] = dateEl.value; 
+            render(); 
+            updateChallengeWidget();
+        }
 
         function startTimer() { readingStartTime = Date.now(); currentSessionSeconds = 0; document.getElementById('readerTimer').innerText = "00:00"; readingTimer = setInterval(() => { currentSessionSeconds = Math.floor((Date.now() - readingStartTime) / 1000); const m = String(Math.floor(currentSessionSeconds / 60)).padStart(2, '0'), s = String(currentSessionSeconds % 60).padStart(2, '0'), h = Math.floor(currentSessionSeconds / 3600); document.getElementById('readerTimer').innerText = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`; }, 1000); }
         function stopTimer() { if (readingTimer && currentReaderBookId) { clearInterval(readingTimer); readingTimer = null; const book = myLibrary.find(b => b.id === currentReaderBookId); if (book && currentSessionSeconds > 5) { const totalTime = (book.timeSpent || 0) + currentSessionSeconds; db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ timeSpent: totalTime }); } } }
@@ -681,7 +870,7 @@
         function promptForEpubUrl(bookId, event) { event.stopPropagation(); const url = prompt("Пряме веб-посилання на файл .epub:"); if(url) updateBookInFirestore(bookId, { epubUrl: url }); }
         function openReaderFromUrl(bookId, url, event) { event.stopPropagation(); const bookData = myLibrary.find(b => b.id === bookId); startReaderUI(bookData); loadEpubData('https://corsproxy.io/?' + encodeURIComponent(url), bookData); }
 
-        function startReaderUI(bookData) { currentReaderBookId = bookData.id; document.getElementById('readerOverlay').style.display = 'flex'; document.getElementById('readerTitle').innerText = bookData.title; document.getElementById('readerProgress').innerText = "Завантаження..."; document.getElementById('librarySections').classList.add('hidden'); startTimer(); initSwipeGestures(); }
+        function startReaderUI(bookData) { currentReaderBookId = bookData.id; document.getElementById('readerOverlay').style.display = 'flex'; document.getElementById('readerTitle').innerText = bookData.title; document.getElementById('readerProgress').innerText = "Завантаження..."; document.getElementById('librarySections').classList.add('hidden'); document.getElementById('challengeWidget').classList.add('hidden'); startTimer(); initSwipeGestures(); }
 
         function loadEpubData(source, bookData) {
             document.getElementById('viewer').innerHTML = ''; 
@@ -701,7 +890,7 @@
             } catch (err) { console.error(err); document.getElementById('readerProgress').innerText = "Помилка"; stopTimer(); }
         }
 
-        function closeReader() { stopTimer(); document.getElementById('readerOverlay').style.display = 'none'; document.getElementById('readerSettingsMenu').classList.add('hidden'); if(currentBookInstance) { currentBookInstance.destroy(); currentBookInstance = null; rendition = null; } document.getElementById('viewer').innerHTML = ''; document.getElementById('librarySections').classList.remove('hidden'); }
+        function closeReader() { stopTimer(); document.getElementById('readerOverlay').style.display = 'none'; document.getElementById('readerSettingsMenu').classList.add('hidden'); if(currentBookInstance) { currentBookInstance.destroy(); currentBookInstance = null; rendition = null; } document.getElementById('viewer').innerHTML = ''; document.getElementById('librarySections').classList.remove('hidden'); document.getElementById('challengeWidget').classList.remove('hidden'); }
         function deleteBook(id, event) { event.stopPropagation(); if(confirm("Видалити книгу?")) db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); }
         function formatTime(secs) { if (!secs) return "0 хв"; const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60); return h > 0 ? `${h} год ${m} хв` : `${m} хв`; }
 
@@ -765,23 +954,26 @@
                 navItems[0].classList.add('active'); 
                 const lib = document.getElementById('librarySections'); lib.classList.remove('hidden', 'fade-in'); void lib.offsetWidth; lib.classList.add('fade-in'); 
                 document.getElementById('recommendationsScreen').classList.add('hidden'); 
+                document.getElementById('challengeWidget').classList.remove('hidden');
             } 
             else if (tab === 'recommendations') { 
                 navItems[1].classList.add('active'); 
                 const rec = document.getElementById('recommendationsScreen'); rec.classList.remove('hidden', 'fade-in'); void rec.offsetWidth; rec.classList.add('fade-in'); 
                 document.getElementById('librarySections').classList.add('hidden'); 
+                document.getElementById('challengeWidget').classList.add('hidden');
                 if(!currentRecCategory) loadRealRecommendations('auto', 'rec_auto'); 
             }
         }
 
+        // ============ FIXED RECOMMENDATIONS ============
         const curatedCategories = {
-            'Академія магії': ['"академия магии" фэнтези', '"магическая академия"', 'ромфант академия', 'академия волшебства', 'студентка академии магии', '"академия" фэнтези'],
-            'Фентезі': ['"фентезі" бестселер', '"фэнтези" бестселлер', 'эпическое фэнтези', 'попаданцы фэнтези', 'Джон Толкин', 'Джордж Мартин', 'Анджей Сапковский', 'Терри Пратчетт', 'Робин Хобб', 'Брэндон Сандерсон', 'Роберт Джордан', 'Ник Перумов', 'Алексей Пехов', 'Макс Фрай', 'боевое фэнтези', 'героическое фэнтези'],
-            'Детектив': ['"детектив" бестселер', '"детектив" бестселлер', 'Агата Кристи', 'Артур Конан Дойл', 'Ю Несбё', 'Жан-Кристоф Гранже', 'Стиг Ларссон', 'Джеймс Чейз', 'Борис Акунин', 'Татьяна Устинова', 'Рекс Стаут', 'психологический детектив', 'триллер детектив'],
-            'Трилер': ['"трилер" бестселер', '"триллер" бестселлер', 'Стивен Кинг', 'Джиллиан Флинн', 'Томас Харрис', 'Дэн Браун', 'Джон Маррс', 'Франк Тилье', 'психологический триллер', 'мистический триллер'],
-            'Романтика': ['"любовний роман" бестселер', '"любовный роман" бестселлер', 'Николас Спаркс', 'Джоджо Мойес', 'Колин Гувер', 'Джейн Остин', 'Эмили Бронте', 'Сара Джио', 'Эмма Скотт', 'современный любовный роман', 'исторический любовный роман'],
-            'Саморозвиток': ['"саморозвиток" бестселер', '"саморазвитие" бестселлер', 'Роберт Кийосаки', 'Марк Мэнсон', 'Джо Диспенза', 'Джеймс Клир', 'Стивен Кови', 'Брайан Трейси', 'психология успеха', 'мотивация', 'личная эффективность'],
-            'Фантастика': ['"наукова фантастика" бестселер', '"научная фантастика" бестселлер', 'Фрэнк Герберт Дюна', 'Айзек Азимов', 'Рэй Брэдбери', 'Джордж Оруэлл', 'Энди Вейер', 'Артур Кларк', 'Роберт Хайнлайн', 'Дэн Симмонс', 'Братья Стругацкие', 'Сергей Лукьяненко', 'космическая фантастика', 'киберпанк', 'постапокалипсис']
+            'Академія магії': ['"академия магии"', '"магическая академия"', 'ромфант академия', 'академия волшебства', 'студентка академии магии', '"школа магии"', 'академія магії', 'магічна академія'],
+            'Фентезі': ['фентезі бестселер', 'фэнтези бестселлер', 'эпическое фэнтези', 'попаданцы фэнтези', 'Джон Толкін', 'Джордж Мартін', 'Анджей Сапковський', 'Террі Пратчетт', 'Робін Гобб', 'Брендон Сандерсон', 'Роберт Джордан', 'Нік Перумов', 'Олексій Пехов', 'Макс Фрай', 'бойове фентезі', 'героїчне фентезі', 'темне фентезі'],
+            'Детектив': ['детектив бестселер', 'детектив бестселлер', 'Агата Крісті', 'Артур Конан Дойл', 'Ю Несбьо', 'Жан-Крістоф Гранже', 'Стіг Ларссон', 'Джеймс Чейз', 'Борис Акунін', 'Тетяна Устинова', 'Рекс Стаут', 'психологічний детектив', 'кримінальний детектив'],
+            'Трилер': ['трилер бестселер', 'триллер бестселлер', 'Стівен Кінг', 'Джилліан Флінн', 'Томас Гарріс', 'Ден Браун', 'Джон Маррс', 'Франк Тільє', 'психологічний трилер', 'містичний трилер', 'жахи'],
+            'Романтика': ['любовний роман бестселер', 'любовный роман', 'Ніколас Спаркс', 'Джоджо Мойєс', 'Колін Гувер', 'Джейн Остін', 'Емілі Бронте', 'Сара Джіо', 'Емма Скотт', 'сучасний любовний роман', 'історичний любовний роман', 'ромком'],
+            'Саморозвиток': ['саморозвиток бестселер', 'саморазвитие', 'Роберт Кійосакі', 'Марк Менсон', 'Джо Діспенза', 'Джеймс Клір', 'Стівен Кові', 'Браян Трейсі', 'психологія успіху', 'мотивація', 'особиста ефективність'],
+            'Фантастика': ['наукова фантастика', 'научная фантастика', 'Френк Герберт Дюна', 'Айзек Азімов', 'Рей Бредбері', 'Джордж Оруелл', 'Енді Вейєр', 'Артур Кларк', 'Роберт Гайнлайн', 'Ден Сіммонс', 'Брати Стругацькі', 'Сергій Лук\'яненко', 'космічна фантастика', 'кіберпанк', 'постапокаліпсис']
         };
 
         async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
@@ -819,7 +1011,15 @@
         }
 
         async function fetchMoreRecommendations(isFirstLoad = false) {
-            if (isFetchingRecs || currentRecQueryIndex >= currentRecQueries.length) return;
+            if (isFetchingRecs) return;
+            
+            // Перезапуск якщо закінчились запити
+            if (currentRecQueryIndex >= currentRecQueries.length) {
+                currentRecQueryIndex = 0;
+                recStartIndex = 0;
+                currentRecQueries.sort(() => 0.5 - Math.random());
+            }
+            
             isFetchingRecs = true;
 
             const lst = document.getElementById('recommendationsList');
@@ -832,37 +1032,48 @@
             }
 
             let finalBooks = [];
-            let consecutiveEmptyFetches = 0;
+            let attempts = 0;
+            const maxAttempts = 8;
 
-            while (finalBooks.length < 5 && currentRecQueryIndex < currentRecQueries.length && consecutiveEmptyFetches < 3) {
+            while (finalBooks.length < 6 && attempts < maxAttempts && currentRecQueryIndex < currentRecQueries.length) {
+                attempts++;
                 const q = currentRecQueries[currentRecQueryIndex];
-                const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}`;
+                
+                // Два запити: укр + рос
+                const urls = [
+                    `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=uk&maxResults=30&startIndex=${recStartIndex}`,
+                    `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=ru&maxResults=30&startIndex=${recStartIndex}`
+                ];
                 
                 try {
-                    const res = await fetch(url).then(r => r.ok ? r.json() : {items:[]}).catch(()=>({items:[]}));
-                    let items = res.items || [];
+                    const responses = await Promise.all(urls.map(url => fetch(url).then(r => r.ok ? r.json() : {items:[]}).catch(()=>({items:[]}))));
                     
-                    if (items.length < 30) {
+                    let items = [];
+                    responses.forEach(res => {
+                        if (res.items) items.push(...res.items);
+                    });
+                    
+                    if (items.length < 20) {
                         currentRecQueryIndex++;
                         recStartIndex = 0;
                     } else {
-                        recStartIndex += 40;
+                        recStartIndex += 30;
                     }
 
-                    const badWords = ['учебник','словарь','журнал','комикс','манга','підручник','словник','вісник','сборник','збірник','посібник','пособие','том ','випуск','выпуск','зошит','тетрадь','хрестоматия','дневник'];
+                    const badWords = ['учебник','словарь','журнал','комикс','манга','підручник','словник','вісник','сборник','збірник','посібник','пособие','том ','випуск','выпуск','зошит','тетрадь','хрестоматия','дневник','энциклопедия','енциклопедія'];
                     const existingTitles = new Set(myLibrary.map(b => (b.title||'').trim().toLowerCase()));
 
                     let valid = items.filter(item => {
                         const b = item.volumeInfo;
-                        if (!b.title || !b.description || b.description.length < 20) return false;
-                        if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 40) return false;
-                        if (!isCyrillic(b.title) || isEnglishTitle(b.title)) return false;
+                        if (!b.title || !b.description || b.description.length < 30) return false;
+                        if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 50) return false;
+                        if (!hasCyrillicContent(b.title) && !hasCyrillicContent(b.description)) return false;
 
                         const tLower = b.title.toLowerCase();
                         if (badWords.some(bw => tLower.includes(bw))) return false;
                         if (existingTitles.has(tLower)) return false;
                         
-                        const key = tLower + (b.authors ? b.authors[0] : '');
+                        const key = (tLower + (b.authors ? b.authors[0] : '')).replace(/[^a-zа-яіїєґ0-9]/gi, '');
                         if (shownRecTitles.has(key)) return false;
                         
                         return true;
@@ -871,23 +1082,20 @@
                     const u = new Map(); 
                     valid.forEach(i => {
                         const b = i.volumeInfo;
-                        const key = b.title.toLowerCase() + (b.authors ? b.authors[0] : '');
+                        const key = (b.title.toLowerCase() + (b.authors ? b.authors[0] : '')).replace(/[^a-zа-яіїєґ0-9]/gi, '');
                         u.set(key, i);
                     });
                     
                     let uniqueBatch = Array.from(u.values());
                     uniqueBatch.forEach(i => {
                         const b = i.volumeInfo;
-                        const key = b.title.toLowerCase() + (b.authors ? b.authors[0] : '');
+                        const key = (b.title.toLowerCase() + (b.authors ? b.authors[0] : '')).replace(/[^a-zа-яіїєґ0-9]/gi, '');
                         shownRecTitles.add(key);
                         finalBooks.push(i);
                     });
 
-                    if (uniqueBatch.length === 0) consecutiveEmptyFetches++;
-                    else consecutiveEmptyFetches = 0;
-
                 } catch (e) {
-                    consecutiveEmptyFetches++;
+                    console.error(e);
                     currentRecQueryIndex++; 
                     recStartIndex = 0;
                 }
