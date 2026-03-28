@@ -57,6 +57,29 @@
         .sortable-drag { cursor: grabbing !important; }
         .date-input { border: none; background: transparent; color: #334155; outline: none; font-size: 14px; font-weight: 500; cursor: pointer; text-align: right; }
         body.dark .date-input { color: #f8fafc; }
+        
+        /* Challenge Widget Styles */
+        .challenge-widget {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-radius: 1.5rem;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .challenge-widget::before {
+            content: '📚';
+            position: absolute;
+            right: -10px;
+            top: -10px;
+            font-size: 80px;
+            opacity: 0.15;
+            transform: rotate(15deg);
+        }
+        body.dark .challenge-widget {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        }
     </style>
 </head>
 <body class="bg-[#f5f5f7] font-sans pb-32 text-slate-900 antialiased selection:bg-indigo-100">
@@ -88,20 +111,24 @@
             <button onclick="openSheet('settingsSheet'); calculateStats();" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl hover:bg-slate-50 active:scale-95 transition-all">⚙️</button>
         </header>
         
-        <div id="librarySections" class="space-y-2 fade-in">
-            <div id="goalWidget" onclick="openSheet('settingsSheet'); calculateStats();" class="bg-white rounded-[1.25rem] p-4 shadow-sm border border-slate-100 mb-4 cursor-pointer active:scale-[0.98] transition-transform">
-                <div class="flex justify-between items-end mb-2.5">
-                    <div>
-                        <h3 class="text-[10px] font-black uppercase tracking-wider text-slate-400">🏆 Виклик 2026</h3>
-                        <p class="text-sm font-bold text-slate-700 mt-0.5">Прочитано <span id="goalCurrentText" class="text-indigo-600 font-black">0</span> із <span id="goalTotalText">50</span></p>
-                    </div>
-                    <span class="text-2xl mb-1">🎯</span>
+        <div id="challengeWidget" class="challenge-widget fade-in cursor-pointer" onclick="openSheet('challengeSheet')">
+            <div class="flex justify-between items-start mb-3 relative z-10">
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider opacity-80">🎯 Виклик 2026</h3>
+                    <p class="text-2xl font-black mt-1"><span id="challengeRead">0</span> / <span id="challengeGoal">12</span> книг</p>
                 </div>
-                <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
-                    <div id="goalProgressBar" class="bg-gradient-to-r from-indigo-500 to-fuchsia-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                <div class="text-right">
+                    <span id="challengePercent" class="text-3xl font-black">0%</span>
+                    <p class="text-[10px] uppercase tracking-wide opacity-70 mt-1">виконано</p>
                 </div>
             </div>
-
+            <div class="w-full bg-white/25 h-3 rounded-full overflow-hidden relative z-10">
+                <div id="challengeProgressBar" class="bg-white h-full rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+            </div>
+            <p class="text-[10px] mt-2 opacity-70 text-center relative z-10">Натисніть, щоб змінити ціль</p>
+        </div>
+        
+        <div id="librarySections" class="space-y-2 fade-in">
             <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="libraryTabs">
                 <button onclick="setLibraryTab('reading')" id="tab_reading" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-indigo-600 text-white shadow-md active:scale-95">Читаю зараз</button>
                 <button onclick="setLibraryTab('planned')" id="tab_planned" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Хочу прочитати</button>
@@ -143,22 +170,45 @@
         </div>
     </nav>
 
+    <div id="challengeSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 70vh;">
+        <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+        <div class="text-center mb-6">
+            <span class="text-5xl mb-3 block">🎯</span>
+            <h2 class="text-2xl font-black text-slate-900">Виклик 2026</h2>
+            <p class="text-slate-500 text-sm mt-1">Скільки книг ви хочете прочитати цього року?</p>
+        </div>
+        <div class="flex items-center justify-center gap-4 mb-6">
+            <button onclick="adjustChallengeGoal(-1)" class="size-14 bg-slate-100 rounded-full text-2xl font-bold text-slate-600 active:scale-95 transition-transform hover:bg-slate-200">−</button>
+            <div class="text-center">
+                <input type="number" id="challengeGoalInput" value="12" min="1" max="365" class="w-24 text-5xl font-black text-indigo-600 text-center bg-transparent outline-none">
+                <p class="text-xs text-slate-400 uppercase tracking-wider mt-1">книг</p>
+            </div>
+            <button onclick="adjustChallengeGoal(1)" class="size-14 bg-slate-100 rounded-full text-2xl font-bold text-slate-600 active:scale-95 transition-transform hover:bg-slate-200">+</button>
+        </div>
+        <div class="bg-indigo-50 rounded-2xl p-4 mb-6">
+            <div class="flex justify-between text-sm mb-2">
+                <span class="text-slate-600 font-medium">Прочитано у 2026:</span>
+                <span id="challengeSheetRead" class="font-bold text-indigo-600">0 книг</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-slate-600 font-medium">Залишилось:</span>
+                <span id="challengeSheetLeft" class="font-bold text-slate-700">12 книг</span>
+            </div>
+        </div>
+        <button onclick="saveChallengeGoal()" class="w-full p-4 bg-indigo-600 text-white font-bold rounded-xl active:scale-95 transition-transform shadow-lg shadow-indigo-200">
+            💾 Зберегти ціль
+        </button>
+        <p class="text-center text-xs text-slate-400 mt-4">Книги рахуються автоматично за датою завершення у 2026 році</p>
+    </div>
+
     <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 90vh; overflow-y: auto;">
         <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <h2 class="text-2xl font-bold mb-4">Налаштування</h2>
-        
         <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-4">
             <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400 mb-3">📊 Моя статистика</h3>
             <div class="flex justify-between items-center mb-2"><span class="text-sm font-bold text-slate-700">Всього прочитано книг:</span><span id="statBooks" class="text-lg font-black text-indigo-600">0</span></div>
-            <div class="flex justify-between items-center mb-4"><span class="text-sm font-bold text-slate-700">Прочитано сторінок:</span><span id="statPages" class="text-lg font-black text-indigo-600">0</span></div>
-            <div class="h-px bg-indigo-100 w-full mb-4"></div>
-            <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400 mb-3">🎯 Ціль на 2026 рік</h3>
-            <div class="flex justify-between items-center">
-                <span class="text-sm font-bold text-slate-700">Книг за рік:</span>
-                <input type="number" id="goalInput" value="50" onchange="updateGoal(this.value)" class="w-20 bg-white border border-indigo-200 text-indigo-700 text-center rounded-xl p-2 font-bold outline-none focus:ring-2 focus:ring-indigo-400 transition-shadow">
-            </div>
+            <div class="flex justify-between items-center"><span class="text-sm font-bold text-slate-700">Прочитано сторінок:</span><span id="statPages" class="text-lg font-black text-indigo-600">0</span></div>
         </div>
-
         <div class="space-y-3">
             <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors"><span class="font-bold text-sm">Темна тема</span><button onclick="toggleAppTheme()" class="text-2xl p-1 bg-white rounded-full shadow-sm border border-slate-200 active:scale-95 transition-transform">🌓</button></div>
             <button onclick="exportLibrary()" class="w-full p-4 bg-emerald-50 text-emerald-600 font-bold text-sm rounded-2xl active:scale-95 transition-transform">📥 Експортувати бібліотеку (JSON)</button>
@@ -226,6 +276,8 @@
 
     <script>
         const PLACEHOLDER_IMG = 'https://via.placeholder.com/128x192/f1f5f9/94a3b8?text=No+Cover';
+        const GOOGLE_BOOKS_API_KEY = "AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME"; 
+        
         const firebaseConfig = { apiKey: "AIzaSyAXgYW2_9ofKCvLoQFT6oMz0bCvbvldPGg", authDomain: "chitayko-pwa.firebaseapp.com", projectId: "chitayko-pwa", storageBucket: "chitayko-pwa.firebasestorage.app", messagingSenderId: "278531514478", appId: "1:278531514478:web:731dad47437f6aae2b067f", measurementId: "G-1JN4FBQ13K" };
         firebase.initializeApp(firebaseConfig); const auth = firebase.auth(); const db = firebase.firestore();
         
@@ -235,39 +287,13 @@
         let readerTheme = localStorage.getItem('readerTheme') || 'light', readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
 
-        let recStartIndex = 0;
-        let currentRecQueries = [];
-        let currentRecQueryIndex = 0;
-        let isFetchingRecs = false;
-        let currentRecCategory = null;
-        let shownRecTitles = new Set();
+        let recStartIndex = 0, currentRecQueries = [], currentRecQueryIndex = 0;
+        let isFetchingRecs = false, currentRecCategory = null, shownRecTitles = new Set();
         
-        // --- GAMIFICATION LOGIC ---
-        let currentGoal = parseInt(localStorage.getItem('readingGoal2026')) || 50;
+        // Challenge 2026
+        let challengeGoal = 12;
+        const CHALLENGE_YEAR = 2026;
 
-        function updateGoal(val) {
-            currentGoal = parseInt(val) || 50;
-            localStorage.setItem('readingGoal2026', currentGoal);
-            renderGoalWidget();
-        }
-
-        function renderGoalWidget() {
-            const currentYearStr = "2026";
-            const readThisYear = myLibrary.filter(b => {
-                if (b.status !== 'finished') return false;
-                const d = b.dateFinished ? b.dateFinished : (b.dateAdded ? new Date(b.dateAdded).toISOString() : '');
-                return d.includes(currentYearStr);
-            }).length;
-            
-            if(document.getElementById('goalInput')) document.getElementById('goalInput').value = currentGoal;
-            if(document.getElementById('goalTotalText')) document.getElementById('goalTotalText').innerText = currentGoal;
-            if(document.getElementById('goalCurrentText')) document.getElementById('goalCurrentText').innerText = readThisYear;
-            
-            let percent = Math.min(100, Math.round((readThisYear / currentGoal) * 100)) || 0;
-            if(document.getElementById('goalProgressBar')) document.getElementById('goalProgressBar').style.width = percent + '%';
-        }
-
-        // --- INDEXED DB ---
         const idb = {
             db: null,
             async init() {
@@ -283,8 +309,7 @@
                 });
             },
             async save(id, file) {
-                await this.init();
-                if (!this.db) return;
+                await this.init(); if (!this.db) return;
                 return new Promise((resolve) => {
                     try {
                         const tx = this.db.transaction('epubs', 'readwrite');
@@ -295,8 +320,7 @@
                 });
             },
             async get(id) {
-                await this.init();
-                if (!this.db) return null;
+                await this.init(); if (!this.db) return null;
                 return new Promise((resolve) => {
                     try {
                         const tx = this.db.transaction('epubs', 'readonly');
@@ -330,21 +354,68 @@
 
             const recObserver = new IntersectionObserver((entries) => {
                 if(entries[0].isIntersecting && !document.getElementById('recommendationsScreen').classList.contains('hidden')) {
-                    if (!isFetchingRecs && currentRecQueries.length > 0) {
-                        fetchMoreRecommendations();
-                    }
+                    if (!isFetchingRecs && currentRecQueries.length > 0) fetchMoreRecommendations();
                 }
             }, { rootMargin: '300px' });
-            
             const scrollTarget = document.getElementById('recScrollTarget');
             if(scrollTarget) recObserver.observe(scrollTarget);
         });
 
+        function getBooksReadIn2026() {
+            return myLibrary.filter(b => {
+                if (b.status !== 'finished') return false;
+                if (!b.dateFinished) return false;
+                try {
+                    const year = parseInt(b.dateFinished.substring(0, 4));
+                    return year === CHALLENGE_YEAR;
+                } catch(e) { return false; }
+            });
+        }
+
+        function updateChallengeWidget() {
+            const booksRead = getBooksReadIn2026().length;
+            const percent = challengeGoal > 0 ? Math.min(100, Math.round((booksRead / challengeGoal) * 100)) : 0;
+            
+            document.getElementById('challengeRead').innerText = booksRead;
+            document.getElementById('challengeGoal').innerText = challengeGoal;
+            document.getElementById('challengePercent').innerText = percent + '%';
+            document.getElementById('challengeProgressBar').style.width = percent + '%';
+            
+            if(document.getElementById('challengeGoalInput')) document.getElementById('challengeGoalInput').value = challengeGoal;
+            if(document.getElementById('challengeSheetRead')) document.getElementById('challengeSheetRead').innerText = booksRead + ' книг';
+            if(document.getElementById('challengeSheetLeft')) document.getElementById('challengeSheetLeft').innerText = Math.max(0, challengeGoal - booksRead) + ' книг';
+        }
+
+        function adjustChallengeGoal(delta) {
+            const input = document.getElementById('challengeGoalInput');
+            let val = parseInt(input.value) || 12;
+            val = Math.max(1, Math.min(365, val + delta));
+            input.value = val;
+        }
+
+        async function saveChallengeGoal() {
+            const input = document.getElementById('challengeGoalInput');
+            challengeGoal = Math.max(1, Math.min(365, parseInt(input.value) || 12));
+            if (currentUser) {
+                await db.collection('users').doc(currentUser.uid).set({ challengeGoal2026: challengeGoal }, { merge: true });
+            }
+            updateChallengeWidget();
+            closeAllSheets();
+        }
+
+        async function loadChallengeGoal() {
+            if (currentUser) {
+                const doc = await db.collection('users').doc(currentUser.uid).get();
+                if (doc.exists && doc.data().challengeGoal2026) challengeGoal = doc.data().challengeGoal2026;
+            }
+            updateChallengeWidget();
+        }
+
         function calculateStats() {
             const finished = myLibrary.filter(b => b.status === 'finished');
             const totalPages = finished.reduce((sum, b) => sum + (parseInt(b.pagesTotal) || 0), 0);
-            document.getElementById('statBooks').innerText = finished.length; document.getElementById('statPages').innerText = totalPages;
-            renderGoalWidget();
+            document.getElementById('statBooks').innerText = finished.length; 
+            document.getElementById('statPages').innerText = totalPages;
         }
 
         function exportLibrary() {
@@ -375,7 +446,7 @@
             if (user) {
                 currentUser = user; authScrn.classList.add('hidden'); authScrn.classList.remove('flex'); appScrn.classList.remove('hidden');
                 document.getElementById('searchFab').classList.remove('hidden'); document.getElementById('mainBottomNav').classList.remove('hidden');
-                document.getElementById('userEmailDisplay').innerText = user.email || user.phoneNumber || "Користувач"; updateViewButtons(); loadLibrary(); 
+                document.getElementById('userEmailDisplay').innerText = user.email || user.phoneNumber || "Користувач"; updateViewButtons(); loadLibrary(); loadChallengeGoal();
             } else {
                 currentUser = null; myLibrary = []; authScrn.classList.remove('hidden'); authScrn.classList.add('flex'); appScrn.classList.add('hidden');
                 document.getElementById('searchFab').classList.add('hidden'); document.getElementById('mainBottomNav').classList.add('hidden');
@@ -397,7 +468,14 @@
         }
         
         function logout() { auth.signOut(); closeAllSheets(); }
-        function loadLibrary() { db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded', 'desc').onSnapshot(snap => { myLibrary = []; snap.forEach(doc => myLibrary.push({ id: doc.id, ...doc.data() })); render(); renderGoalWidget(); }); }
+        function loadLibrary() { 
+            db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded', 'desc').onSnapshot(snap => { 
+                myLibrary = []; 
+                snap.forEach(doc => myLibrary.push({ id: doc.id, ...doc.data() })); 
+                render(); 
+                updateChallengeWidget();
+            }); 
+        }
         async function updateBookInFirestore(id, updates) { if (currentUser) await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(updates); }
         function openSheet(id) { document.body.classList.add('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.getElementById(id).classList.add('open'); document.querySelector('.backdrop').classList.remove('hidden'); }
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
@@ -406,16 +484,17 @@
         function isEnglishTitle(title) {
             if (!title) return true;
             const letters = title.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);
-            if (!letters) return false;
-            const engLetters = title.match(/[a-zA-Z]/g);
-            return (engLetters && engLetters.length > (letters.length * 0.6));
+            if (!letters || letters.length < 3) return false;
+            const cyrillicLetters = title.match(/[а-яА-ЯіІїЇєЄґҐ]/g);
+            return !(cyrillicLetters && cyrillicLetters.length >= letters.length * 0.3);
         }
+        
         function isCyrillic(str) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(str); }
 
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const rawQuery = e.target.value.trim();
             if (rawQuery.length < 2) { searchItems.innerHTML = ''; return; }
-            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у всіх базах (Google + Apple)...</div>';
+            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у всіх базах...</div>';
 
             timeoutId = setTimeout(async () => {
                 try {
@@ -426,18 +505,24 @@
                     
                     let promises = [];
                     if (isAuthorSearch) {
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&maxResults=30`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&maxResults=40&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30&country=UA`).catch(()=>({ok:false})));
                     } else {
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&maxResults=20`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=25`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&langRestrict=uk&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&langRestrict=ru&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&langRestrict=uk&maxResults=15&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&langRestrict=ru&maxResults=15&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&maxResults=15&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=25&country=UA`).catch(()=>({ok:false})));
                     }
 
                     const responses = await Promise.all(promises);
 
                     for (let i = 0; i < responses.length - 1; i++) {
-                        if (responses[i] && responses[i].ok) { const d = await responses[i].json(); if (d.items) allItems.push(...d.items); }
+                        if (responses[i] && responses[i].ok) { 
+                            const d = await responses[i].json(); 
+                            if (d.items) allItems.push(...d.items); 
+                        }
                     }
                     
                     const appleRes = responses[responses.length - 1];
@@ -468,11 +553,11 @@
                     allItems.forEach(item => {
                         const b = item.volumeInfo;
                         if (!b || !b.title) return;
-                        const key = (b.title.toLowerCase() + (b.authors ? b.authors[0].toLowerCase() : '')).replace(/[^a-zа-я0-9]/gi, '');
+                        const key = (b.title.toLowerCase() + (b.authors ? b.authors[0].toLowerCase() : '')).replace(/[^a-zа-яіїєґ0-9]/gi, '');
                         if (!seenKeys.has(key)) { seenKeys.add(key); uniqueItems.push(item); }
                     });
 
-                    const badCategories = ['Science', 'Technology', 'Computers', 'Medical', 'Law', 'Business & Economics', 'Mathematics', 'Education', 'Study Aids', 'Religion'];
+                    const badCategories = ['Science', 'Technology', 'Computers', 'Medical', 'Law', 'Business & Economics', 'Mathematics', 'Education', 'Study Aids'];
 
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
@@ -822,15 +907,14 @@
             }
         }
 
-        // СПРОЩЕНІ КАТЕГОРІЇ ДЛЯ СТАБІЛЬНОСТІ РЕКОМЕНДАЦІЙ
         const curatedCategories = {
-            'Академія магії': ['академія магії', 'магічна академія', 'ромфант академія', 'попаданка академія'],
-            'Фентезі': ['фентезі', 'епічне фентезі', 'бойове фентезі', 'попаданці фентезі', 'брендон сандерсон', 'террі пратчетт', 'джо аберкромбі'],
-            'Детектив': ['детектив', 'трилер детектив', 'агата крісті', 'ю несбе', 'жюрж сіменон', 'артур конан дойл'],
-            'Трилер': ['трилер', 'психологічний трилер', 'стівена кінга', 'джон маррс'],
-            'Романтика': ['любовний роман', 'романтика', 'колін гувер', 'джоджо моєс', 'ніколас спаркс'],
-            'Саморозвиток': ['саморозвиток', 'психологія успіху', 'мотивація', 'марк менсон', 'джеймс клір'],
-            'Фантастика': ['наукова фантастика', 'кіберпанк', 'постапокаліпсис', 'френк герберт', 'енді вір']
+            'Академія магії': ['академия магии', 'магическая академия', 'ромфант', 'фэнтези академия'],
+            'Фентезі': ['фентезі', 'фэнтези', 'боевое фэнтези', 'эпическое фэнтези', 'Джон Толкин'],
+            'Детектив': ['детектив', 'остросюжетный детектив', 'Агата Кристи', 'Артур Конан Дойл'],
+            'Трилер': ['триллер', 'психологический триллер', 'Стивен Кинг', 'Джиллиан Флинн'],
+            'Романтика': ['любовний роман', 'современный любовный роман', 'Николас Спаркс', 'Джоджо Мойес'],
+            'Саморозвиток': ['саморозвиток', 'саморазвитие', 'психология успеха', 'Джеймс Клир'],
+            'Фантастика': ['наукова фантастика', 'научная фантастика', 'космическая фантастика', 'Рэй Брэдбери']
         };
 
         async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
@@ -852,10 +936,10 @@
                 let authors = myLibrary.map(b => b.author).filter(a => a && a.length > 3 && !a.toLowerCase().includes('невідом') && !a.toLowerCase().includes('автор'));
                 if (authors.length > 0) {
                     let counts = {}; authors.forEach(a => counts[a] = (counts[a] || 0) + 1);
-                    let topAuthors = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 10);
+                    let topAuthors = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 5);
                     pool.push(...topAuthors.map(a => `inauthor:"${a}"`));
                 }
-                let generic = ['фентезі', 'детектив', 'трилер', 'саморозвиток', 'романтика'];
+                let generic = ['фентезі', 'детектив', 'триллер', 'саморозвиток', 'романтика'];
                 generic.sort(() => 0.5 - Math.random());
                 pool.push(...generic);
             } else {
@@ -881,22 +965,24 @@
             }
 
             let finalBooks = [];
-            let consecutiveEmptyFetches = 0;
+            let apiFetches = 0; 
 
-            // Зменшено вимоги до кількості пустих відповідей
-            while (finalBooks.length < 5 && currentRecQueryIndex < currentRecQueries.length && consecutiveEmptyFetches < 5) {
+            while (finalBooks.length < 5 && currentRecQueryIndex < currentRecQueries.length && apiFetches < 2) {
+                apiFetches++;
                 const q = currentRecQueries[currentRecQueryIndex];
-                const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}`;
+                let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=35&startIndex=${recStartIndex}&key=${GOOGLE_BOOKS_API_KEY}`;
                 
                 try {
-                    const res = await fetch(url).then(r => r.ok ? r.json() : {items:[]}).catch(()=>({items:[]}));
-                    let items = res.items || [];
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error('API Rate Limit або помилка з\'єднання');
+                    const data = await res.json();
+                    let items = data.items || [];
                     
                     if (items.length < 20) {
                         currentRecQueryIndex++;
                         recStartIndex = 0;
                     } else {
-                        recStartIndex += 40;
+                        recStartIndex += 35; 
                     }
 
                     const existingTitles = new Set(myLibrary.map(b => (b.title||'').trim().toLowerCase()));
@@ -904,8 +990,8 @@
                     let valid = items.filter(item => {
                         const b = item.volumeInfo;
                         if (!b.title) return false;
-                        if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 40) return false;
-                        if (!isCyrillic(b.title) || isEnglishTitle(b.title)) return false;
+                        if (b.pageCount !== undefined && b.pageCount < 40) return false;
+                        if (!/[а-яА-ЯіІїЇєЄґҐ]/.test(b.title)) return false;
 
                         const tLower = b.title.toLowerCase();
                         if (existingTitles.has(tLower)) return false;
@@ -916,28 +1002,20 @@
                         return true;
                     });
 
-                    const u = new Map(); 
                     valid.forEach(i => {
                         const b = i.volumeInfo;
                         const key = b.title.toLowerCase() + (b.authors ? b.authors[0] : '');
-                        u.set(key, i);
+                        if (!shownRecTitles.has(key)) {
+                            shownRecTitles.add(key);
+                            finalBooks.push(i);
+                        }
                     });
-                    
-                    let uniqueBatch = Array.from(u.values());
-                    uniqueBatch.forEach(i => {
-                        const b = i.volumeInfo;
-                        const key = b.title.toLowerCase() + (b.authors ? b.authors[0] : '');
-                        shownRecTitles.add(key);
-                        finalBooks.push(i);
-                    });
-
-                    if (uniqueBatch.length === 0) consecutiveEmptyFetches++;
-                    else consecutiveEmptyFetches = 0;
 
                 } catch (e) {
-                    consecutiveEmptyFetches++;
+                    console.warn("Помилка API Google Books:", e);
                     currentRecQueryIndex++; 
                     recStartIndex = 0;
+                    await new Promise(r => setTimeout(r, 600));
                 }
             }
 
@@ -945,9 +1023,8 @@
             if (document.getElementById('recLoadingMore')) document.getElementById('recLoadingMore').remove();
 
             if (finalBooks.length === 0 && isFirstLoad) {
-                lst.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm w-full">Не знайшли нових книг 😔 Спробуйте іншу категорію.</div>`;
+                lst.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm w-full">Спробуйте іншу категорію 😔 Можливо, Google Books тимчасово обмежив запити.</div>`;
             } else if (finalBooks.length > 0) {
-                finalBooks.sort(() => 0.5 - Math.random());
                 let h = '';
                 finalBooks.forEach(i => {
                     const b = i.volumeInfo; 
