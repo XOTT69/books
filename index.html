@@ -242,9 +242,10 @@
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <div class="px-5 pb-4 shrink-0">
             <h2 class="text-xl font-bold mb-4">Знайти книгу</h2>
-            <div class="relative">
-                <span class="absolute left-4 top-3.5 size-5 text-slate-400">🔍</span>
-                <input type="text" id="searchInput" placeholder="Назва або автор..." class="w-full pl-11 pr-4 py-3.5 bg-slate-100/80 rounded-2xl outline-none focus:bg-white focus:ring-2 ring-indigo-500 font-medium transition-all">
+            <div class="relative flex items-center">
+                <span class="absolute left-4 size-5 text-slate-400 flex items-center justify-center">🔍</span>
+                <input type="text" id="searchInput" placeholder="Назва або автор..." class="w-full pl-11 pr-10 h-12 bg-slate-100/80 rounded-2xl outline-none focus:bg-white focus:ring-2 ring-indigo-500 font-medium transition-all text-[15px]">
+                <button id="clearSearchBtn" onclick="clearSearch()" class="absolute right-4 text-slate-400 hover:text-slate-600 hidden text-2xl w-6 h-6 flex items-center justify-center leading-none">&times;</button>
             </div>
         </div>
         <div id="searchResults" class="px-3 pb-6 overflow-y-auto flex-1">
@@ -290,7 +291,6 @@
         let recStartIndex = 0, currentRecQueries = [], currentRecQueryIndex = 0;
         let isFetchingRecs = false, currentRecCategory = null, shownRecTitles = new Set();
         
-        // Challenge 2026
         let challengeGoal = 12;
         const CHALLENGE_YEAR = 2026;
 
@@ -441,6 +441,13 @@
 
         const searchInput = document.getElementById('searchInput'), searchItems = document.getElementById('searchItems');
 
+        window.clearSearch = function() {
+            searchInput.value = '';
+            searchItems.innerHTML = '';
+            document.getElementById('clearSearchBtn').classList.add('hidden');
+            searchInput.focus();
+        };
+
         auth.onAuthStateChanged(user => {
             const authScrn = document.getElementById('authScreen'); const appScrn = document.getElementById('appScreen');
             if (user) {
@@ -481,18 +488,27 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        function isEnglishTitle(title) {
-            if (!title) return true;
-            const letters = title.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);
-            if (!letters || letters.length < 3) return false;
-            const cyrillicLetters = title.match(/[а-яА-ЯіІїЇєЄґҐ]/g);
-            return !(cyrillicLetters && cyrillicLetters.length >= letters.length * 0.3);
+        // ====== ЛОГІКА ФІЛЬТРАЦІЇ СМІТТЯ ======
+        const JUNK_WORDS = ['учебник', 'словарь', 'журнал', 'комикс', 'манга', 'підручник', 'словник', 'вісник', 'сборник', 'збірник', 'посібник', 'пособие', 'хрестоматія', 'хрестоматия', 'дневник', 'ссср', 'ussr', 'наука', 'фізика', 'физика', 'математика', 'історія', 'история', 'практикум', 'дослідження', 'закон', 'медицина', 'рецепт', 'кулінарія', 'кулинария', 'биология', 'біологія', 'химия', 'хімія', 'экономика', 'економіка', 'география', 'географія', 'маркетинг', 'менеджмент', 'программирование', 'програмування', 'довідник', 'справочник'];
+        const JUNK_CATEGORIES = ['science', 'technology', 'computers', 'medical', 'law', 'business', 'economics', 'mathematics', 'education', 'study aids', 'history', 'cooking', 'religion', 'art', 'crafts', 'health', 'fitness'];
+
+        function isCleanFiction(b) {
+            if (!b || !b.title) return false;
+            const fullText = ((b.title || '') + ' ' + (b.description || '')).toLowerCase();
+            if (JUNK_WORDS.some(w => fullText.includes(w))) return false;
+            if (b.categories && b.categories.length > 0) {
+                const catStr = b.categories.join(' ').toLowerCase();
+                if (JUNK_CATEGORIES.some(c => catStr.includes(c))) return false;
+            }
+            return true;
         }
-        
-        function isCyrillic(str) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(str); }
 
         searchInput.addEventListener('input', (e) => {
-            clearTimeout(timeoutId); const rawQuery = e.target.value.trim();
+            const rawQuery = e.target.value.trim();
+            if (rawQuery.length > 0) document.getElementById('clearSearchBtn').classList.remove('hidden');
+            else document.getElementById('clearSearchBtn').classList.add('hidden');
+
+            clearTimeout(timeoutId); 
             if (rawQuery.length < 2) { searchItems.innerHTML = ''; return; }
             searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у всіх базах...</div>';
 
@@ -557,11 +573,9 @@
                         if (!seenKeys.has(key)) { seenKeys.add(key); uniqueItems.push(item); }
                     });
 
-                    const badCategories = ['Science', 'Technology', 'Computers', 'Medical', 'Law', 'Business & Economics', 'Mathematics', 'Education', 'Study Aids'];
-
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
-                        if (!b || !b.title) return false;
+                        if (!isCleanFiction(b)) return false;
                         if (isAuthorSearch) return true;
 
                         const qLower = cleanQuery.toLowerCase();
@@ -571,18 +585,21 @@
                         const isTitleMatch = tLower.includes(qLower);
                         const isAuthMatch = aLower.includes(qLower);
                         
-                        if (!isTitleMatch && !isAuthMatch && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
+                        if (!isTitleMatch && !isAuthMatch) return false;
                         return true;
                     });
 
-                    if (isAuthorSearch) {
-                        filteredItems.sort((a, b) => {
+                    // СОРТУВАННЯ: Спочатку книги з обкладинками!
+                    filteredItems.sort((a, b) => {
+                        const hasCoverA = (a.volumeInfo.imageLinks && a.volumeInfo.imageLinks.thumbnail) ? 1 : 0;
+                        const hasCoverB = (b.volumeInfo.imageLinks && b.volumeInfo.imageLinks.thumbnail) ? 1 : 0;
+                        if (hasCoverA !== hasCoverB) return hasCoverB - hasCoverA;
+                        
+                        if (isAuthorSearch) {
                             const dateA = a.volumeInfo.publishedDate || '9999';
                             const dateB = b.volumeInfo.publishedDate || '9999';
                             return dateA.localeCompare(dateB);
-                        });
-                    } else {
-                        filteredItems.sort((a, b) => {
+                        } else {
                             const tA = (a.volumeInfo.title || '').toLowerCase();
                             const tB = (b.volumeInfo.title || '').toLowerCase();
                             const aA = (a.volumeInfo.authors || []).join(' ').toLowerCase();
@@ -606,8 +623,8 @@
                             if (inclA && !inclB) return -1; if (!inclA && inclB) return 1;
                             
                             return 0;
-                        });
-                    }
+                        }
+                    });
 
                     filteredItems = filteredItems.slice(0, 30);
                     if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено художніх книг за цим запитом.</div>';
@@ -644,6 +661,7 @@
             setTimeout(() => {
                 const input = document.getElementById('searchInput');
                 input.value = `author:"${authorName}"`; 
+                document.getElementById('clearSearchBtn').classList.remove('hidden');
                 openSheet('searchSheet');
                 input.dispatchEvent(new Event('input'));
             }, 350); 
@@ -989,7 +1007,9 @@
 
                     let valid = items.filter(item => {
                         const b = item.volumeInfo;
-                        if (!b.title) return false;
+                        // В РЕКОМЕНДАЦІЯХ ТІЛЬКИ З ОБКЛАДИНКАМИ
+                        if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
+                        if (!isCleanFiction(b)) return false;
                         if (b.pageCount !== undefined && b.pageCount < 40) return false;
                         if (!/[а-яА-ЯіІїЇєЄґҐ]/.test(b.title)) return false;
 
@@ -1023,7 +1043,7 @@
             if (document.getElementById('recLoadingMore')) document.getElementById('recLoadingMore').remove();
 
             if (finalBooks.length === 0 && isFirstLoad) {
-                lst.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm w-full">Спробуйте іншу категорію 😔 Можливо, Google Books тимчасово обмежив запити.</div>`;
+                lst.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm w-full">Спробуйте іншу категорію 😔 Можливо, немає книг з обкладинками.</div>`;
             } else if (finalBooks.length > 0) {
                 let h = '';
                 finalBooks.forEach(i => {
