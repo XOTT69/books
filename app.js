@@ -1,7 +1,7 @@
 const PLACEHOLDER_IMG = 'https://via.placeholder.com/128x192/f1f5f9/94a3b8?text=No+Cover';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAXgYW29ofKCvLoQFT6oMz0bCvbvldPGg",
+  apiKey: "AIzaSyAXgYW2_9ofKCvLoQFT6oMz0bCvbvldPGg",
   authDomain: "chitayko-pwa.firebaseapp.com",
   projectId: "chitayko-pwa",
   storageBucket: "chitayko-pwa.firebasestorage.app",
