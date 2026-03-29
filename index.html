@@ -58,34 +58,14 @@
         .date-input { border: none; background: transparent; color: #334155; outline: none; font-size: 14px; font-weight: 500; cursor: pointer; text-align: right; }
         body.dark .date-input { color: #f8fafc; }
         
-        .challenge-widget {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            border-radius: 1.5rem;
-            padding: 1.25rem;
-            margin-bottom: 1rem;
-            color: white;
-            position: relative;
-            overflow: hidden;
-        }
-        .challenge-widget::before {
-            content: '📚';
-            position: absolute;
-            right: -10px;
-            top: -10px;
-            font-size: 80px;
-            opacity: 0.15;
-            transform: rotate(15deg);
-        }
-        body.dark .challenge-widget {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-        }
+        .challenge-widget { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 1.5rem; padding: 1.25rem; margin-bottom: 1rem; color: white; position: relative; overflow: hidden; }
+        .challenge-widget::before { content: '📚'; position: absolute; right: -10px; top: -10px; font-size: 80px; opacity: 0.15; transform: rotate(15deg); }
+        body.dark .challenge-widget { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
         
         input[type="search"]::-webkit-search-decoration,
         input[type="search"]::-webkit-search-cancel-button,
         input[type="search"]::-webkit-search-results-button,
-        input[type="search"]::-webkit-search-results-decoration {
-            -webkit-appearance: none;
-        }
+        input[type="search"]::-webkit-search-results-decoration { -webkit-appearance: none; }
     </style>
 </head>
 <body class="bg-[#f5f5f7] font-sans pb-32 text-slate-900 antialiased selection:bg-indigo-100">
@@ -183,15 +163,16 @@
 
         <div class="space-y-4">
             <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-                <h3 class="font-bold text-[11px] uppercase tracking-wider text-blue-700 mb-3">✈️ Telegram-боти (Безкоштовно)</h3>
-                <a href="https://t.me/flibustafreebookbot" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 mb-2 active:scale-95 transition-transform flex items-center justify-between"><span>🤖 Flibusta Book Bot</span> <span>↗</span></a>
-                <a href="https://t.me/Ebooksukr_bot" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 active:scale-95 transition-transform flex items-center justify-between"><span>🇺🇦 Українські книги Bot</span> <span>↗</span></a>
+                <h3 class="font-bold text-[11px] uppercase tracking-wider text-blue-700 mb-3">🌐 Онлайн-бібліотеки</h3>
+                <a href="https://loveread.ec" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 mb-2 active:scale-95 transition-transform flex items-center justify-between"><span>📖 LoveRead.ec</span> <span>↗</span></a>
+                <a href="https://e-bookua.org.ua/" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 mb-2 active:scale-95 transition-transform flex items-center justify-between"><span>🇺🇦 E-bookUA</span> <span>↗</span></a>
+                <a href="https://coollib.net/" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 active:scale-95 transition-transform flex items-center justify-between"><span>📚 CoolLib</span> <span>↗</span></a>
             </div>
 
-            <div class="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-                <h3 class="font-bold text-[11px] uppercase tracking-wider text-amber-700 mb-3">🌐 Онлайн-бібліотеки</h3>
-                <a href="https://chtyvo.org.ua/" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 mb-2 active:scale-95 transition-transform flex items-center justify-between"><span>📚 Чтиво (Chtyvo)</span> <span>↗</span></a>
-                <a href="https://javalibre.com.ua/" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 active:scale-95 transition-transform flex items-center justify-between"><span>📖 JavaLibre</span> <span>↗</span></a>
+            <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                <h3 class="font-bold text-[11px] uppercase tracking-wider text-indigo-700 mb-3">✈️ Telegram-боти (Безкоштовно)</h3>
+                <a href="https://t.me/KnygyUA_bot" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 mb-2 active:scale-95 transition-transform flex items-center justify-between"><span>🤖 Українські книги (@KnygyUA_bot)</span> <span>↗</span></a>
+                <a href="https://t.me/e_book_ua_bot" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 active:scale-95 transition-transform flex items-center justify-between"><span>📚 E-book UA (@e_book_ua_bot)</span> <span>↗</span></a>
             </div>
 
             <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
@@ -316,7 +297,9 @@
     </div>
 
     <script>
-        const PLACEHOLDER_IMG = 'https://via.placeholder.com/128x192/f1f5f9/94a3b8?text=No+Cover';
+        // ВІЧНА КАРТИНКА-ЗАГЛУШКА (SVG Base64) - ніколи не зламається і не покаже знак питання
+        const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='192' viewBox='0 0 128 192' fill='%23f8fafc'%3E%3Crect width='128' height='192' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='13' font-weight='bold' fill='%2394a3b8'%3EБез фото%3C/text%3E%3C/svg%3E";
+        
         const GOOGLE_BOOKS_API_KEY = "AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME"; 
         
         const firebaseConfig = { apiKey: "AIzaSyAXgYW2_9ofKCvLoQFT6oMz0bCvbvldPGg", authDomain: "chitayko-pwa.firebaseapp.com", projectId: "chitayko-pwa", storageBucket: "chitayko-pwa.firebasestorage.app", messagingSenderId: "278531514478", appId: "1:278531514478:web:731dad47437f6aae2b067f", measurementId: "G-1JN4FBQ13K" };
@@ -525,20 +508,9 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        const JUNK_WORDS = ['підручник', 'учебник', 'словник', 'словарь', 'хрестоматія', 'довідник', 'справочник', 'зошит', 'тетрадь', 'посібник', 'пособие', 'збірник задач', 'ссср', 'ussr'];
-        const JUNK_CATEGORIES = ['science', 'technology', 'computers', 'medical', 'law', 'business', 'economics', 'mathematics', 'education', 'study aids'];
-
-        function isCleanFiction(b) {
-            if (!b || !b.title) return false;
-            const t = b.title.toLowerCase();
-            if (JUNK_WORDS.some(w => t.includes(w))) return false;
-            if (b.categories && b.categories.length > 0) {
-                const catStr = b.categories.join(' ').toLowerCase();
-                if (JUNK_CATEGORIES.some(c => catStr.includes(c))) return false;
-            }
-            return true;
-        }
-
+        // ====== РОЗШИРЕНИЙ СЛОВНИК СМІТТЯ ======
+        const JUNK_WORDS = ['підручник', 'учебник', 'словник', 'словарь', 'хрестоматія', 'довідник', 'справочник', 'зошит', 'тетрадь', 'посібник', 'пособие', 'збірник', 'сборник', 'ссср', 'ussr', 'музей', 'музея', 'материалы', 'матеріали', 'конференция', 'конференція', 'вісник', 'вестник', 'практикум', 'наука', 'медицина', 'закон', 'кодекс', 'том ', 'випуск', 'выпуск', 'бюлетень'];
+        
         searchInput.addEventListener('input', (e) => {
             const rawQuery = e.target.value.trim();
             if (rawQuery.length > 0) document.getElementById('clearSearchBtn').classList.remove('hidden');
@@ -546,7 +518,7 @@
 
             clearTimeout(timeoutId); 
             if (rawQuery.length < 2) { searchItems.innerHTML = ''; return; }
-            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у всіх базах...</div>';
+            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у базах (Google + Apple)...</div>';
 
             timeoutId = setTimeout(async () => {
                 try {
@@ -559,14 +531,13 @@
                     if (isAuthorSearch) {
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=40&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30&country=UA`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://openlibrary.org/search.json?author=${safeQuery}&limit=15`).catch(()=>({ok:false})));
                     } else {
+                        // ТІЛЬКИ GOOGLE BOOKS (З фільтром мови) ТА APPLE BOOKS
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&langRestrict=uk&printType=books&orderBy=relevance&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&langRestrict=ru&printType=books&orderBy=relevance&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&langRestrict=uk&printType=books&maxResults=15&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&langRestrict=ru&printType=books&maxResults=15&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=25&country=UA`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://openlibrary.org/search.json?q=${safeQuery}&limit=15`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=30&country=UA`).catch(()=>({ok:false})));
                     }
 
                     const responses = await Promise.all(promises);
@@ -574,12 +545,7 @@
                     for (let i = 0; i < responses.length; i++) {
                         if (responses[i] && responses[i].ok) { 
                             const d = await responses[i].json(); 
-                            
-                            // Google Books
-                            if (d.items) {
-                                allItems.push(...d.items); 
-                            } 
-                            // Apple Books
+                            if (d.items) { allItems.push(...d.items); } 
                             else if (d.results) {
                                 d.results.forEach(book => {
                                     allItems.push({
@@ -594,25 +560,6 @@
                                             categories: book.genres || []
                                         }
                                     });
-                                });
-                            }
-                            // Open Library
-                            else if (d.docs) {
-                                d.docs.forEach(doc => {
-                                    if (doc.title && doc.author_name) {
-                                        allItems.push({
-                                            id: 'ol_' + doc.key.replace('/works/', ''),
-                                            volumeInfo: {
-                                                title: doc.title,
-                                                authors: doc.author_name,
-                                                pageCount: doc.number_of_pages_median || 300,
-                                                description: 'Знайдено у відкритій базі Open Library.',
-                                                publishedDate: doc.first_publish_year ? doc.first_publish_year.toString() : '',
-                                                imageLinks: doc.cover_i ? { thumbnail: `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` } : null,
-                                                categories: doc.subject || []
-                                            }
-                                        });
-                                    }
                                 });
                             }
                         }
@@ -631,20 +578,30 @@
 
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
-                        if (!isCleanFiction(b)) return false;
+                        const t = b.title.toLowerCase();
+                        
+                        // Фільтр сміття
+                        if (JUNK_WORDS.some(w => t.includes(w))) return false;
+                        
+                        // ВІДКИНУТИ КНИГИ, ДЕ НЕМАЄ КИРИЛИЦІ (Англійські)
+                        // Дозволяємо, якщо є кирилиця АБО якщо це чисто цифри (напр. "1984")
+                        if (!/[а-яА-ЯіІїЇєЄґҐ]/.test(b.title) && /[a-zA-Z]/.test(b.title) && !isAuthorSearch) {
+                            return false; 
+                        }
+
                         if (isAuthorSearch) return true;
 
                         const qLower = cleanQuery.toLowerCase();
-                        const tLower = b.title.toLowerCase();
                         const aLower = (b.authors || []).join(' ').toLowerCase();
 
-                        const isTitleMatch = tLower.includes(qLower);
+                        const isTitleMatch = t.includes(qLower);
                         const isAuthMatch = aLower.includes(qLower);
                         
                         if (!isTitleMatch && !isAuthMatch) return false;
                         return true;
                     });
 
+                    // Сортуємо: З обкладинкою завжди перші!
                     filteredItems.sort((a, b) => {
                         const hasCoverA = (a.volumeInfo.imageLinks && a.volumeInfo.imageLinks.thumbnail) ? 1 : 0;
                         const hasCoverB = (b.volumeInfo.imageLinks && b.volumeInfo.imageLinks.thumbnail) ? 1 : 0;
@@ -657,32 +614,21 @@
                         } else {
                             const tA = (a.volumeInfo.title || '').toLowerCase();
                             const tB = (b.volumeInfo.title || '').toLowerCase();
-                            const aA = (a.volumeInfo.authors || []).join(' ').toLowerCase();
-                            const aB = (b.volumeInfo.authors || []).join(' ').toLowerCase();
                             const qLower = cleanQuery.toLowerCase();
                             
                             const exactTitleA = tA === qLower; const exactTitleB = tB === qLower;
                             if (exactTitleA && !exactTitleB) return -1; if (!exactTitleA && exactTitleB) return 1;
 
-                            const exactAuthA = aA === qLower; const exactAuthB = aB === qLower;
-                            if (exactAuthA && !exactAuthB) return -1; if (!exactAuthA && exactAuthB) return 1;
-
                             const startsA = tA.startsWith(qLower + ' ') || tA.startsWith(qLower + ':');
                             const startsB = tB.startsWith(qLower + ' ') || tB.startsWith(qLower + ':');
                             if (startsA && !startsB) return -1; if (!startsA && startsB) return 1;
-
-                            const authInclA = aA.includes(qLower); const authInclB = aB.includes(qLower);
-                            if (authInclA && !authInclB) return -1; if (!authInclA && authInclB) return 1;
-
-                            const inclA = tA.includes(qLower); const inclB = tB.includes(qLower);
-                            if (inclA && !inclB) return -1; if (!inclA && inclB) return 1;
                             
                             return 0;
                         }
                     });
 
                     filteredItems = filteredItems.slice(0, 30);
-                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено книг за цим запитом.</div>';
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено художніх книг за цим запитом.</div>';
 
                     searchItems.innerHTML = ''; 
                     filteredItems.forEach(item => {
@@ -724,7 +670,6 @@
 
         function openManualForm() { tempSelectedBook = 'manual'; toggleEditMode(true); document.getElementById('editTitle').value = ''; document.getElementById('editAuthor').value = ''; document.getElementById('editPages').value = ''; document.getElementById('editImage').value = ''; document.getElementById('statusButtons').classList.remove('hidden'); openSheet('detailsSheet'); }
 
-        // ТЕГИ
         function addTag(bookId) {
             const input = document.getElementById(`newTagInput_${bookId}`);
             const newTag = input.value.trim().toLowerCase().replace(/[^a-zа-яіїєґ0-9\s-]/gi, '');
@@ -798,7 +743,13 @@
                              <div class="relative w-full"><input type="file" id="epubFile_${libBook.id}_det" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${libBook.id}')"><button onclick="document.getElementById('epubFile_${libBook.id}_det').click();" class="w-full py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold active:scale-95 transition-transform">Оновити файл</button></div>`;
                 } else {
                     html += `<div class="relative w-full mb-2"><input type="file" id="epubFile_${libBook.id}_det" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${libBook.id}')"><button onclick="document.getElementById('epubFile_${libBook.id}_det').click();" class="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">📥 Завантажити файл з пристрою</button></div>`;
-                    html += `<button onclick="openSheet('sourcesSheet')" class="w-full py-2 mb-2 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl text-xs font-bold active:scale-95 transition-transform">🔎 Де знайти книгу в інтернеті?</button>`;
+                    
+                    const googleSearchQuery = encodeURIComponent(`${safeTitle} ${safeAuthor} epub скачати безкоштовно`);
+                    html += `<div class="flex gap-2 mb-2">
+                        <button onclick="openSheet('sourcesSheet')" class="flex-1 py-2 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl text-xs font-bold active:scale-95 transition-transform flex items-center justify-center gap-1">📚 Каталог</button>
+                        <a href="https://www.google.com/search?q=${googleSearchQuery}" target="_blank" class="flex-1 py-2 bg-blue-50 border border-blue-100 text-blue-700 rounded-xl text-xs font-bold active:scale-95 transition-transform flex items-center justify-center gap-1">🌐 Шукати в Google ↗</a>
+                    </div>`;
+
                     if (libBook.epubUrl) {
                          html += `<button onclick="openReaderFromUrl('${libBook.id}', '${libBook.epubUrl}', event)" class="w-full mb-2 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2">☁️ Відкрити онлайн</button>`;
                     }
@@ -1152,10 +1103,10 @@
             let finalBooks = [];
             let apiFetches = 0; 
 
-            while (finalBooks.length < 5 && currentRecQueryIndex < currentRecQueries.length && apiFetches < 2) {
+            while (finalBooks.length < 10 && currentRecQueryIndex < currentRecQueries.length && apiFetches < 4) {
                 apiFetches++;
                 const q = currentRecQueries[currentRecQueryIndex];
-                let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=35&startIndex=${recStartIndex}&key=${GOOGLE_BOOKS_API_KEY}`;
+                let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}&key=${GOOGLE_BOOKS_API_KEY}`;
                 
                 try {
                     const res = await fetch(url);
@@ -1167,7 +1118,7 @@
                         currentRecQueryIndex++;
                         recStartIndex = 0;
                     } else {
-                        recStartIndex += 35; 
+                        recStartIndex += 40; 
                     }
 
                     const existingTitles = new Set(myLibrary.map(b => (b.title||'').trim().toLowerCase()));
@@ -1179,7 +1130,7 @@
                         const t = (b.title || '').toLowerCase();
                         if (JUNK_WORDS.some(w => t.includes(w))) return false;
                         
-                        if (b.pageCount !== undefined && b.pageCount < 40) return false;
+                        if (b.pageCount !== undefined && b.pageCount < 10) return false;
                         if (!/[а-яА-ЯіІїЇєЄґҐ]/.test(b.title)) return false;
 
                         if (existingTitles.has(t)) return false;
