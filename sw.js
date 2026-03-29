@@ -1,53 +1,112 @@
-const CACHE_NAME = "chitayko-cache-v13";
+const STATIC_CACHE = "chitayko-static-v14";
+const CDN_CACHE = "chitayko-cdn-v14";
 
-const urlsToCache = [
+const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json",
   "./icon.png"
 ];
 
-// Встановлення і кешування файлів
+const CDN_URLS = [
+  "https://cdn.tailwindcss.com/",
+  "https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js",
+  "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js",
+  "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js",
+  "https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js",
+  "https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"
+];
+
 self.addEventListener("install", (event) => {
-  self.skipWaiting(); // Змушуємо новий SW активуватися відразу
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log("Відкрито кеш");
-      return cache.addAll(urlsToCache);
-    })
-  );
+  self.skipWaiting();
+  event.waitUntil((async () => {
+    const staticCache = await caches.open(STATIC_CACHE);
+    await staticCache.addAll(APP_SHELL);
+
+    const cdnCache = await caches.open(CDN_CACHE);
+    await Promise.allSettled(CDN_URLS.map((url) => cdnCache.add(url)));
+  })());
 });
 
-// Активація і видалення старого кешу (щоб на телефонах завжди була свіжа версія)
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log("Видаляємо старий кеш:", cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.map((key) => {
+        if (![STATIC_CACHE, CDN_CACHE].includes(key)) {
+          return caches.delete(key);
+        }
+      })
+    );
+    await self.clients.claim();
+  })());
 });
 
-// Перехоплення запитів
 self.addEventListener("fetch", (event) => {
-  // Пропускаємо запити до API (Firebase, Google Books), щоб вони йшли в інтернет
-  if (!event.request.url.startsWith(self.location.origin)) {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  if (req.method !== "GET") return;
+
+  if (
+    url.hostname.includes("googleapis.com") ||
+    url.hostname.includes("itunes.apple.com") ||
+    url.hostname.includes("firestore.googleapis.com") ||
+    url.hostname.includes("identitytoolkit.googleapis.com") ||
+    url.hostname.includes("securetoken.googleapis.com")
+  ) {
     return;
   }
 
-  // Для наших локальних файлів беремо з кешу, або йдемо в інтернет
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    }).catch(() => {
-      // Якщо взагалі немає інтернету і файл не знайдено, показуємо головну сторінку
-      return caches.match('./index.html');
-    })
-  );
+  if (req.mode === "navigate") {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        const cache = await caches.open(STATIC_CACHE);
+        cache.put("./index.html", fresh.clone());
+        return fresh;
+      } catch {
+        return (await caches.match("./index.html")) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  const isLocal = url.origin === self.location.origin;
+  const isCdn =
+    url.hostname.includes("gstatic.com") ||
+    url.hostname.includes("cdnjs.cloudflare.com") ||
+    url.hostname.includes("cdn.jsdelivr.net") ||
+    url.href.startsWith("https://cdn.tailwindcss.com");
+
+  if (isLocal || isCdn) {
+    event.respondWith((async () => {
+      const cacheName = isLocal ? STATIC_CACHE : CDN_CACHE;
+      const cache = await caches.open(cacheName);
+      const cached = await cache.match(req);
+
+      const networkFetch = fetch(req)
+        .then((res) => {
+          if (res && res.ok) cache.put(req, res.clone());
+          return res;
+        })
+        .catch(() => null);
+
+      if (cached) {
+        event.waitUntil(networkFetch);
+        return cached;
+      }
+
+      const fresh = await networkFetch;
+      if (fresh) return fresh;
+
+      if (req.destination === "image") {
+        return (await caches.match("./icon.png")) || Response.error();
+      }
+
+      return Response.error();
+    })());
+  }
 });
