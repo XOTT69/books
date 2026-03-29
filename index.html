@@ -181,7 +181,7 @@
                 <span id="challengeSheetLeft" class="font-bold text-slate-700">12 книг</span>
             </div>
         </div>
-        <button onclick="saveChallengeGoal()" class="w-full p-4 bg-indigo-600 text-white font-bold rounded-xl active:scale-95 transition-transform shadow-lg shadow-indigo-200">
+        <button onclick="saveChallengeGoal(this)" class="w-full p-4 bg-indigo-600 text-white font-bold rounded-xl active:scale-95 transition-transform shadow-lg shadow-indigo-200">
             💾 Зберегти ціль
         </button>
         <p class="text-center text-xs text-slate-400 mt-4">Книги рахуються автоматично за датою завершення у 2026 році</p>
@@ -387,14 +387,28 @@
             input.value = val;
         }
 
-        window.saveChallengeGoal = async function() {
+        // ВІДРЕМОНТОВАНА КНОПКА ЗБЕРЕЖЕННЯ ЦІЛІ
+        window.saveChallengeGoal = async function(btn) {
+            if (!currentUser) return alert("Увійдіть в акаунт, щоб зберегти ціль!");
+            
             const input = document.getElementById('challengeGoalInput');
             challengeGoal = Math.max(1, Math.min(365, parseInt(input.value) || 12));
-            if (currentUser) {
+            
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Збереження...';
+            
+            try {
                 await db.collection('users').doc(currentUser.uid).set({ challengeGoal2026: challengeGoal }, { merge: true });
+                updateChallengeWidget();
+                setTimeout(() => {
+                    closeAllSheets();
+                    btn.innerHTML = originalText;
+                }, 400);
+            } catch(e) {
+                console.error(e);
+                btn.innerHTML = originalText;
+                alert("Сталася помилка при збереженні цілі.");
             }
-            updateChallengeWidget();
-            closeAllSheets();
         }
 
         async function loadChallengeGoal() {
@@ -482,21 +496,19 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // ====== РОЗШИРЕНИЙ СЛОВНИК СМІТТЯ ======
-        const JUNK_WORDS = ['підручник', 'учебник', 'словник', 'словарь', 'хрестоматія', 'хрестоматия', 'довідник', 'справочник', 'зошит', 'тетрадь', 'посібник', 'пособие', 'збірник', 'сборник', 'ссср', 'ussr', 'музей', 'музея', 'материалы', 'матеріали', 'конференция', 'конференція', 'вісник', 'вестник', 'практикум', 'наука', 'медицина', 'закон', 'кодекс', 'випуск', 'выпуск', 'бюлетень', 'поезія', 'поэзия', 'стихи', 'вірші', 'музична', 'музыкальная', 'энциклопедия', 'енциклопедія'];
-        const JUNK_CATEGORIES = ['science', 'technology', 'computers', 'medical', 'law', 'business', 'economics', 'mathematics', 'education', 'study aids'];
+        // ====== СУПЕР ЖОРСТКИЙ ФІЛЬТР СМІТТЯ ======
+        const JUNK_WORDS = ['підручник', 'учебник', 'словник', 'словарь', 'хрестоматія', 'хрестоматия', 'довідник', 'справочник', 'зошит', 'тетрадь', 'посібник', 'пособие', 'збірник', 'сборник', 'ссср', 'ussr', 'музей', 'музея', 'материалы', 'матеріали', 'конференция', 'конференція', 'вісник', 'вестник', 'практикум', 'наука', 'медицина', 'закон', 'кодекс', 'випуск', 'выпуск', 'бюлетень', 'поезія', 'поэзия', 'стихи', 'вірші', 'музична', 'музыкальная', 'энциклопедия', 'енциклопедія', 'журнал', 'альманах', 'урок', 'шпаргалка'];
 
         function isCleanFiction(b) {
             if (!b || !b.title) return false;
             const t = b.title.toLowerCase();
             
-            // Тільки назва книги перевіряється на сміттєві слова
+            // Якщо у назві є ці слова - це точно не роман
             if (JUNK_WORDS.some(w => t.includes(w))) return false;
             
-            if (b.categories && b.categories.length > 0) {
-                const catStr = b.categories.join(' ').toLowerCase();
-                if (JUNK_CATEGORIES.some(c => catStr.includes(c))) return false;
-            }
+            // ФІЛЬТР МОВИ ВІД GOOGLE: пропускаємо ТІЛЬКИ укр та рос
+            if (b.language && b.language !== 'uk' && b.language !== 'ru') return false;
+
             return true;
         }
 
@@ -507,7 +519,7 @@
 
             clearTimeout(timeoutId); 
             if (rawQuery.length < 2) { searchItems.innerHTML = ''; return; }
-            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у базах (Google + Apple)...</div>';
+            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у базах...</div>';
 
             timeoutId = setTimeout(async () => {
                 try {
@@ -521,8 +533,7 @@
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=40&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30&country=UA`).catch(()=>({ok:false})));
                     } else {
-                        // ТІЛЬКИ GOOGLE BOOKS (без обмежень по мові, щоб шукало і рос і укр нормально) ТА APPLE BOOKS
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&printType=books&maxResults=30&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&printType=books&orderBy=relevance&maxResults=30&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=30&country=UA`).catch(()=>({ok:false})));
                     }
@@ -565,8 +576,6 @@
 
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
-                        
-                        // Фільтр сміття
                         if (!isCleanFiction(b)) return false;
 
                         if (isAuthorSearch) return true;
@@ -582,7 +591,6 @@
                         return true;
                     });
 
-                    // Сортуємо: З обкладинкою завжди перші!
                     filteredItems.sort((a, b) => {
                         const hasCoverA = (a.volumeInfo.imageLinks && a.volumeInfo.imageLinks.thumbnail) ? 1 : 0;
                         const hasCoverB = (b.volumeInfo.imageLinks && b.volumeInfo.imageLinks.thumbnail) ? 1 : 0;
@@ -599,6 +607,9 @@
                             
                             const exactTitleA = tA === qLower; const exactTitleB = tB === qLower;
                             if (exactTitleA && !exactTitleB) return -1; if (!exactTitleA && exactTitleB) return 1;
+
+                            const exactAuthA = aA === qLower; const exactAuthB = aB === qLower;
+                            if (exactAuthA && !exactAuthB) return -1; if (!exactAuthA && exactAuthB) return 1;
 
                             const startsA = tA.startsWith(qLower + ' ') || tA.startsWith(qLower + ':');
                             const startsB = tB.startsWith(qLower + ' ') || tB.startsWith(qLower + ':');
