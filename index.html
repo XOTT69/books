@@ -58,14 +58,11 @@
         .date-input { border: none; background: transparent; color: #334155; outline: none; font-size: 14px; font-weight: 500; cursor: pointer; text-align: right; }
         body.dark .date-input { color: #f8fafc; }
         
+        /* ДОДАНО: Стилі для цілі та пошуку */
         .challenge-widget { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 1.5rem; padding: 1.25rem; margin-bottom: 1rem; color: white; position: relative; overflow: hidden; }
         .challenge-widget::before { content: '📚'; position: absolute; right: -10px; top: -10px; font-size: 80px; opacity: 0.15; transform: rotate(15deg); }
         body.dark .challenge-widget { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
-        
-        input[type="search"]::-webkit-search-decoration,
-        input[type="search"]::-webkit-search-cancel-button,
-        input[type="search"]::-webkit-search-results-button,
-        input[type="search"]::-webkit-search-results-decoration { -webkit-appearance: none; }
+        input[type="search"]::-webkit-search-decoration, input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webkit-search-results-button, input[type="search"]::-webkit-search-results-decoration { -webkit-appearance: none; }
     </style>
 </head>
 <body class="bg-[#f5f5f7] font-sans pb-32 text-slate-900 antialiased selection:bg-indigo-100">
@@ -96,7 +93,7 @@
             <div><h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1><p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1"></p></div>
             <button onclick="openSheet('settingsSheet'); calculateStats();" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl hover:bg-slate-50 active:scale-95 transition-all">⚙️</button>
         </header>
-        
+
         <div id="challengeWidget" class="challenge-widget fade-in cursor-pointer" onclick="openSheet('challengeSheet')">
             <div class="flex justify-between items-start mb-3 relative z-10">
                 <div>
@@ -267,7 +264,6 @@
 
     <script>
         const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='192' viewBox='0 0 128 192' fill='%23f8fafc'%3E%3Crect width='128' height='192' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='13' font-weight='bold' fill='%2394a3b8'%3EБез фото%3C/text%3E%3C/svg%3E";
-        const GOOGLE_BOOKS_API_KEY = "AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME"; 
         
         const firebaseConfig = { apiKey: "AIzaSyAXgYW2_9ofKCvLoQFT6oMz0bCvbvldPGg", authDomain: "chitayko-pwa.firebaseapp.com", projectId: "chitayko-pwa", storageBucket: "chitayko-pwa.firebasestorage.app", messagingSenderId: "278531514478", appId: "1:278531514478:web:731dad47437f6aae2b067f", measurementId: "G-1JN4FBQ13K" };
         firebase.initializeApp(firebaseConfig); const auth = firebase.auth(); const db = firebase.firestore();
@@ -288,18 +284,19 @@
         let challengeGoal = 12;
         const CHALLENGE_YEAR = 2026;
 
+        // ДОДАНО: IndexedDB для офлайну
         const idb = {
             db: null,
             async init() {
                 if (this.db) return;
-                if (!window.indexedDB) { console.warn("IndexedDB не підтримується цим браузером."); return; }
+                if (!window.indexedDB) return;
                 return new Promise((resolve) => {
                     try {
                         const req = indexedDB.open('ChitaykoDB', 1);
                         req.onupgradeneeded = e => e.target.result.createObjectStore('epubs');
                         req.onsuccess = e => { this.db = e.target.result; resolve(); };
-                        req.onerror = e => { console.error("Помилка IndexedDB", e); resolve(); }; 
-                    } catch (e) { console.error("Критична помилка ініціалізації БД", e); resolve(); }
+                        req.onerror = () => resolve(); 
+                    } catch (e) { resolve(); }
                 });
             },
             async save(id, file) {
@@ -355,6 +352,7 @@
             if(scrollTarget) recObserver.observe(scrollTarget);
         });
 
+        // ДОДАНО: Логіка Ціль 2026
         function getBooksReadIn2026() {
             return myLibrary.filter(b => {
                 if (b.status !== 'finished') return false;
@@ -387,10 +385,8 @@
             input.value = val;
         }
 
-        // ВІДРЕМОНТОВАНА КНОПКА ЗБЕРЕЖЕННЯ ЦІЛІ
         window.saveChallengeGoal = async function(btn) {
-            if (!currentUser) return alert("Увійдіть в акаунт, щоб зберегти ціль!");
-            
+            if (!currentUser) return;
             const input = document.getElementById('challengeGoalInput');
             challengeGoal = Math.max(1, Math.min(365, parseInt(input.value) || 12));
             
@@ -403,11 +399,10 @@
                 setTimeout(() => {
                     closeAllSheets();
                     btn.innerHTML = originalText;
-                }, 400);
+                }, 300);
             } catch(e) {
                 console.error(e);
                 btn.innerHTML = originalText;
-                alert("Сталася помилка при збереженні цілі.");
             }
         }
 
@@ -449,13 +444,6 @@
 
         const searchInput = document.getElementById('searchInput'), searchItems = document.getElementById('searchItems');
 
-        window.clearSearch = function() {
-            searchInput.value = '';
-            searchItems.innerHTML = '';
-            document.getElementById('clearSearchBtn').classList.add('hidden');
-            searchInput.focus();
-        };
-
         auth.onAuthStateChanged(user => {
             const authScrn = document.getElementById('authScreen'); const appScrn = document.getElementById('appScreen');
             if (user) {
@@ -496,21 +484,8 @@
         function closeAllSheets() { document.body.classList.remove('modal-open'); document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open')); document.querySelector('.backdrop').classList.add('hidden'); toggleEditMode(false); }
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
-        // ====== СУПЕР ЖОРСТКИЙ ФІЛЬТР СМІТТЯ ======
-        const JUNK_WORDS = ['підручник', 'учебник', 'словник', 'словарь', 'хрестоматія', 'хрестоматия', 'довідник', 'справочник', 'зошит', 'тетрадь', 'посібник', 'пособие', 'збірник', 'сборник', 'ссср', 'ussr', 'музей', 'музея', 'материалы', 'матеріали', 'конференция', 'конференція', 'вісник', 'вестник', 'практикум', 'наука', 'медицина', 'закон', 'кодекс', 'випуск', 'выпуск', 'бюлетень', 'поезія', 'поэзия', 'стихи', 'вірші', 'музична', 'музыкальная', 'энциклопедия', 'енциклопедія', 'журнал', 'альманах', 'урок', 'шпаргалка'];
-
-        function isCleanFiction(b) {
-            if (!b || !b.title) return false;
-            const t = b.title.toLowerCase();
-            
-            // Якщо у назві є ці слова - це точно не роман
-            if (JUNK_WORDS.some(w => t.includes(w))) return false;
-            
-            // ФІЛЬТР МОВИ ВІД GOOGLE: пропускаємо ТІЛЬКИ укр та рос
-            if (b.language && b.language !== 'uk' && b.language !== 'ru') return false;
-
-            return true;
-        }
+        // ДОДАНО: Фільтр сміття
+        const JUNK_WORDS = ['підручник', 'учебник', 'словник', 'словарь', 'хрестоматія', 'хрестоматия', 'довідник', 'справочник', 'зошит', 'тетрадь', 'посібник', 'пособие', 'збірник', 'сборник', 'ссср', 'ussr', 'музей', 'музея', 'материалы', 'матеріали', 'конференция', 'конференція', 'вісник', 'вестник', 'наука', 'медицина', 'закон', 'кодекс', 'випуск', 'выпуск', 'поезія', 'поэзия', 'стихи', 'вірші', 'музична', 'музыкальная', 'энциклопедия', 'енциклопедія'];
 
         searchInput.addEventListener('input', (e) => {
             const rawQuery = e.target.value.trim();
@@ -530,12 +505,12 @@
                     
                     let promises = [];
                     if (isAuthorSearch) {
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=40&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30&country=UA`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=40`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30`).catch(()=>({ok:false})));
                     } else {
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&printType=books&orderBy=relevance&maxResults=30&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=30&country=UA`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&printType=books&maxResults=30`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=30`).catch(()=>({ok:false})));
                     }
 
                     const responses = await Promise.all(promises);
@@ -576,15 +551,15 @@
 
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
-                        if (!isCleanFiction(b)) return false;
-
+                        const t = b.title.toLowerCase();
+                        
+                        if (JUNK_WORDS.some(w => t.includes(w))) return false;
                         if (isAuthorSearch) return true;
 
                         const qLower = cleanQuery.toLowerCase();
-                        const tLower = b.title.toLowerCase();
                         const aLower = (b.authors || []).join(' ').toLowerCase();
 
-                        const isTitleMatch = tLower.includes(qLower);
+                        const isTitleMatch = t.includes(qLower);
                         const isAuthMatch = aLower.includes(qLower);
                         
                         if (!isTitleMatch && !isAuthMatch) return false;
@@ -607,9 +582,6 @@
                             
                             const exactTitleA = tA === qLower; const exactTitleB = tB === qLower;
                             if (exactTitleA && !exactTitleB) return -1; if (!exactTitleA && exactTitleB) return 1;
-
-                            const exactAuthA = aA === qLower; const exactAuthB = aB === qLower;
-                            if (exactAuthA && !exactAuthB) return -1; if (!exactAuthA && exactAuthB) return 1;
 
                             const startsA = tA.startsWith(qLower + ' ') || tA.startsWith(qLower + ':');
                             const startsB = tB.startsWith(qLower + ' ') || tB.startsWith(qLower + ':');
@@ -662,6 +634,7 @@
 
         function openManualForm() { tempSelectedBook = 'manual'; toggleEditMode(true); document.getElementById('editTitle').value = ''; document.getElementById('editAuthor').value = ''; document.getElementById('editPages').value = ''; document.getElementById('editImage').value = ''; document.getElementById('statusButtons').classList.remove('hidden'); openSheet('detailsSheet'); }
 
+        // ДОДАНО: Теги
         window.addTag = function(bookId) {
             const input = document.getElementById(`newTagInput_${bookId}`);
             const newTag = input.value.trim().toLowerCase().replace(/[^a-zа-яіїєґ0-9\s-]/gi, '');
@@ -838,6 +811,7 @@
         window.changeReaderTheme = function(theme) { readerTheme = theme; localStorage.setItem('readerTheme', theme); applyReaderSettings(); }
         function initSwipeGestures() { const viewerEl = document.getElementById('viewer'); if(!window.mc) { window.mc = new Hammer(viewerEl); window.mc.get('swipe').set({ direction: Hammer.DIRECTION_HORIZONTAL }); window.mc.on("swipeleft", () => { if (rendition) rendition.next(); }); window.mc.on("swiperight", () => { if (rendition) rendition.prev(); }); } }
 
+        // ДОДАНО: Цитати
         window.saveQuoteFromReader = function() {
             if(!tempQuote || !currentReaderBookId) return;
             const book = myLibrary.find(b => b.id === currentReaderBookId);
@@ -902,6 +876,7 @@
                 rendition.display(safeCfi).catch(() => rendition.display());
                 currentBookInstance.ready.then(() => currentBookInstance.locations.generate(1600)).then(() => { const loc = rendition.currentLocation(); if(loc && loc.start) document.getElementById('readerProgress').innerText = Math.round(loc.start.percentage * 100) + "%"; else document.getElementById('readerProgress').innerText = "Відкрито"; }).catch(err => console.log(err));
                 
+                // ЛОВИМО ЦИТАТИ
                 rendition.on("selected", function(cfiRange, contents) {
                     currentBookInstance.getRange(cfiRange).then(function (range) {
                         const text = range.toString().trim();
@@ -1032,11 +1007,12 @@
             }
         }
 
+        // ====== ТОЧКОВІ ЗАПИТИ ДЛЯ РЕКОМЕНДАЦІЙ ======
         const curatedCategories = {
-            'Академія магії': ['"академия магии" фэнтези', 'магическая академия роман', 'ромфант', 'фэнтези академия'],
+            'Академія магії': ['"академия магии" роман', 'магическая академия фэнтези', '"академия" ромфант', 'фэнтези академия'],
             'Фентезі': ['фентезі роман', 'фэнтези бестселлер', 'боевое фэнтези', 'эпическое фэнтези', 'попаданцы фэнтези'],
             'Детектив': ['детектив бестселер', 'остросюжетный детектив', 'детективний роман', 'психологический детектив'],
-            'Трилер': ['трилер бестселер', 'психологический триллер', 'мистический триллер'],
+            'Трилер': ['трилер бестселер', 'психологический триллер', 'мистический триллер', 'триллер роман'],
             'Романтика': ['любовний роман', 'современный любовный роман', 'романтика бестселлер'],
             'Саморозвиток': ['саморозвиток', 'саморазвитие', 'психология успеха', 'мотивация'],
             'Фантастика': ['наукова фантастика', 'научная фантастика', 'космическая фантастика', 'киберпанк']
@@ -1115,13 +1091,19 @@
                     let valid = items.filter(item => {
                         const b = item.volumeInfo;
                         if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
-                        if (!isCleanFiction(b)) return false;
-                        if (b.pageCount !== undefined && b.pageCount < 40) return false;
-
-                        const tLower = b.title.toLowerCase();
-                        if (existingTitles.has(tLower)) return false;
                         
-                        const key = tLower + (b.authors ? b.authors[0] : '');
+                        const t = (b.title || '').toLowerCase();
+                        // ТОЧКОВИЙ ФІЛЬТР ТІЛЬКИ ПО НАЗВІ (Опис не блокуємо)
+                        if (JUNK_WORDS.some(w => t.includes(w))) return false;
+                        
+                        // Відкидаємо чисто англомовні результати
+                        if (!/[а-яА-ЯіІїЇєЄґҐ]/.test(b.title)) return false;
+
+                        if (b.pageCount !== undefined && b.pageCount < 40) return false;
+                        
+                        if (existingTitles.has(t)) return false;
+                        
+                        const key = t + (b.authors ? b.authors[0] : '');
                         if (shownRecTitles.has(key)) return false;
                         
                         return true;
