@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ЧитайКо — Хмарний Трекер</title>
     <link rel="icon" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
@@ -45,7 +45,8 @@
         .nav-btn { background: #f1f5f9; padding: 12px 20px; border-radius: 12px; font-weight: bold; color: #475569; transition: transform 0.1s; }
         body.dark .nav-btn { background: #334155; color: #f8fafc; }
         .nav-btn:active { transform: scale(0.95); }
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; z-index: 30; border-top: 1px solid #f1f5f9; box-shadow: 0 -2px 10px rgba(0,0,0,0.02); }
+        
+        .bottom-nav { background: #fff; z-index: 30; border-top: 1px solid #f1f5f9; transition: background-color 0.3s, border-color 0.3s; }
         body.dark .bottom-nav { background: #1e293b; border-color: #334155; }
         .nav-item { flex: 1; text-align: center; color: #94a3b8; font-weight: bold; padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: color 0.2s; cursor: pointer; background: transparent; border: none; }
         .nav-item.active { color: #4f46e5; }
@@ -53,15 +54,16 @@
         body.dark .nav-item.active { color: #818cf8; }
         .nav-icon { font-size: 20px; margin-bottom: 3px; display: block; transition: transform 0.2s; }
         .nav-item:active .nav-icon { transform: scale(0.85); }
+        
         .sortable-ghost { opacity: 0.4; transform: scale(0.95); }
         .sortable-drag { cursor: grabbing !important; }
         .date-input { border: none; background: transparent; color: #334155; outline: none; font-size: 14px; font-weight: 500; cursor: pointer; text-align: right; }
         body.dark .date-input { color: #f8fafc; }
     </style>
 </head>
-<body class="bg-[#f5f5f7] font-sans pb-32 text-slate-900 antialiased selection:bg-indigo-100">
+<body class="bg-[#f5f5f7] font-sans text-slate-900 antialiased selection:bg-indigo-100 overflow-hidden flex flex-col w-screen" style="height: 100dvh;">
 
-    <div id="authScreen" class="fixed inset-0 z-[100] bg-[#f5f5f7] flex items-center justify-center p-6 overflow-y-auto fade-in">
+    <div id="authScreen" class="fixed inset-0 z-[100] bg-[#f5f5f7] flex items-center justify-center p-6 overflow-y-auto fade-in" style="height: 100dvh;">
         <div class="w-full max-w-sm bg-white p-8 rounded-3xl shadow-xl border border-slate-100 my-auto">
             <div class="text-center mb-6"><span class="text-6xl mb-4 block">📚</span><h1 class="text-3xl font-black tracking-tight text-slate-950">ЧитайКо</h1><p class="text-slate-500 mt-1 font-medium">Ваша хмарна бібліотека</p></div>
             <div id="authError" class="text-center text-sm text-white bg-red-500 font-medium p-3 rounded-xl mb-4 hidden shadow-sm fade-in"></div>
@@ -82,55 +84,58 @@
         </div>
     </div>
 
-    <div id="appScreen" class="max-w-xl mx-auto p-4 md:p-6 pt-8 hidden">
-        <header class="mb-4 flex justify-between items-start fade-in">
-            <div><h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1><p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1"></p></div>
-            <button onclick="openSheet('settingsSheet'); calculateStats();" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl hover:bg-slate-50 active:scale-95 transition-all">⚙️</button>
-        </header>
+    <div id="appScreen" class="hidden flex-1 flex-col w-full max-w-xl mx-auto relative bg-[#f5f5f7] dark:bg-slate-900 transition-colors duration-300 overflow-hidden">
         
-        <div id="librarySections" class="space-y-2 fade-in">
-            <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="libraryTabs">
-                <button onclick="setLibraryTab('reading')" id="tab_reading" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-indigo-600 text-white shadow-md active:scale-95">Читаю зараз</button>
-                <button onclick="setLibraryTab('planned')" id="tab_planned" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Хочу прочитати</button>
-                <button onclick="setLibraryTab('finished')" id="tab_finished" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Прочитано</button>
-            </div>
-            <div class="flex justify-end mb-2 fade-in">
-                <div class="bg-slate-200/60 p-1 rounded-xl flex gap-1 items-center">
-                    <button onclick="setViewMode('list')" id="view_list" class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-900 bg-white shadow-sm transition-all">☰ Списком</button>
-                    <button onclick="setViewMode('grid')" id="view_grid" class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-all">⊞ Полицями</button>
+        <div class="flex-1 w-full overflow-y-auto overflow-x-hidden px-4 md:px-6 pt-8 pb-32" style="-webkit-overflow-scrolling: touch;">
+            <header class="mb-4 flex justify-between items-start fade-in">
+                <div><h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1><p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1"></p></div>
+            </header>
+            
+            <div id="librarySections" class="space-y-2 fade-in">
+                <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="libraryTabs">
+                    <button onclick="setLibraryTab('reading')" id="tab_reading" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-indigo-600 text-white shadow-md active:scale-95">Читаю зараз</button>
+                    <button onclick="setLibraryTab('planned')" id="tab_planned" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Хочу прочитати</button>
+                    <button onclick="setLibraryTab('finished')" id="tab_finished" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Прочитано</button>
                 </div>
+                <div class="flex justify-end mb-2 fade-in">
+                    <div class="bg-slate-200/60 p-1 rounded-xl flex gap-1 items-center">
+                        <button onclick="setViewMode('list')" id="view_list" class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-900 bg-white shadow-sm transition-all">☰ Списком</button>
+                        <button onclick="setViewMode('grid')" id="view_grid" class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-all">⊞ Полицями</button>
+                    </div>
+                </div>
+                <div id="myBooksContainer" class="pb-8"></div>
             </div>
-            <div id="myBooksContainer" class="pb-8"></div>
-        </div>
-        
-        <div id="recommendationsScreen" class="hidden flex-col h-full mt-2 fade-in">
-            <h2 class="text-xs font-bold uppercase text-slate-400 mb-3 ml-1 tracking-wide">Категорії</h2>
-            <div class="flex gap-2 overflow-x-auto pb-3 mb-2 scrollbar-hide px-1" id="recTabs">
-                <button onclick="loadRealRecommendations('auto', 'rec_auto')" id="rec_auto" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95">✨ Для вас</button>
-                <button onclick="loadRealRecommendations('Академія магії', 'rec_magic')" id="rec_magic" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">🔮 Академія магії</button>
-                <button onclick="loadRealRecommendations('Фентезі', 'rec_fantasy')" id="rec_fantasy" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фентезі</button>
-                <button onclick="loadRealRecommendations('Детектив', 'rec_detective')" id="rec_detective" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Детектив</button>
-                <button onclick="loadRealRecommendations('Трилер', 'rec_thriller')" id="rec_thriller" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Трилер</button>
-                <button onclick="loadRealRecommendations('Романтика', 'rec_romance')" id="rec_romance" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Романтика</button>
-                <button onclick="loadRealRecommendations('Саморозвиток', 'rec_self')" id="rec_self" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Саморозвиток</button>
-                <button onclick="loadRealRecommendations('Фантастика', 'rec_scifi')" id="rec_scifi" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фантастика</button>
+            
+            <div id="recommendationsScreen" class="hidden flex-col h-full mt-2 fade-in">
+                <h2 class="text-xs font-bold uppercase text-slate-400 mb-3 ml-1 tracking-wide">Категорії</h2>
+                <div class="flex gap-2 overflow-x-auto pb-3 mb-2 scrollbar-hide px-1" id="recTabs">
+                    <button onclick="loadRealRecommendations('auto', 'rec_auto')" id="rec_auto" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95">✨ Для вас</button>
+                    <button onclick="loadRealRecommendations('Академія магії', 'rec_magic')" id="rec_magic" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">🔮 Академія магії</button>
+                    <button onclick="loadRealRecommendations('Фентезі', 'rec_fantasy')" id="rec_fantasy" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фентезі</button>
+                    <button onclick="loadRealRecommendations('Детектив', 'rec_detective')" id="rec_detective" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Детектив</button>
+                    <button onclick="loadRealRecommendations('Трилер', 'rec_thriller')" id="rec_thriller" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Трилер</button>
+                    <button onclick="loadRealRecommendations('Романтика', 'rec_romance')" id="rec_romance" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Романтика</button>
+                    <button onclick="loadRealRecommendations('Саморозвиток', 'rec_self')" id="rec_self" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Саморозвиток</button>
+                    <button onclick="loadRealRecommendations('Фантастика', 'rec_scifi')" id="rec_scifi" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фантастика</button>
+                </div>
+                <div id="recommendationsList" class="space-y-4 pb-2 mt-2"></div>
+                <div id="recScrollTarget" class="h-10 w-full pb-24"></div>
             </div>
-            <div id="recommendationsList" class="space-y-4 pb-2 mt-2"></div>
-            <div id="recScrollTarget" class="h-10 w-full pb-24"></div>
         </div>
+
+        <nav id="mainBottomNav" class="bottom-nav hidden fade-in shrink-0 w-full" style="padding-bottom: env(safe-area-inset-bottom);">
+            <div class="flex items-center justify-between px-2 w-full pt-1">
+                <button id="btnNavLibrary" onclick="switchTab('library')" class="nav-item active"><span class="nav-icon">📚</span>Бібліотека</button>
+                <button id="btnNavRecs" onclick="switchTab('recommendations')" class="nav-item"><span class="nav-icon">⭐</span>Рекомендації</button>
+                <button onclick="openSheet('settingsSheet'); calculateStats();" class="nav-item"><span class="nav-icon">⚙️</span>Налаштування</button>
+            </div>
+        </nav>
     </div>
 
-    <button id="searchFab" onclick="openSheet('searchSheet')" class="fixed bottom-24 right-6 z-40 size-14 bg-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-300 flex items-center justify-center text-2xl hover:scale-105 active:scale-95 transition-transform duration-200 hidden">➕</button>
+    <button id="searchFab" onclick="openSheet('searchSheet')" class="fixed right-6 z-40 size-14 bg-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-300 flex items-center justify-center text-2xl hover:scale-105 active:scale-95 transition-transform duration-200 hidden" style="bottom: calc(80px + env(safe-area-inset-bottom));">➕</button>
     <div class="backdrop fixed inset-0 z-40 bg-black/50 backdrop-blur-sm hidden" onclick="closeAllSheets()"></div>
 
-    <nav id="mainBottomNav" class="bottom-nav hidden fade-in">
-        <div class="max-w-xl mx-auto flex items-center justify-between px-3">
-            <button onclick="switchTab('library')" class="nav-item active"><span class="nav-icon">📚</span>Бібліотека</button>
-            <button onclick="switchTab('recommendations')" class="nav-item"><span class="nav-icon">⭐</span>Рекомендації</button>
-        </div>
-    </nav>
-
-    <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 90vh; overflow-y: auto;">
+    <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 90vh; overflow-y: auto; padding-bottom: max(1.5rem, env(safe-area-inset-bottom));">
         <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <h2 class="text-2xl font-bold mb-4">Налаштування</h2>
         <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-4">
@@ -146,8 +151,8 @@
         </div>
     </div>
 
-    <div id="readerOverlay">
-        <div class="reader-controls relative">
+    <div id="readerOverlay" style="padding-bottom: env(safe-area-inset-bottom);">
+        <div class="reader-controls relative pt-[env(safe-area-inset-top)]">
             <button onclick="closeReader()" class="font-bold text-red-500 bg-red-50 px-4 py-2 rounded-lg active:scale-95 transition-transform">✕ Закрити</button>
             <div class="flex flex-col items-center justify-center max-w-[50%]">
                 <div id="readerTitle" class="text-xs font-bold truncate text-slate-500 w-full text-center">Назва книги</div>
@@ -167,7 +172,7 @@
         </div>
     </div>
 
-    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="height: 85vh;">
+    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="height: 85vh; padding-bottom: env(safe-area-inset-bottom);">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <div class="px-5 pb-4 shrink-0">
             <h2 class="text-xl font-bold mb-4">Знайти книгу</h2>
@@ -182,7 +187,7 @@
         </div>
     </div>
 
-    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="max-height: 92vh;">
+    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="max-height: 92vh; padding-bottom: env(safe-area-inset-bottom);">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab active:cursor-grabbing"><div class="w-12 h-1.5 bg-slate-200 rounded-full pointer-events-none"></div></div>
         <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
         <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-4 fade-in">
@@ -213,13 +218,50 @@
         let rendition = null, currentReaderBookId = null, currentBookInstance = null;
         let readerTheme = localStorage.getItem('readerTheme') || 'light', readerFontSize = parseInt(localStorage.getItem('readerFontSize')) || 100;
         let readingTimer = null, readingStartTime = 0, currentSessionSeconds = 0;
+        let recStartIndex = 0, currentRecQueries = [], currentRecQueryIndex = 0, isFetchingRecs = false, currentRecCategory = null, shownRecTitles = new Set();
 
-        let recStartIndex = 0;
-        let currentRecQueries = [];
-        let currentRecQueryIndex = 0;
-        let isFetchingRecs = false;
-        let currentRecCategory = null;
-        let shownRecTitles = new Set();
+        // ІНІЦІАЛІЗАЦІЯ INDEXEDDB ДЛЯ ОФЛАЙН ЧИТАННЯ
+        const DB_NAME = "ChitaykoOfflineDB";
+        const STORE_NAME = "epubs";
+
+        function getDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = e => e.target.result.createObjectStore(STORE_NAME);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function saveEpubLocal(id, buffer) {
+            const db = await getDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                tx.objectStore(STORE_NAME).put(buffer, id);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
+        async function getEpubLocal(id) {
+            const db = await getDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, "readonly");
+                const req = tx.objectStore(STORE_NAME).get(id);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(tx.error);
+            });
+        }
+
+        async function deleteEpubLocal(id) {
+            const db = await getDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                tx.objectStore(STORE_NAME).delete(id);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.bottom-sheet').forEach(sheet => {
@@ -243,9 +285,7 @@
 
             const recObserver = new IntersectionObserver((entries) => {
                 if(entries[0].isIntersecting && !document.getElementById('recommendationsScreen').classList.contains('hidden')) {
-                    if (!isFetchingRecs && currentRecQueries.length > 0) {
-                        fetchMoreRecommendations();
-                    }
+                    if (!isFetchingRecs && currentRecQueries.length > 0) fetchMoreRecommendations();
                 }
             }, { rootMargin: '300px' });
             
@@ -316,19 +356,15 @@
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
         function isEnglishTitle(title) {
-            if (!title) return true;
-            const letters = title.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);
-            if (!letters) return false;
-            const engLetters = title.match(/[a-zA-Z]/g);
-            return (engLetters && engLetters.length > (letters.length * 0.4));
+            if (!title) return true; const letters = title.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g); if (!letters) return false;
+            const engLetters = title.match(/[a-zA-Z]/g); return (engLetters && engLetters.length > (letters.length * 0.4));
         }
         function isCyrillic(str) { return /[а-яА-ЯіІїЇєЄґҐ]/.test(str); }
 
-        // ПАРАЛЕЛЬНИЙ ПОШУК: GOOGLE BOOKS + APPLE BOOKS (iTunes API)
         searchInput.addEventListener('input', (e) => {
             clearTimeout(timeoutId); const query = e.target.value.trim();
             if (query.length < 2) { searchItems.innerHTML = ''; return; }
-            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю у всіх базах (Google + Apple)...</div>';
+            searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Шукаю найкращі видання...</div>';
 
             timeoutId = setTimeout(async () => {
                 try {
@@ -340,24 +376,17 @@
                     
                     let promises = [];
                     if (isAuthorSearch) {
-                        // 1. Google (точний пошук автора)
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=40`).catch(()=>({ok:false})));
-                        // 2. Google (якщо автор вказаний як звичайний текст, щоб обійти баги Google)
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQueryQuote}&printType=books&maxResults=40`).catch(()=>({ok:false})));
-                        // 3. Apple Books (ЛитРес, електронні книги)
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=20`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQueryQuote}&printType=books&maxResults=20`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&entity=ebook&attribute=authorTerm&country=ua&limit=30`).catch(()=>({ok:false})));
                     } else {
-                        // 1. Google (точна назва)
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQueryQuote}&printType=books&maxResults=20`).catch(()=>({ok:false})));
-                        // 2. Google (загальний пошук)
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQueryQuote}&printType=books&maxResults=15`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20`).catch(()=>({ok:false})));
-                        // 3. Apple Books (ЛитРес, електронні книги)
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&entity=ebook&country=ua&limit=25`).catch(()=>({ok:false})));
                     }
 
                     const responses = await Promise.all(promises);
 
-                    // Парсимо результати Google Books
                     for (let i = 0; i < responses.length - 1; i++) {
                         if (responses[i] && responses[i].ok) {
                             const d = await responses[i].json();
@@ -365,118 +394,67 @@
                         }
                     }
                     
-                    // Парсимо результати Apple Books (завжди останній проміс)
                     const appleRes = responses[responses.length - 1];
                     if (appleRes && appleRes.ok) {
                         const dApple = await appleRes.json();
                         if (dApple.results) {
                             dApple.results.forEach(book => {
-                                allItems.push({
-                                    id: 'apple_' + book.trackId,
-                                    volumeInfo: {
-                                        title: book.trackName,
-                                        authors: [book.artistName || 'Автор невідомий'],
-                                        pageCount: 300,
-                                        description: book.description ? book.description.replace(/(<([^>]+)>)/gi, "") : 'Знайдено в Apple Books.',
-                                        publishedDate: book.releaseDate ? book.releaseDate.substring(0, 4) : '',
-                                        imageLinks: { thumbnail: book.artworkUrl100 ? book.artworkUrl100.replace('100x100bb', '400x400bb') : null },
-                                        categories: book.genres || []
-                                    }
-                                });
+                                allItems.push({ id: 'apple_' + book.trackId, volumeInfo: { title: book.trackName, authors: [book.artistName || 'Автор невідомий'], pageCount: 300, description: book.description ? book.description.replace(/(<([^>]+)>)/gi, "") : 'Знайдено в Apple Books.', publishedDate: book.releaseDate ? book.releaseDate.substring(0, 4) : '', imageLinks: { thumbnail: book.artworkUrl100 ? book.artworkUrl100.replace('100x100bb', '400x400bb') : null }, categories: book.genres || [], language: 'uk' } });
                             });
                         }
                     }
 
                     if (allItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Нічого не знайдено</div>';
 
-                    // Видаляємо дублікати з обох баз
-                    const uniqueItems = [];
-                    const seenKeys = new Set();
+                    const uniqueItems = []; const seenKeys = new Set();
                     allItems.forEach(item => {
-                        const b = item.volumeInfo;
-                        if (!b || !b.title) return;
-                        // Створюємо унікальний ключ: Назва + Автор (тільки літери та цифри)
+                        const b = item.volumeInfo; if (!b || !b.title) return;
                         const key = (b.title.toLowerCase() + (b.authors ? b.authors[0].toLowerCase() : '')).replace(/[^a-zа-я0-9ієї]/gi, '');
-                        if (!seenKeys.has(key)) {
-                            seenKeys.add(key);
-                            uniqueItems.push(item);
-                        }
+                        if (!seenKeys.has(key)) { seenKeys.add(key); uniqueItems.push(item); }
                     });
 
                     const badCategories = ['Science', 'Technology', 'Computers', 'Medical', 'Law', 'Business & Economics', 'Mathematics', 'Education', 'Study Aids', 'Religion'];
+                    const badWords = ['учебник','словарь','журнал','комикс','манга','підручник','словник','вісник','сборник','збірник','посібник','пособие','том ','випуск','выпуск','зошит','тетрадь','хрестоматия','дневник', 'конспект', 'довідник', 'срср', 'ссср', 'музея', 'музей', 'матеріали', 'материалы', 'звіт', 'отчет', 'доповідь', 'альманах', 'праці', 'труды'];
 
                     let filteredItems = uniqueItems.filter(item => {
-                        const b = item.volumeInfo;
-                        if (!b || !b.title) return false;
-                        
-                        if (isAuthorSearch) {
-                            // Якщо це пошук автора, перевіряємо, чи є його ім'я в авторах
-                            const authorStr = (b.authors || []).join(' ').toLowerCase();
-                            return authorStr.includes(rawQuery.toLowerCase());
-                        }
+                        const b = item.volumeInfo; if (!b || !b.title) return false;
+                        if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
+                        if (b.language && !['uk', 'ru', 'bg'].includes(b.language)) return false;
 
-                        const isExactTitle = b.title.toLowerCase().includes(rawQuery.toLowerCase());
-                        
+                        const tLower = b.title.toLowerCase();
+                        if (badWords.some(bw => tLower.includes(bw))) return false;
+
+                        if (isAuthorSearch) { const authorStr = (b.authors || []).join(' ').toLowerCase(); return authorStr.includes(rawQuery.toLowerCase()); }
+                        const isExactTitle = tLower.includes(rawQuery.toLowerCase());
                         if (!isExactTitle && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
                         return true;
                     });
 
-                    // Сортування
-                    if (isAuthorSearch) {
+                    if (isAuthorSearch) { filteredItems.sort((a, b) => { const dateA = a.volumeInfo.publishedDate || '9999'; const dateB = b.volumeInfo.publishedDate || '9999'; return dateA.localeCompare(dateB); }); } 
+                    else {
                         filteredItems.sort((a, b) => {
-                            const dateA = a.volumeInfo.publishedDate || '9999';
-                            const dateB = b.volumeInfo.publishedDate || '9999';
-                            return dateA.localeCompare(dateB);
-                        });
-                    } else {
-                        filteredItems.sort((a, b) => {
-                            const tA = (a.volumeInfo.title || '').toLowerCase();
-                            const tB = (b.volumeInfo.title || '').toLowerCase();
-                            const qLower = rawQuery.toLowerCase();
-                            
-                            const exactA = tA === qLower;
-                            const exactB = tB === qLower;
-                            if (exactA && !exactB) return -1;
-                            if (!exactA && exactB) return 1;
-
-                            const startsA = tA.startsWith(qLower + ' ') || tA.startsWith(qLower + ':');
-                            const startsB = tB.startsWith(qLower + ' ') || tB.startsWith(qLower + ':');
-                            if (startsA && !startsB) return -1;
-                            if (!startsA && startsB) return 1;
-
-                            const inclA = tA.includes(qLower);
-                            const inclB = tB.includes(qLower);
-                            if (inclA && !inclB) return -1;
-                            if (!inclA && inclB) return 1;
-                            
+                            const tA = (a.volumeInfo.title || '').toLowerCase(), tB = (b.volumeInfo.title || '').toLowerCase(), qLower = rawQuery.toLowerCase();
+                            if (tA === qLower && tB !== qLower) return -1; if (tA !== qLower && tB === qLower) return 1;
+                            const startsA = tA.startsWith(qLower + ' ') || tA.startsWith(qLower + ':'), startsB = tB.startsWith(qLower + ' ') || tB.startsWith(qLower + ':');
+                            if (startsA && !startsB) return -1; if (!startsA && startsB) return 1;
+                            const inclA = tA.includes(qLower), inclB = tB.includes(qLower);
+                            if (inclA && !inclB) return -1; if (!inclA && inclB) return 1;
                             return 0;
                         });
                     }
 
                     filteredItems = filteredItems.slice(0, 30);
-
-                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено художніх книг за цим запитом.</div>';
+                    if (filteredItems.length === 0) return searchItems.innerHTML = '<div class="p-8 text-slate-400 text-sm text-center">Не знайдено нормальних книг за цим запитом.</div>';
 
                     searchItems.innerHTML = ''; 
                     filteredItems.forEach(item => {
                         const b = item.volumeInfo, div = document.createElement('div');
                         const genre = b.categories && b.categories.length > 0 ? b.categories[0] : '';
                         const safeImage = (b.imageLinks?.thumbnail || PLACEHOLDER_IMG).replace(/^http:\/\//i, 'https://');
-                        
-                        const book = { 
-                            googleId: item.id || Math.random().toString(), 
-                            title: b.title || 'Без назви', 
-                            author: b.authors ? b.authors[0] : 'Автор невідомий', 
-                            pagesTotal: b.pageCount || 300, 
-                            image: safeImage, 
-                            description: b.description || 'Анотація відсутня.', 
-                            genre: genre,
-                            publishedDate: b.publishedDate || ''
-                        };
+                        const book = { googleId: item.id || Math.random().toString(), title: b.title || 'Без назви', author: b.authors ? b.authors[0] : 'Автор невідомий', pagesTotal: b.pageCount || 300, image: safeImage, description: b.description || 'Анотація відсутня.', genre: genre, publishedDate: b.publishedDate || '' };
                         
                         div.className = "p-3 mx-2 my-1 hover:bg-slate-100 rounded-2xl cursor-pointer flex items-center gap-4 active:bg-slate-200 fade-in relative";
                         const yearHtml = (isAuthorSearch && book.publishedDate) ? `<div class="absolute top-2 right-3 text-[10px] font-bold text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded">${book.publishedDate.substring(0,4)}</div>` : '';
-                        
                         div.innerHTML = `<img src="${book.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-12 h-16 object-cover rounded-lg shadow-sm"><div class="flex-1 min-w-0 pr-6"><div class="font-bold text-slate-900 truncate">${book.title}</div><div class="text-xs text-slate-500 mt-0.5 truncate">${book.author}</div></div>${yearHtml}`;
                         div.onclick = () => showBookDetails(book, true); searchItems.appendChild(div);
                     });
@@ -484,24 +462,13 @@
             }, 600);
         });
 
-        window.searchAuthorBooks = function(authorName) {
-            closeAllSheets(); 
-            setTimeout(() => {
-                const input = document.getElementById('searchInput');
-                input.value = `author:"${authorName}"`; 
-                openSheet('searchSheet');
-                input.dispatchEvent(new Event('input'));
-            }, 350); 
-        }
-
+        window.searchAuthorBooks = function(authorName) { closeAllSheets(); setTimeout(() => { const input = document.getElementById('searchInput'); input.value = `author:"${authorName}"`; openSheet('searchSheet'); input.dispatchEvent(new Event('input')); }, 350); }
         function openManualForm() { tempSelectedBook = 'manual'; toggleEditMode(true); document.getElementById('editTitle').value = ''; document.getElementById('editAuthor').value = ''; document.getElementById('editPages').value = ''; document.getElementById('editImage').value = ''; document.getElementById('statusButtons').classList.remove('hidden'); openSheet('detailsSheet'); }
 
         function showBookDetails(bookData, isNewFromSearch = false) {
             if (!bookData || !bookData.title) return;
-
             const libBook = myLibrary.find(b => (b.googleId && b.googleId === bookData.googleId) || b.id === bookData.id) || bookData;
-            tempSelectedBook = isNewFromSearch ? bookData : null;
-            toggleEditMode(false);
+            tempSelectedBook = isNewFromSearch ? bookData : null; toggleEditMode(false);
 
             const safeAuthor = (libBook.author || 'Невідомий').replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const safeTitle = libBook.title || 'Без назви';
@@ -528,71 +495,63 @@
                 </div>`;
             
             if (!isNewFromSearch) {
+                let readerActionsDetails = '';
+                if (libBook.isLocalSaved) {
+                    readerActionsDetails = `
+                        <div class="flex gap-3 mb-5 fade-in border-t border-slate-100 pt-4">
+                            <button onclick="openLocalReader('${libBook.id}', event)" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold active:scale-95 transition-transform shadow-sm">📖 Читати (Офлайн)</button>
+                            <button onclick="removeLocalEpub('${libBook.id}', event)" class="px-4 bg-red-50 text-red-500 rounded-xl font-bold active:scale-95 transition-transform text-sm">✕ Видалити файл</button>
+                        </div>
+                    `;
+                } else {
+                    readerActionsDetails = `
+                        <div class="grid grid-cols-2 gap-3 mb-5 fade-in border-t border-slate-100 pt-4">
+                            <div class="relative">
+                                <input type="file" id="epubFile_${libBook.id}_details" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${libBook.id}')">
+                                <button onclick="event.stopPropagation(); document.getElementById('epubFile_${libBook.id}_details').click();" class="w-full py-3 bg-slate-800 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-transform shadow-sm">📥 Завантажити (.epub)</button>
+                            </div>
+                            ${libBook.epubUrl ? `
+                                <button onclick="openReaderFromUrl('${libBook.id}', '${libBook.epubUrl}', event)" class="w-full py-3 bg-indigo-600 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-transform shadow-sm">☁️ Читати онлайн</button>
+                            ` : `
+                                <button onclick="promptForEpubUrl('${libBook.id}', event)" class="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl text-[11px] font-bold active:scale-95 transition-transform">🔗 Додати URL</button>
+                            `}
+                        </div>
+                    `;
+                }
+                
+                html += readerActionsDetails;
+
                 html += `
                 <div class="mb-6 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm fade-in">
                     <h4 class="text-[9px] font-black uppercase text-indigo-500 tracking-wider mb-3 flex items-center gap-1">🗓 Дати читання</h4>
                     <div class="space-y-2">
-                        <div class="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
-                            <span class="text-xs font-bold text-slate-600">Початок:</span>
-                            <input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="date-input">
-                        </div>
-                        <div class="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
-                            <span class="text-xs font-bold text-slate-600">Кінець:</span>
-                            <input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="date-input">
-                        </div>
+                        <div class="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100"><span class="text-xs font-bold text-slate-600">Початок:</span><input type="date" value="${libBook.dateStarted || ''}" onchange="saveManualDate('${libBook.id}', 'dateStarted', this)" class="date-input"></div>
+                        <div class="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-xl border border-slate-100"><span class="text-xs font-bold text-slate-600">Кінець:</span><input type="date" value="${libBook.dateFinished || ''}" onchange="saveManualDate('${libBook.id}', 'dateFinished', this)" class="date-input"></div>
                     </div>
                 </div>`;
 
                 let starsHtml = ''; const currentRating = libBook.rating || 0;
                 for(let i=1; i<=5; i++) starsHtml += `<span onclick="setRating('${libBook.id}', ${i})" class="text-4xl cursor-pointer ${currentRating >= i ? 'text-slate-400' : 'text-slate-200'} active:scale-90 transition-transform">★</span>`;
-                html += `
-                <div class="mb-6 text-center fade-in bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-                    <div class="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-wider">Моя оцінка</div>
-                    <div class="flex justify-center gap-3">${starsHtml}</div>
-                </div>
-                
-                <div class="mb-6 bg-slate-50 p-5 rounded-3xl border border-slate-100 fade-in shadow-sm">
-                    <h4 class="text-[10px] font-black uppercase text-slate-500 mb-3 flex justify-between items-center tracking-wider">Нотатки <button onclick="saveReview('${libBook.id}')" class="text-indigo-600 bg-indigo-100 px-4 py-2 rounded-xl text-[10px] font-bold active:scale-95 transition-transform shadow-sm">Зберегти</button></h4>
-                    <textarea id="reviewText_${libBook.id}" class="w-full bg-transparent text-sm text-slate-700 outline-none resize-none min-h-[80px]" placeholder="Напишіть свої враження тут...">${libBook.review || ''}</textarea>
-                </div>`;
+                html += `<div class="mb-6 text-center fade-in bg-white border border-slate-100 rounded-2xl p-4 shadow-sm"><div class="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-wider">Моя оцінка</div><div class="flex justify-center gap-3">${starsHtml}</div></div>
+                <div class="mb-6 bg-slate-50 p-5 rounded-3xl border border-slate-100 fade-in shadow-sm"><h4 class="text-[10px] font-black uppercase text-slate-500 mb-3 flex justify-between items-center tracking-wider">Нотатки <button onclick="saveReview('${libBook.id}')" class="text-indigo-600 bg-indigo-100 px-4 py-2 rounded-xl text-[10px] font-bold active:scale-95 transition-transform shadow-sm">Зберегти</button></h4><textarea id="reviewText_${libBook.id}" class="w-full bg-transparent text-sm text-slate-700 outline-none resize-none min-h-[80px]" placeholder="Напишіть свої враження тут...">${libBook.review || ''}</textarea></div>`;
             }
             html += `<div class="desc-scroll fade-in"><h4 class="text-[10px] font-black uppercase text-slate-400 mb-2 tracking-wider">Анотація</h4><p class="text-sm text-slate-700 leading-relaxed text-justify">${safeDesc}</p></div>`;
-            if (!isNewFromSearch) {
-                html += `<div class="mt-8 mb-2 flex justify-center fade-in"><button onclick="deleteBookFromDetails('${libBook.id}')" class="flex items-center gap-2 px-6 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm active:scale-95 transition-all shadow-sm">🗑️ Видалити книгу з бібліотеки</button></div>`;
-            }
+            if (!isNewFromSearch) html += `<div class="mt-8 mb-2 flex justify-center fade-in"><button onclick="deleteBookFromDetails('${libBook.id}')" class="flex items-center gap-2 px-6 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm active:scale-95 transition-all shadow-sm">🗑️ Видалити книгу з бібліотеки</button></div>`;
 
             document.getElementById('detailsContent').innerHTML = html;
             if (isNewFromSearch) document.getElementById('statusButtons').classList.remove('hidden'); else document.getElementById('statusButtons').classList.add('hidden');
             openSheet('detailsSheet');
         }
 
-        function deleteBookFromDetails(id) { if(confirm("Видалити цю книгу назавжди?")) { db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); closeAllSheets(); } }
+        function deleteBookFromDetails(id) { if(confirm("Видалити цю книгу назавжди?")) { deleteEpubLocal(id).catch(e=>{}); db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); closeAllSheets(); } }
         function setRating(id, rating) { updateBookInFirestore(id, { rating: rating }); setTimeout(() => { showBookDetails(myLibrary.find(b => b.id === id)); }, 100); }
-        function changeStatusFromDetails(id, newStatus) {
-            const updates = { status: newStatus }; const book = myLibrary.find(b => b.id === id);
-            if (newStatus === 'finished') { updates.pagesRead = book.pagesTotal; updates.dateFinished = book.dateFinished || new Date().toISOString().slice(0, 10); } else if (newStatus === 'reading') { updates.dateStarted = book.dateStarted || new Date().toISOString().slice(0, 10); }
-            updateBookInFirestore(id, updates); closeAllSheets(); setLibraryTab(newStatus);
-        }
+        function changeStatusFromDetails(id, newStatus) { const updates = { status: newStatus }; const book = myLibrary.find(b => b.id === id); if (newStatus === 'finished') { updates.pagesRead = book.pagesTotal; updates.dateFinished = book.dateFinished || new Date().toISOString().slice(0, 10); } else if (newStatus === 'reading') { updates.dateStarted = book.dateStarted || new Date().toISOString().slice(0, 10); } updateBookInFirestore(id, updates); closeAllSheets(); setLibraryTab(newStatus); }
         function toggleEditMode(isEditing) { if(isEditing) { document.getElementById('detailsContent').classList.add('hidden'); document.getElementById('editContent').classList.remove('hidden'); } else { document.getElementById('detailsContent').classList.remove('hidden'); document.getElementById('editContent').classList.add('hidden'); } }
-        function saveBookEdits() {
-            const updates = { title: document.getElementById('editTitle').value.trim() || 'Без назви', author: document.getElementById('editAuthor').value.trim() || 'Невідомий', pagesTotal: parseInt(document.getElementById('editPages').value) || 300, image: document.getElementById('editImage').value.trim() };
-            if(tempSelectedBook === 'manual') { tempSelectedBook = { ...updates, description: 'Додано вручну.' }; } else { updateBookInFirestore(tempSelectedBook.id, updates); showBookDetails({ ...tempSelectedBook, ...updates }); } 
-        }
+        function saveBookEdits() { const updates = { title: document.getElementById('editTitle').value.trim() || 'Без назви', author: document.getElementById('editAuthor').value.trim() || 'Невідомий', pagesTotal: parseInt(document.getElementById('editPages').value) || 300, image: document.getElementById('editImage').value.trim() }; if(tempSelectedBook === 'manual') { tempSelectedBook = { ...updates, description: 'Додано вручну.' }; } else { updateBookInFirestore(tempSelectedBook.id, updates); showBookDetails({ ...tempSelectedBook, ...updates }); } }
         function saveReview(id) { updateBookInFirestore(id, { review: document.getElementById(`reviewText_${id}`).value }); }
         
-        async function addBookWithStatus(status) {
-            if (!currentUser) return; if(tempSelectedBook === 'manual') saveBookEdits(); 
-            let newBookData = { ...tempSelectedBook, status: status, pagesRead: status === 'finished' ? tempSelectedBook.pagesTotal : 0, dateAdded: Date.now(), rating: 0, review: '', epubUrl: null, timeSpent: 0, lastFileName: null, dateStarted: status === 'reading' ? new Date().toISOString().slice(0, 10) : null, dateFinished: status === 'finished' ? new Date().toISOString().slice(0, 10) : null };
-            await db.collection('users').doc(currentUser.uid).collection('books').add(newBookData); tempSelectedBook = null; closeAllSheets();
-        }
-
-        function changeStatus(id, newStatus, event) {
-            event.stopPropagation(); const updates = { status: newStatus }; const book = myLibrary.find(b => b.id === id); 
-            if (newStatus === 'reading' && !book.dateStarted) updates.dateStarted = new Date().toISOString().slice(0, 10);
-            if (newStatus === 'finished') { updates.pagesRead = book.pagesTotal; updates.dateFinished = new Date().toISOString().slice(0, 10); }
-            updateBookInFirestore(id, updates); setLibraryTab(newStatus); 
-        }
-
+        async function addBookWithStatus(status) { if (!currentUser) return; if(tempSelectedBook === 'manual') saveBookEdits(); let newBookData = { ...tempSelectedBook, status: status, pagesRead: status === 'finished' ? tempSelectedBook.pagesTotal : 0, dateAdded: Date.now(), rating: 0, review: '', epubUrl: null, timeSpent: 0, lastFileName: null, isLocalSaved: false, dateStarted: status === 'reading' ? new Date().toISOString().slice(0, 10) : null, dateFinished: status === 'finished' ? new Date().toISOString().slice(0, 10) : null }; await db.collection('users').doc(currentUser.uid).collection('books').add(newBookData); tempSelectedBook = null; closeAllSheets(); }
+        function changeStatus(id, newStatus, event) { event.stopPropagation(); const updates = { status: newStatus }; const book = myLibrary.find(b => b.id === id); if (newStatus === 'reading' && !book.dateStarted) updates.dateStarted = new Date().toISOString().slice(0, 10); if (newStatus === 'finished') { updates.pagesRead = book.pagesTotal; updates.dateFinished = new Date().toISOString().slice(0, 10); } updateBookInFirestore(id, updates); setLibraryTab(newStatus); }
         function saveManualDate(id, field, dateEl) { updateBookInFirestore(id, { [field]: dateEl.value }); const book = myLibrary.find(b => b.id === id); if (book) book[field] = dateEl.value; render(); }
 
         function startTimer() { readingStartTime = Date.now(); currentSessionSeconds = 0; document.getElementById('readerTimer').innerText = "00:00"; readingTimer = setInterval(() => { currentSessionSeconds = Math.floor((Date.now() - readingStartTime) / 1000); const m = String(Math.floor(currentSessionSeconds / 60)).padStart(2, '0'), s = String(currentSessionSeconds % 60).padStart(2, '0'), h = Math.floor(currentSessionSeconds / 3600); document.getElementById('readerTimer').innerText = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`; }, 1000); }
@@ -604,12 +563,64 @@
         function changeReaderTheme(theme) { readerTheme = theme; localStorage.setItem('readerTheme', theme); applyReaderSettings(); }
         function initSwipeGestures() { const viewerEl = document.getElementById('viewer'); if(!window.mc) { window.mc = new Hammer(viewerEl); window.mc.get('swipe').set({ direction: Hammer.DIRECTION_HORIZONTAL }); window.mc.on("swipeleft", () => { if (rendition) rendition.next(); }); window.mc.on("swiperight", () => { if (rendition) rendition.prev(); }); } }
 
-        function handleFileSelect(event, bookId) {
-            const file = event.target.files[0]; if (!file) return; if (!file.name.toLowerCase().endsWith('.epub')) { alert("Будь ласка, виберіть файл у форматі .epub"); event.target.value = ''; return; }
+        async function handleFileSelect(event, bookId) { 
+            const file = event.target.files[0]; 
+            if (!file) return; 
+            if (!file.name.toLowerCase().endsWith('.epub')) { alert("Тільки файли формату .epub!"); event.target.value = ''; return; } 
+            
+            const reader = new FileReader(); 
+            reader.onload = async function(e) { 
+                const buffer = e.target.result;
+                try {
+                    await saveEpubLocal(bookId, buffer);
+                    await updateBookInFirestore(bookId, { lastFileName: file.name, isLocalSaved: true });
+                    const bookData = myLibrary.find(b => b.id === bookId);
+                    if (bookData) { bookData.isLocalSaved = true; bookData.lastFileName = file.name; }
+                    startReaderUI(bookData);
+                    loadEpubData(buffer, bookData);
+                    render();
+                } catch(err) { alert("Не вдалося зберегти книгу. Можливо недостатньо пам'яті."); }
+            }; 
+            reader.onerror = function() { alert("Помилка читання файлу."); closeReader(); }; 
+            reader.readAsArrayBuffer(file); 
+            event.target.value = ''; 
+        }
+
+        async function openLocalReader(bookId, e) {
+            if(e) e.stopPropagation();
             const bookData = myLibrary.find(b => b.id === bookId);
-            if (bookData.lastFileName && bookData.lastFileName !== file.name) { const isSure = confirm(`⚠️ Увага!\nМинулого разу ви читали: "${bookData.lastFileName}"\nЗараз обрали: "${file.name}"\nЯкщо це інша книга, прогрес зіб'ється. Ви впевнені?`); if (!isSure) { event.target.value = ''; return; } }
-            if (bookData.lastFileName !== file.name) updateBookInFirestore(bookId, { lastFileName: file.name });
-            startReaderUI(bookData); const reader = new FileReader(); reader.onload = function(e) { loadEpubData(e.target.result, bookData); }; reader.onerror = function() { alert("Помилка."); closeReader(); }; reader.readAsArrayBuffer(file); event.target.value = ''; 
+            startReaderUI(bookData);
+            try {
+                const buffer = await getEpubLocal(bookId);
+                if (buffer) {
+                    loadEpubData(buffer, bookData);
+                } else {
+                    alert("Файл не знайдено на пристрої. Ймовірно кеш було очищено. Завантажте файл знову.");
+                    closeReader();
+                    await updateBookInFirestore(bookId, { isLocalSaved: false });
+                    bookData.isLocalSaved = false;
+                    render();
+                }
+            } catch(err) {
+                alert("Помилка відкриття файлу.");
+                closeReader();
+            }
+        }
+
+        async function removeLocalEpub(bookId, e) {
+            if(e) e.stopPropagation();
+            if(confirm("Видалити збережений файл з пристрою?\nВідсоток прочитаного та нотатки залишаться у хмарі.")) {
+                try {
+                    await deleteEpubLocal(bookId);
+                    await updateBookInFirestore(bookId, { isLocalSaved: false });
+                    const bookData = myLibrary.find(b => b.id === bookId);
+                    if(bookData) bookData.isLocalSaved = false;
+                    render();
+                    if(!document.getElementById('detailsSheet').classList.contains('translate-y-100')) {
+                        showBookDetails(bookData);
+                    }
+                } catch(err) { alert("Помилка видалення."); }
+            }
         }
 
         function promptForEpubUrl(bookId, event) { event.stopPropagation(); const url = prompt("Пряме веб-посилання на файл .epub:"); if(url) updateBookInFirestore(bookId, { epubUrl: url }); }
@@ -621,22 +632,16 @@
             document.getElementById('viewer').innerHTML = ''; 
             try {
                 currentBookInstance = ePub(source); rendition = currentBookInstance.renderTo("viewer", { width: "100%", height: "100%", spread: "none", manager: "continuous", flow: "paginated" });
-                rendition.themes.register("light", { "body": { "background": "#f8fafc", "color": "#0f172a" }}); rendition.themes.register("sepia", { "body": { "background": "#f4ecd8", "color": "#5b4636" }}); rendition.themes.register("dark", { "body": { "background": "#0f172a", "color": "#cbd5e1" }});
-                applyReaderSettings();
+                rendition.themes.register("light", { "body": { "background": "#f8fafc", "color": "#0f172a" }}); rendition.themes.register("sepia", { "body": { "background": "#f4ecd8", "color": "#5b4636" }}); rendition.themes.register("dark", { "body": { "background": "#0f172a", "color": "#cbd5e1" }}); applyReaderSettings();
                 const safeCfi = (bookData.lastCfi && typeof bookData.lastCfi === 'string' && bookData.lastCfi.startsWith('epubcfi')) ? bookData.lastCfi : undefined;
                 rendition.display(safeCfi).catch(() => rendition.display());
                 currentBookInstance.ready.then(() => currentBookInstance.locations.generate(1600)).then(() => { const loc = rendition.currentLocation(); if(loc && loc.start) document.getElementById('readerProgress').innerText = Math.round(loc.start.percentage * 100) + "%"; else document.getElementById('readerProgress').innerText = "Відкрито"; }).catch(err => console.log(err));
-                rendition.on("relocated", (location) => {
-                    if (location && location.start) {
-                        let percent = 0; if (location.start.percentage) percent = Math.round(location.start.percentage * 100); document.getElementById('readerProgress').innerText = percent > 0 ? percent + "%" : "Рахуємо...";
-                        if (percent > 0) db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ lastCfi: location.start.cfi, pagesRead: Math.round((percent / 100) * (bookData.pagesTotal || 300)) }); else db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ lastCfi: location.start.cfi });
-                    }
-                });
+                rendition.on("relocated", (location) => { if (location && location.start) { let percent = 0; if (location.start.percentage) percent = Math.round(location.start.percentage * 100); document.getElementById('readerProgress').innerText = percent > 0 ? percent + "%" : "Рахуємо..."; if (percent > 0) db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ lastCfi: location.start.cfi, pagesRead: Math.round((percent / 100) * (bookData.pagesTotal || 300)) }); else db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ lastCfi: location.start.cfi }); } });
             } catch (err) { console.error(err); document.getElementById('readerProgress').innerText = "Помилка"; stopTimer(); }
         }
 
         function closeReader() { stopTimer(); document.getElementById('readerOverlay').style.display = 'none'; document.getElementById('readerSettingsMenu').classList.add('hidden'); if(currentBookInstance) { currentBookInstance.destroy(); currentBookInstance = null; rendition = null; } document.getElementById('viewer').innerHTML = ''; document.getElementById('librarySections').classList.remove('hidden'); }
-        function deleteBook(id, event) { event.stopPropagation(); if(confirm("Видалити книгу?")) db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); }
+        function deleteBook(id, event) { event.stopPropagation(); if(confirm("Видалити книгу?")) { deleteEpubLocal(id).catch(e=>{}); db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); } }
         function formatTime(secs) { if (!secs) return "0 хв"; const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60); return h > 0 ? `${h} год ${m} хв` : `${m} хв`; }
 
         function setLibraryTab(tab) { currentLibraryTab = tab; document.querySelectorAll('#libraryTabs button').forEach(btn => { btn.className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95'; }); document.getElementById('tab_' + tab).className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-indigo-600 text-white shadow-md active:scale-95'; render(); }
@@ -645,8 +650,34 @@
             const percent = Math.round((book.pagesRead / book.pagesTotal) * 100) || 0;
             const isFinished = book.status === 'finished'; const isPlanned = book.status === 'planned'; const isReading = book.status === 'reading';
 
-            if (viewMode === 'grid') {
-                return `<div data-id="${book.id}" onclick="showBookDetails(${JSON.stringify(book).replace(/"/g, '&quot;')})" class="flex flex-col items-center cursor-pointer fade-in active:scale-[0.98] transition-transform ${isFinished ? 'opacity-80' : ''}"><div class="relative w-full aspect-[2/3]"><img src="${book.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-full h-full rounded-xl shadow-md object-cover border border-slate-200">${isFinished && book.rating ? `<div class="absolute -bottom-2 -right-2 bg-white text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-sm border border-slate-100">★${book.rating}</div>` : ''}</div><h3 class="font-bold text-slate-900 text-[11px] leading-tight mt-2 w-full text-center truncate px-1">${book.title}</h3></div>`;
+            if (viewMode === 'grid') { return `<div data-id="${book.id}" onclick="showBookDetails(${JSON.stringify(book).replace(/"/g, '&quot;')})" class="flex flex-col items-center cursor-pointer fade-in active:scale-[0.98] transition-transform ${isFinished ? 'opacity-80' : ''}"><div class="relative w-full aspect-[2/3]"><img src="${book.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-full h-full rounded-xl shadow-md object-cover border border-slate-200">${isFinished && book.rating ? `<div class="absolute -bottom-2 -right-2 bg-white text-amber-400 text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-sm border border-slate-100">★${book.rating}</div>` : ''}</div><h3 class="font-bold text-slate-900 text-[11px] leading-tight mt-2 w-full text-center truncate px-1">${book.title}</h3></div>`; }
+
+            let readerActions = '';
+            if (book.isLocalSaved) {
+                readerActions = `
+                    <div class="flex gap-2">
+                        <button onclick="openLocalReader('${book.id}', event)" class="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">📖 Читати (Офлайн)</button>
+                        <button onclick="removeLocalEpub('${book.id}', event)" class="px-3 bg-red-50 text-red-500 rounded-lg flex items-center justify-center active:scale-95 transition-transform">✕</button>
+                    </div>`;
+            } else if (book.epubUrl) {
+                readerActions = `
+                    <button onclick="openReaderFromUrl('${book.id}', '${book.epubUrl}', event)" class="w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm mb-1.5">☁️ Читати онлайн</button>
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')">
+                            <button onclick="event.stopPropagation(); document.getElementById('epubFile_${book.id}').click();" class="w-full py-2 bg-slate-800 text-white rounded-lg text-[10px] font-bold active:scale-95 transition-transform shadow-sm">📥 Завантажити</button>
+                        </div>
+                        <button onclick="promptForEpubUrl('${book.id}', event)" class="flex-1 py-2 text-[10px] text-slate-500 bg-slate-100 rounded-lg font-bold">Змінити URL</button>
+                    </div>`;
+            } else {
+                readerActions = `
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')">
+                            <button onclick="event.stopPropagation(); document.getElementById('epubFile_${book.id}').click();" class="w-full py-2 bg-slate-800 text-white rounded-lg text-[10px] font-bold active:scale-95 transition-transform shadow-sm">📥 Завантажити</button>
+                        </div>
+                        <button onclick="promptForEpubUrl('${book.id}', event)" class="flex-1 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold active:scale-95 transition-transform">🔗 URL (.epub)</button>
+                    </div>`;
             }
 
             return `
@@ -661,9 +692,8 @@
                             ${book.dateStarted ? `<div class="flex items-center justify-between"><span>Почато:</span><input type="date" value="${book.dateStarted}" class="date-input" onchange="saveManualDate('${book.id}', 'dateStarted', this)" onclick="event.stopPropagation()"></div>` : ''}
                             ${book.dateFinished ? `<div class="flex items-center justify-between"><span>Закінчено:</span><input type="date" value="${book.dateFinished}" class="date-input" onchange="saveManualDate('${book.id}', 'dateFinished', this)" onclick="event.stopPropagation()"></div>` : ''}
                         </div>
-                        <div class="mt-3 flex flex-col gap-1.5 border-t border-slate-50 pt-3">
-                            ${book.epubUrl ? `<button onclick="openReaderFromUrl('${book.id}', '${book.epubUrl}', event)" class="w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">☁️ Читати онлайн</button><button onclick="promptForEpubUrl('${book.id}', event)" class="w-full text-[10px] text-slate-400">Змінити посилання</button>` : `<button onclick="promptForEpubUrl('${book.id}', event)" class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold active:scale-95 transition-transform">🔗 Додати URL (.epub)</button>`}
-                            <div class="relative w-full"><input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')"><button onclick="event.stopPropagation(); document.getElementById('epubFile_${book.id}').click();" class="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">📁 Файл з пристрою</button></div>
+                        <div class="mt-3 flex flex-col border-t border-slate-50 pt-3">
+                            ${readerActions}
                         </div>
                     `}
                 </div>
@@ -689,23 +719,20 @@
                 container.innerHTML = html;
             }
 
-            if (viewMode === 'grid') {
-                document.querySelectorAll('.sortable-list').forEach(list => {
-                    new Sortable(list, { delay: 300, delayOnTouchOnly: true, animation: 150, ghostClass: 'sortable-ghost' });
-                });
-            }
+            if (viewMode === 'grid') { document.querySelectorAll('.sortable-list').forEach(list => { new Sortable(list, { delay: 300, delayOnTouchOnly: true, animation: 150, ghostClass: 'sortable-ghost' }); }); }
         }
 
         function switchTab(tab) {
-            document.getElementById('appScreen').classList.remove('hidden'); document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            const navItems = document.querySelectorAll('.nav-item');
+            document.getElementById('appScreen').classList.remove('hidden'); 
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            
             if (tab === 'library') { 
-                navItems[0].classList.add('active'); 
+                document.getElementById('btnNavLibrary').classList.add('active'); 
                 const lib = document.getElementById('librarySections'); lib.classList.remove('hidden', 'fade-in'); void lib.offsetWidth; lib.classList.add('fade-in'); 
                 document.getElementById('recommendationsScreen').classList.add('hidden'); 
             } 
             else if (tab === 'recommendations') { 
-                navItems[1].classList.add('active'); 
+                document.getElementById('btnNavRecs').classList.add('active'); 
                 const rec = document.getElementById('recommendationsScreen'); rec.classList.remove('hidden', 'fade-in'); void rec.offsetWidth; rec.classList.add('fade-in'); 
                 document.getElementById('librarySections').classList.add('hidden'); 
                 if(!currentRecCategory) loadRealRecommendations('auto', 'rec_auto'); 
@@ -724,11 +751,7 @@
 
         async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
             if (currentRecCategory === category) return;
-            currentRecCategory = category;
-            recStartIndex = 0;
-            currentRecQueryIndex = 0;
-            currentRecQueries = [];
-            shownRecTitles.clear();
+            currentRecCategory = category; recStartIndex = 0; currentRecQueryIndex = 0; currentRecQueries = []; shownRecTitles.clear();
 
             const list = document.getElementById('recommendationsList');
             list.innerHTML = `<div class="p-8 flex flex-col items-center justify-center text-slate-400 text-sm fade-in animate-pulse w-full"><span class="text-3xl mb-3">🔍</span>Шукаємо круті книги...</div>`;
@@ -744,16 +767,10 @@
                     let topAuthors = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 10);
                     pool.push(...topAuthors.map(a => `inauthor:"${a}"`));
                 }
-                let generic = Object.values(curatedCategories).flat();
-                generic.sort(() => 0.5 - Math.random());
-                pool.push(...generic);
-            } else {
-                pool = [...curatedCategories[category]];
-                pool.sort(() => 0.5 - Math.random());
-            }
+                let generic = Object.values(curatedCategories).flat(); generic.sort(() => 0.5 - Math.random()); pool.push(...generic);
+            } else { pool = [...curatedCategories[category]]; pool.sort(() => 0.5 - Math.random()); }
             
-            currentRecQueries = pool;
-            await fetchMoreRecommendations(true);
+            currentRecQueries = pool; await fetchMoreRecommendations(true);
         }
 
         async function fetchMoreRecommendations(isFirstLoad = false) {
@@ -762,17 +779,12 @@
 
             const lst = document.getElementById('recommendationsList');
             if (!isFirstLoad && !document.getElementById('recLoadingMore')) {
-                const d = document.createElement('div');
-                d.id = 'recLoadingMore';
-                d.className = 'py-6 text-center text-slate-400 animate-pulse text-sm w-full block';
-                d.innerHTML = 'Завантажуємо ще...';
-                lst.appendChild(d);
+                const d = document.createElement('div'); d.id = 'recLoadingMore'; d.className = 'py-6 text-center text-slate-400 animate-pulse text-sm w-full block'; d.innerHTML = 'Завантажуємо ще...'; lst.appendChild(d);
             }
 
-            let finalBooks = [];
-            let consecutiveEmptyFetches = 0;
+            let finalBooks = []; let consecutiveEmptyFetches = 0;
 
-            while (finalBooks.length < 5 && currentRecQueryIndex < currentRecQueries.length && consecutiveEmptyFetches < 3) {
+            while (finalBooks.length < 12 && currentRecQueryIndex < currentRecQueries.length && consecutiveEmptyFetches < 3) {
                 const q = currentRecQueries[currentRecQueryIndex];
                 const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}`;
                 
@@ -780,55 +792,35 @@
                     const res = await fetch(url).then(r => r.ok ? r.json() : {items:[]}).catch(()=>({items:[]}));
                     let items = res.items || [];
                     
-                    if (items.length < 30) {
-                        currentRecQueryIndex++;
-                        recStartIndex = 0;
-                    } else {
-                        recStartIndex += 40;
-                    }
+                    if (items.length < 30) { currentRecQueryIndex++; recStartIndex = 0; } else { recStartIndex += 40; }
 
-                    const badWords = ['учебник','словарь','журнал','комикс','манга','підручник','словник','вісник','сборник','збірник','посібник','пособие','том ','випуск','выпуск','зошит','тетрадь','хрестоматия','дневник'];
+                    const badWords = ['учебник','словарь','журнал','комикс','манга','підручник','словник','вісник','сборник','збірник','посібник','пособие','том ','випуск','выпуск','зошит','тетрадь','хрестоматия','дневник', 'конспект', 'довідник', 'срср', 'ссср', 'музея', 'музей', 'матеріали', 'материалы', 'звіт', 'отчет', 'доповідь', 'альманах', 'праці', 'труды'];
                     const existingTitles = new Set(myLibrary.map(b => (b.title||'').trim().toLowerCase()));
 
                     let valid = items.filter(item => {
                         const b = item.volumeInfo;
                         if (!b.title || !b.description || b.description.length < 20) return false;
                         if (b.pageCount !== undefined && b.pageCount > 0 && b.pageCount < 40) return false;
+                        if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
+                        if (b.language && !['uk', 'ru', 'bg'].includes(b.language)) return false;
                         if (!isCyrillic(b.title) || isEnglishTitle(b.title)) return false;
 
                         const tLower = b.title.toLowerCase();
                         if (badWords.some(bw => tLower.includes(bw))) return false;
                         if (existingTitles.has(tLower)) return false;
-                        
                         const key = tLower + (b.authors ? b.authors[0] : '');
                         if (shownRecTitles.has(key)) return false;
-                        
                         return true;
                     });
 
                     const u = new Map(); 
-                    valid.forEach(i => {
-                        const b = i.volumeInfo;
-                        const key = b.title.toLowerCase() + (b.authors ? b.authors[0] : '');
-                        u.set(key, i);
-                    });
+                    valid.forEach(i => { const b = i.volumeInfo; const key = b.title.toLowerCase() + (b.authors ? b.authors[0] : ''); u.set(key, i); });
                     
                     let uniqueBatch = Array.from(u.values());
-                    uniqueBatch.forEach(i => {
-                        const b = i.volumeInfo;
-                        const key = b.title.toLowerCase() + (b.authors ? b.authors[0] : '');
-                        shownRecTitles.add(key);
-                        finalBooks.push(i);
-                    });
+                    uniqueBatch.forEach(i => { const b = i.volumeInfo; const key = b.title.toLowerCase() + (b.authors ? b.authors[0] : ''); shownRecTitles.add(key); finalBooks.push(i); });
 
-                    if (uniqueBatch.length === 0) consecutiveEmptyFetches++;
-                    else consecutiveEmptyFetches = 0;
-
-                } catch (e) {
-                    consecutiveEmptyFetches++;
-                    currentRecQueryIndex++; 
-                    recStartIndex = 0;
-                }
+                    if (uniqueBatch.length === 0) consecutiveEmptyFetches++; else consecutiveEmptyFetches = 0;
+                } catch (e) { consecutiveEmptyFetches++; currentRecQueryIndex++; recStartIndex = 0; }
             }
 
             if (isFirstLoad) lst.innerHTML = '';
@@ -837,11 +829,9 @@
             if (finalBooks.length === 0 && isFirstLoad) {
                 lst.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm w-full">Не знайшли нових книг 😔 Спробуйте іншу категорію.</div>`;
             } else if (finalBooks.length > 0) {
-                finalBooks.sort(() => 0.5 - Math.random());
-                let h = '';
+                finalBooks.sort(() => 0.5 - Math.random()); let h = '';
                 finalBooks.forEach(i => {
-                    const b = i.volumeInfo; 
-                    const safeImg = (b.imageLinks?.thumbnail || PLACEHOLDER_IMG).replace(/^http:\/\//i, 'https://');
+                    const b = i.volumeInfo; const safeImg = (b.imageLinks?.thumbnail || PLACEHOLDER_IMG).replace(/^http:\/\//i, 'https://');
                     const bookObj = { googleId: i.id || Math.random().toString(), title: b.title, author: b.authors ? b.authors[0] : 'Невідомий', pagesTotal: b.pageCount || 300, image: safeImg, description: b.description || 'Опис відсутній.', genre: b.categories ? b.categories[0] : '' };
                     h += `
                     <div onclick="showBookDetails(${JSON.stringify(bookObj).replace(/"/g, '&quot;')}, true)" class="bg-white p-4 rounded-xl flex gap-3 items-start border border-slate-100 cursor-pointer shadow-sm mb-3 fade-in active:scale-[0.98] transition-transform">
@@ -850,11 +840,9 @@
                         <button class="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg text-xs font-bold shrink-0 mt-2 pointer-events-none">➕</button>
                     </div>`;
                 });
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = h;
+                const tempDiv = document.createElement('div'); tempDiv.innerHTML = h;
                 while(tempDiv.firstChild) lst.appendChild(tempDiv.firstChild);
             }
-
             isFetchingRecs = false;
         }
 
