@@ -161,12 +161,12 @@
             <p class="text-slate-500 text-sm mt-1">Скільки книг ви хочете прочитати цього року?</p>
         </div>
         <div class="flex items-center justify-center gap-4 mb-6">
-            <button onclick="adjustChallengeGoal(-1)" class="size-14 bg-slate-100 rounded-full text-2xl font-bold text-slate-600 active:scale-95 transition-transform hover:bg-slate-200">−</button>
+            <button type="button" onclick="adjustChallengeGoal(-1)" class="size-14 bg-slate-100 rounded-full text-2xl font-bold text-slate-600 active:scale-95 transition-transform hover:bg-slate-200">−</button>
             <div class="text-center">
                 <input type="number" id="challengeGoalInput" value="12" min="1" max="365" class="w-24 text-5xl font-black text-indigo-600 text-center bg-transparent outline-none">
                 <p class="text-xs text-slate-400 uppercase tracking-wider mt-1">книг</p>
             </div>
-            <button onclick="adjustChallengeGoal(1)" class="size-14 bg-slate-100 rounded-full text-2xl font-bold text-slate-600 active:scale-95 transition-transform hover:bg-slate-200">+</button>
+            <button type="button" onclick="adjustChallengeGoal(1)" class="size-14 bg-slate-100 rounded-full text-2xl font-bold text-slate-600 active:scale-95 transition-transform hover:bg-slate-200">+</button>
         </div>
         <div class="bg-indigo-50 rounded-2xl p-4 mb-6">
             <div class="flex justify-between text-sm mb-2">
@@ -178,8 +178,8 @@
                 <span id="challengeSheetLeft" class="font-bold text-slate-700">12 книг</span>
             </div>
         </div>
-        <button onclick="saveChallengeGoal()" class="w-full p-4 bg-indigo-600 text-white font-bold rounded-xl active:scale-95 transition-transform shadow-lg shadow-indigo-200">
-            💾 Зберегти ціль
+        <button type="button" onclick="saveChallengeGoal()" class="w-full p-4 bg-indigo-600 text-white font-bold rounded-xl active:scale-95 transition-transform shadow-lg shadow-indigo-200 flex items-center justify-center gap-2">
+            <span>💾</span> Зберегти ціль
         </button>
         <p class="text-center text-xs text-slate-400 mt-4">Книги рахуються автоматично за датою завершення у 2026 році</p>
     </div>
@@ -263,7 +263,6 @@
     </div>
 
     <script>
-        // Не міняй ключі API Firebase, вони взяті з твого коду
         const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='192' viewBox='0 0 128 192' fill='%23f8fafc'%3E%3Crect width='128' height='192' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='13' font-weight='bold' fill='%2394a3b8'%3EБез фото%3C/text%3E%3C/svg%3E";
         const GOOGLE_BOOKS_API_KEY = "AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME"; 
         
@@ -286,23 +285,19 @@
         let challengeGoal = 12;
         const CHALLENGE_YEAR = 2026;
 
-        // РОЗШИРЕНИЙ ФІЛЬТР: відкидаємо сміття та англійські книги
+        // РОЗШИРЕНИЙ ФІЛЬТР: відкидаємо сміття та англійські книги на фронтенді
         const JUNK_WORDS = ['підручник', 'учебник', 'словник', 'словарь', 'хрестоматія', 'хрестоматия', 'довідник', 'справочник', 'зошит', 'тетрадь', 'посібник', 'пособие', 'збірник', 'сборник', 'ссср', 'ussr', 'музей', 'музея', 'материалы', 'матеріали', 'конференция', 'конференція', 'вісник', 'вестник', 'наука', 'медицина', 'закон', 'кодекс', 'випуск', 'выпуск', 'поезія', 'поэзия', 'стихи', 'вірші', 'музична', 'музыкальная', 'энциклопедия', 'енциклопедія', 'журнал', 'альманах', 'урок', 'шпаргалка', 'том', 'видання', 'издание', 'практикум'];
+        
+        // ТОТАЛЬНЕ ВИДАЛЕННЯ СМІТТЯ ПРЯМО В ЗАПИТІ ДО GOOGLE:
+        const API_EXCLUDES = ' -учебник -словник -довідник -посібник -журнал -збірник -сборник -музей -материалы -вісник -вестник -практикум -том -видання';
 
         window.isCleanFiction = function(b) {
             if (!b || !b.title) return false;
             const t = b.title.toLowerCase();
-            
-            // Якщо є сміттєві слова
             if (JUNK_WORDS.some(w => t.includes(w))) return false;
-            
-            // Жорсткий фільтр мови (відкидаємо англійську)
             if (b.language === 'en') return false;
             if (b.language && !['uk', 'ru', 'bg'].includes(b.language)) return false;
-            
-            // Якщо немає жодної кирилиці, скоріш за все це не те, що треба
             if (!/[а-яА-ЯіІїЇєЄґҐ]/.test(b.title)) return false;
-
             return true;
         }
 
@@ -373,12 +368,16 @@
             if(scrollTarget) recObserver.observe(scrollTarget);
         });
 
+        // ВИПРАВЛЕНО: Розумніший пошук року (щоб не ламалося, якщо дата не записана чітко)
         function getBooksReadIn2026() {
             return myLibrary.filter(b => {
                 if (b.status !== 'finished') return false;
-                if (!b.dateFinished) return false;
+                let dateStr = b.dateFinished || b.dateAdded; // беремо дату додавання, якщо немає дати завершення
+                if (!dateStr) return false;
                 try {
-                    const year = parseInt(b.dateFinished.substring(0, 4));
+                    let year;
+                    if(typeof dateStr === 'string') year = parseInt(dateStr.substring(0, 4));
+                    else if(typeof dateStr === 'number') year = new Date(dateStr).getFullYear();
                     return year === CHALLENGE_YEAR;
                 } catch(e) { return false; }
             });
@@ -398,15 +397,20 @@
             if(document.getElementById('challengeSheetLeft')) document.getElementById('challengeSheetLeft').innerText = Math.max(0, challengeGoal - booksRead) + ' книг';
         }
 
+        // ВИПРАВЛЕНО: Миттєво оновлює залишок у вікні налаштування цілі
         window.adjustChallengeGoal = function(delta) {
             const input = document.getElementById('challengeGoalInput');
             let val = parseInt(input.value) || 12;
             val = Math.max(1, Math.min(365, val + delta));
             input.value = val;
+            
+            const booksRead = getBooksReadIn2026().length;
+            document.getElementById('challengeSheetLeft').innerText = Math.max(0, val - booksRead) + ' книг';
         }
 
+        // ВИПРАВЛЕНО: Без дурних alert-ів, просто закривається і оновлюється
         window.saveChallengeGoal = async function() {
-            if (!currentUser) { alert("Увійдіть в акаунт, щоб зберегти ціль!"); return; }
+            if (!currentUser) return;
             const input = document.getElementById('challengeGoalInput');
             challengeGoal = Math.max(1, Math.min(365, parseInt(input.value) || 12));
             
@@ -414,10 +418,8 @@
                 await db.collection('users').doc(currentUser.uid).set({ challengeGoal2026: challengeGoal }, { merge: true });
                 updateChallengeWidget();
                 closeAllSheets();
-                alert("Ціль на 2026 рік збережено!");
             } catch(e) {
                 console.error(e);
-                alert("Помилка збереження цілі.");
             }
         }
 
@@ -520,16 +522,16 @@
                     let allItems = [];
                     const isAuthorSearch = rawQuery.startsWith('author:"') && rawQuery.endsWith('"');
                     const cleanQuery = isAuthorSearch ? rawQuery.slice(8, -1) : rawQuery;
-                    const safeQuery = encodeURIComponent(cleanQuery);
+                    const safeQuery = encodeURIComponent(cleanQuery + API_EXCLUDES); // Фільтруємо сміття одразу в запиті!
                     
                     let promises = [];
                     if (isAuthorSearch) {
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=40&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30&country=UA`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${encodeURIComponent(cleanQuery)}"${encodeURIComponent(API_EXCLUDES)}&printType=books&maxResults=40&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&media=ebook&attribute=authorTerm&limit=30&country=UA`).catch(()=>({ok:false})));
                     } else {
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&printType=books&orderBy=relevance&maxResults=30&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=30&country=UA`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&media=ebook&limit=30&country=UA`).catch(()=>({ok:false})));
                     }
 
                     const responses = await Promise.all(promises);
@@ -570,18 +572,13 @@
 
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
-                        
-                        // Жорстко: Якщо немає обкладинки — відразу відкидаємо!
                         if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
-
                         if (!window.isCleanFiction(b)) return false;
 
                         const qLower = cleanQuery.toLowerCase();
                         const aLower = (b.authors || []).join(' ').toLowerCase();
 
-                        if (isAuthorSearch) {
-                            return aLower.includes(qLower); 
-                        }
+                        if (isAuthorSearch) return aLower.includes(qLower); 
 
                         const tLower = b.title.toLowerCase();
                         const isTitleMatch = tLower.includes(qLower);
@@ -735,7 +732,6 @@
                 } else {
                     html += `<div class="relative w-full mb-2"><input type="file" id="epubFile_${libBook.id}_det" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${libBook.id}')"><button onclick="document.getElementById('epubFile_${libBook.id}_det').click();" class="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">📥 Завантажити файл з пристрою</button></div>`;
                     
-                    // ДОДАНО: Кнопки для пошуку книг на нормальних сайтах
                     const googleEpub = encodeURIComponent(`${safeTitle} ${safeAuthor} epub скачати`);
                     const lovereadSearch = encodeURIComponent(`site:loveread.ec ${safeTitle} ${safeAuthor}`);
                     const ukrSearch = encodeURIComponent(`${safeTitle} ${safeAuthor} скачати книгу повністю українською`);
@@ -1041,14 +1037,15 @@
             }
         }
 
+        // ВИПРАВЛЕНО: Жорсткий фокус на "fiction" (художню літературу) для Google API
         const curatedCategories = {
-            'Академія магії': ['академия магии роман', 'магическая академия фэнтези', 'академия магии ромфант', 'фэнтези академия'],
-            'Фентезі': ['фентезі роман', 'фэнтези бестселлер', 'боевое фэнтези', 'эпическое фэнтези', 'попаданцы фэнтези'],
-            'Детектив': ['детектив бестселер', 'остросюжетный детектив', 'детективний роман', 'психологический детектив'],
-            'Трилер': ['трилер бестселер', 'психологический триллер', 'мистический триллер', 'триллер роман'],
-            'Романтика': ['любовний роман', 'современный любовный роман', 'романтика бестселлер'],
-            'Саморозвиток': ['саморозвиток', 'саморазвитие', 'психология успеха', 'мотивация'],
-            'Фантастика': ['наукова фантастика', 'научная фантастика', 'космическая фантастика', 'киберпанк']
+            'Академія магії': ['"академія магії"', '"магическая академия"'],
+            'Фентезі': ['subject:"fiction" фентезі', 'subject:"fiction" фэнтези'],
+            'Детектив': ['subject:"fiction" детектив'],
+            'Трилер': ['subject:"fiction" трилер', 'subject:"fiction" триллер'],
+            'Романтика': ['subject:"fiction" любовний роман', 'subject:"fiction" романтика'],
+            'Саморозвиток': ['саморозвиток', 'мотивація', 'психологія'], 
+            'Фантастика': ['subject:"fiction" фантастика']
         };
 
         window.loadRealRecommendations = async function(category = 'auto', btnId = 'rec_auto') {
@@ -1073,7 +1070,7 @@
                     let topAuthors = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 5);
                     pool.push(...topAuthors.map(a => `inauthor:"${a}"`));
                 }
-                let generic = ['фентезі роман', 'детективний роман', 'психологический триллер', 'саморозвиток', 'любовний роман'];
+                let generic = ['subject:"fiction" фентезі', 'subject:"fiction" детектив', 'subject:"fiction" триллер', 'саморозвиток'];
                 generic.sort(() => 0.5 - Math.random());
                 pool.push(...generic);
             } else {
@@ -1101,11 +1098,12 @@
             let finalBooks = [];
             let apiFetches = 0; 
 
-            // Збільшив кількість спроб і потрібну кількість книг до 15
             while (finalBooks.length < 15 && currentRecQueryIndex < currentRecQueries.length && apiFetches < 10) {
                 apiFetches++;
                 const q = currentRecQueries[currentRecQueryIndex];
-                let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&printType=books&maxResults=40&startIndex=${recStartIndex}&key=${GOOGLE_BOOKS_API_KEY}`;
+                
+                // Додаємо мінус-слова прямо в URL, щоб Google не повертав нам словники
+                let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q + API_EXCLUDES)}&printType=books&maxResults=40&startIndex=${recStartIndex}&key=${GOOGLE_BOOKS_API_KEY}`;
                 
                 try {
                     const res = await fetch(url);
@@ -1125,12 +1123,8 @@
                     let valid = items.filter(item => {
                         const b = item.volumeInfo;
                         
-                        // Жорстко вимагаємо обкладинку
                         if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
-                        
-                        // Відсіваємо сміття та англійську
                         if (!window.isCleanFiction(b)) return false;
-                        
                         if (b.pageCount !== undefined && b.pageCount < 40) return false;
 
                         const tLower = b.title.toLowerCase();
