@@ -1,19 +1,16 @@
 {
-  "id": "./",
   "name": "ЧитайКо — Хмарний Трекер",
   "short_name": "ЧитайКо",
-  "description": "Ваша особиста хмарна бібліотека та читалка",
+  "description": "Особиста хмарна бібліотека, трекер читання та EPUB-читалка",
   "lang": "uk",
   "dir": "ltr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait",
   "background_color": "#f5f5f7",
   "theme_color": "#4f46e5",
-  "orientation": "portrait",
-  "categories": ["books", "education", "productivity"],
-  "prefer_related_applications": false,
+  "categories": ["books", "productivity", "lifestyle"],
   "icons": [
     {
       "src": "icon.png",
