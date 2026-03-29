@@ -156,34 +156,6 @@
         </div>
     </nav>
 
-    <div id="sourcesSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 85vh; overflow-y: auto;">
-        <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
-        <h2 class="text-2xl font-black mb-2">📥 Де завантажити книги?</h2>
-        <p class="text-xs text-slate-500 mb-5 leading-relaxed">Шукайте файли у форматі <b>.epub</b> за цими посиланнями, зберігайте на свій пристрій, а потім відкривайте в ЧитайКо.</p>
-
-        <div class="space-y-4">
-            <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-                <h3 class="font-bold text-[11px] uppercase tracking-wider text-blue-700 mb-3">🌐 Онлайн-бібліотеки</h3>
-                <a href="https://loveread.ec" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 mb-2 active:scale-95 transition-transform flex items-center justify-between"><span>📖 LoveRead.ec</span> <span>↗</span></a>
-                <a href="https://e-bookua.org.ua/" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 mb-2 active:scale-95 transition-transform flex items-center justify-between"><span>🇺🇦 E-bookUA</span> <span>↗</span></a>
-                <a href="https://coollib.net/" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 active:scale-95 transition-transform flex items-center justify-between"><span>📚 CoolLib</span> <span>↗</span></a>
-            </div>
-
-            <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                <h3 class="font-bold text-[11px] uppercase tracking-wider text-indigo-700 mb-3">✈️ Telegram-боти (Безкоштовно)</h3>
-                <a href="https://t.me/KnygyUA_bot" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 mb-2 active:scale-95 transition-transform flex items-center justify-between"><span>🤖 Українські книги (@KnygyUA_bot)</span> <span>↗</span></a>
-                <a href="https://t.me/e_book_ua_bot" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 active:scale-95 transition-transform flex items-center justify-between"><span>📚 E-book UA (@e_book_ua_bot)</span> <span>↗</span></a>
-            </div>
-
-            <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                <h3 class="font-bold text-[11px] uppercase tracking-wider text-emerald-700 mb-3">🛒 Легальні магазини</h3>
-                <a href="https://www.yakaboo.ua/ua/elektronnye-knigi.html" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 mb-2 active:scale-95 transition-transform flex items-center justify-between"><span>🛍️ Yakaboo</span> <span>↗</span></a>
-                <a href="https://nashformat.ua/catalog/elektronni-knygy" target="_blank" class="block w-full py-3 px-4 bg-white rounded-xl shadow-sm text-sm font-bold text-slate-700 active:scale-95 transition-transform flex items-center justify-between"><span>📗 Наш Формат</span> <span>↗</span></a>
-            </div>
-        </div>
-        <button onclick="closeAllSheets()" class="mt-6 w-full py-3 bg-slate-100 text-slate-700 font-bold rounded-xl active:scale-95 transition-transform">Зрозуміло, закрити</button>
-    </div>
-
     <div id="challengeSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 70vh;">
         <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <div class="text-center mb-6">
@@ -267,10 +239,7 @@
             </div>
         </div>
         <div id="searchResults" class="px-3 pb-6 overflow-y-auto flex-1">
-            <div class="flex gap-2 justify-center mb-4 w-full px-2">
-                <button onclick="openManualForm()" class="flex-1 py-3 px-2 text-center text-[12px] font-bold text-indigo-600 bg-indigo-50 rounded-xl active:scale-95 transition-transform shadow-sm flex items-center justify-center gap-1">✍️ Вручну</button>
-                <button onclick="openSheet('sourcesSheet')" class="flex-1 py-3 px-2 text-center text-[12px] font-bold text-emerald-600 bg-emerald-50 rounded-xl active:scale-95 transition-transform shadow-sm flex items-center justify-center gap-1">📥 Де завантажити?</button>
-            </div>
+            <button onclick="openManualForm()" class="w-[calc(100%-24px)] mx-auto mb-4 p-3 text-center text-sm font-semibold text-indigo-600 bg-indigo-50 rounded-xl active:bg-indigo-100 transition-colors">✍️ Не знайшли? Додати вручну</button>
             <div id="searchItems" class="space-y-1"></div>
         </div>
     </div>
@@ -297,9 +266,7 @@
     </div>
 
     <script>
-        // ВІЧНА КАРТИНКА-ЗАГЛУШКА (SVG Base64) - ніколи не зламається і не покаже знак питання
         const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='192' viewBox='0 0 128 192' fill='%23f8fafc'%3E%3Crect width='128' height='192' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='13' font-weight='bold' fill='%2394a3b8'%3EБез фото%3C/text%3E%3C/svg%3E";
-        
         const GOOGLE_BOOKS_API_KEY = "AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME"; 
         
         const firebaseConfig = { apiKey: "AIzaSyAXgYW2_9ofKCvLoQFT6oMz0bCvbvldPGg", authDomain: "chitayko-pwa.firebaseapp.com", projectId: "chitayko-pwa", storageBucket: "chitayko-pwa.firebasestorage.app", messagingSenderId: "278531514478", appId: "1:278531514478:web:731dad47437f6aae2b067f", measurementId: "G-1JN4FBQ13K" };
@@ -413,14 +380,14 @@
             if(document.getElementById('challengeSheetLeft')) document.getElementById('challengeSheetLeft').innerText = Math.max(0, challengeGoal - booksRead) + ' книг';
         }
 
-        function adjustChallengeGoal(delta) {
+        window.adjustChallengeGoal = function(delta) {
             const input = document.getElementById('challengeGoalInput');
             let val = parseInt(input.value) || 12;
             val = Math.max(1, Math.min(365, val + delta));
             input.value = val;
         }
 
-        async function saveChallengeGoal() {
+        window.saveChallengeGoal = async function() {
             const input = document.getElementById('challengeGoalInput');
             challengeGoal = Math.max(1, Math.min(365, parseInt(input.value) || 12));
             if (currentUser) {
@@ -468,6 +435,13 @@
 
         const searchInput = document.getElementById('searchInput'), searchItems = document.getElementById('searchItems');
 
+        window.clearSearch = function() {
+            searchInput.value = '';
+            searchItems.innerHTML = '';
+            document.getElementById('clearSearchBtn').classList.add('hidden');
+            searchInput.focus();
+        };
+
         auth.onAuthStateChanged(user => {
             const authScrn = document.getElementById('authScreen'); const appScrn = document.getElementById('appScreen');
             if (user) {
@@ -509,8 +483,23 @@
         function closeDetailsSheet() { if(!document.getElementById('statusButtons').classList.contains('hidden')) openSheet('searchSheet'); else closeAllSheets(); }
 
         // ====== РОЗШИРЕНИЙ СЛОВНИК СМІТТЯ ======
-        const JUNK_WORDS = ['підручник', 'учебник', 'словник', 'словарь', 'хрестоматія', 'довідник', 'справочник', 'зошит', 'тетрадь', 'посібник', 'пособие', 'збірник', 'сборник', 'ссср', 'ussr', 'музей', 'музея', 'материалы', 'матеріали', 'конференция', 'конференція', 'вісник', 'вестник', 'практикум', 'наука', 'медицина', 'закон', 'кодекс', 'том ', 'випуск', 'выпуск', 'бюлетень'];
-        
+        const JUNK_WORDS = ['підручник', 'учебник', 'словник', 'словарь', 'хрестоматія', 'хрестоматия', 'довідник', 'справочник', 'зошит', 'тетрадь', 'посібник', 'пособие', 'збірник', 'сборник', 'ссср', 'ussr', 'музей', 'музея', 'материалы', 'матеріали', 'конференция', 'конференція', 'вісник', 'вестник', 'практикум', 'наука', 'медицина', 'закон', 'кодекс', 'випуск', 'выпуск', 'бюлетень', 'поезія', 'поэзия', 'стихи', 'вірші', 'музична', 'музыкальная', 'энциклопедия', 'енциклопедія'];
+        const JUNK_CATEGORIES = ['science', 'technology', 'computers', 'medical', 'law', 'business', 'economics', 'mathematics', 'education', 'study aids'];
+
+        function isCleanFiction(b) {
+            if (!b || !b.title) return false;
+            const t = b.title.toLowerCase();
+            
+            // Тільки назва книги перевіряється на сміттєві слова
+            if (JUNK_WORDS.some(w => t.includes(w))) return false;
+            
+            if (b.categories && b.categories.length > 0) {
+                const catStr = b.categories.join(' ').toLowerCase();
+                if (JUNK_CATEGORIES.some(c => catStr.includes(c))) return false;
+            }
+            return true;
+        }
+
         searchInput.addEventListener('input', (e) => {
             const rawQuery = e.target.value.trim();
             if (rawQuery.length > 0) document.getElementById('clearSearchBtn').classList.remove('hidden');
@@ -532,11 +521,9 @@
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=40&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&attribute=authorTerm&limit=30&country=UA`).catch(()=>({ok:false})));
                     } else {
-                        // ТІЛЬКИ GOOGLE BOOKS (З фільтром мови) ТА APPLE BOOKS
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&langRestrict=uk&printType=books&orderBy=relevance&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&langRestrict=ru&printType=books&orderBy=relevance&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&langRestrict=uk&printType=books&maxResults=15&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&langRestrict=ru&printType=books&maxResults=15&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        // ТІЛЬКИ GOOGLE BOOKS (без обмежень по мові, щоб шукало і рос і укр нормально) ТА APPLE BOOKS
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQuery}&printType=books&maxResults=30&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20&key=${GOOGLE_BOOKS_API_KEY}`).catch(()=>({ok:false})));
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&media=ebook&limit=30&country=UA`).catch(()=>({ok:false})));
                     }
 
@@ -578,23 +565,17 @@
 
                     let filteredItems = uniqueItems.filter(item => {
                         const b = item.volumeInfo;
-                        const t = b.title.toLowerCase();
                         
                         // Фільтр сміття
-                        if (JUNK_WORDS.some(w => t.includes(w))) return false;
-                        
-                        // ВІДКИНУТИ КНИГИ, ДЕ НЕМАЄ КИРИЛИЦІ (Англійські)
-                        // Дозволяємо, якщо є кирилиця АБО якщо це чисто цифри (напр. "1984")
-                        if (!/[а-яА-ЯіІїЇєЄґҐ]/.test(b.title) && /[a-zA-Z]/.test(b.title) && !isAuthorSearch) {
-                            return false; 
-                        }
+                        if (!isCleanFiction(b)) return false;
 
                         if (isAuthorSearch) return true;
 
                         const qLower = cleanQuery.toLowerCase();
+                        const tLower = b.title.toLowerCase();
                         const aLower = (b.authors || []).join(' ').toLowerCase();
 
-                        const isTitleMatch = t.includes(qLower);
+                        const isTitleMatch = tLower.includes(qLower);
                         const isAuthMatch = aLower.includes(qLower);
                         
                         if (!isTitleMatch && !isAuthMatch) return false;
@@ -670,7 +651,7 @@
 
         function openManualForm() { tempSelectedBook = 'manual'; toggleEditMode(true); document.getElementById('editTitle').value = ''; document.getElementById('editAuthor').value = ''; document.getElementById('editPages').value = ''; document.getElementById('editImage').value = ''; document.getElementById('statusButtons').classList.remove('hidden'); openSheet('detailsSheet'); }
 
-        function addTag(bookId) {
+        window.addTag = function(bookId) {
             const input = document.getElementById(`newTagInput_${bookId}`);
             const newTag = input.value.trim().toLowerCase().replace(/[^a-zа-яіїєґ0-9\s-]/gi, '');
             if(!newTag) return;
@@ -686,7 +667,7 @@
             }
         }
 
-        function removeTag(bookId, tagToRemove) {
+        window.removeTag = function(bookId, tagToRemove) {
             const book = myLibrary.find(b => b.id === bookId);
             const tags = (book.tags || []).filter(t => t !== tagToRemove);
             updateBookInFirestore(bookId, { tags: tags }).then(() => {
@@ -696,7 +677,7 @@
             });
         }
         
-        function setTagFilter(tag) { activeTagFilter = tag; render(); }
+        window.setTagFilter = function(tag) { activeTagFilter = tag; render(); }
 
         async function showBookDetails(bookData, isNewFromSearch = false) {
             if (!bookData || !bookData.title) return;
@@ -745,10 +726,7 @@
                     html += `<div class="relative w-full mb-2"><input type="file" id="epubFile_${libBook.id}_det" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${libBook.id}')"><button onclick="document.getElementById('epubFile_${libBook.id}_det').click();" class="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">📥 Завантажити файл з пристрою</button></div>`;
                     
                     const googleSearchQuery = encodeURIComponent(`${safeTitle} ${safeAuthor} epub скачати безкоштовно`);
-                    html += `<div class="flex gap-2 mb-2">
-                        <button onclick="openSheet('sourcesSheet')" class="flex-1 py-2 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl text-xs font-bold active:scale-95 transition-transform flex items-center justify-center gap-1">📚 Каталог</button>
-                        <a href="https://www.google.com/search?q=${googleSearchQuery}" target="_blank" class="flex-1 py-2 bg-blue-50 border border-blue-100 text-blue-700 rounded-xl text-xs font-bold active:scale-95 transition-transform flex items-center justify-center gap-1">🌐 Шукати в Google ↗</a>
-                    </div>`;
+                    html += `<a href="https://www.google.com/search?q=${googleSearchQuery}" target="_blank" class="w-full mb-2 py-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-xl text-sm font-bold active:scale-95 transition-transform flex items-center justify-center gap-2">🌐 Знайти в Google ↗</a>`;
 
                     if (libBook.epubUrl) {
                          html += `<button onclick="openReaderFromUrl('${libBook.id}', '${libBook.epubUrl}', event)" class="w-full mb-2 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-200 active:scale-95 transition-transform flex items-center justify-center gap-2">☁️ Відкрити онлайн</button>`;
@@ -811,42 +789,42 @@
             openSheet('detailsSheet');
         }
 
-        function deleteBookFromDetails(id) { if(confirm("Видалити цю книгу назавжди?")) { db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); closeAllSheets(); } }
-        function setRating(id, rating) { updateBookInFirestore(id, { rating: rating }); setTimeout(() => { showBookDetails(myLibrary.find(b => b.id === id)); }, 100); }
-        function changeStatusFromDetails(id, newStatus) {
+        window.deleteBookFromDetails = function(id) { if(confirm("Видалити цю книгу назавжди?")) { db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); closeAllSheets(); } }
+        window.setRating = function(id, rating) { updateBookInFirestore(id, { rating: rating }); setTimeout(() => { showBookDetails(myLibrary.find(b => b.id === id)); }, 100); }
+        window.changeStatusFromDetails = function(id, newStatus) {
             const updates = { status: newStatus }; const book = myLibrary.find(b => b.id === id);
             if (newStatus === 'finished') { updates.pagesRead = book.pagesTotal; updates.dateFinished = book.dateFinished || new Date().toISOString().slice(0, 10); } else if (newStatus === 'reading') { updates.dateStarted = book.dateStarted || new Date().toISOString().slice(0, 10); }
             updateBookInFirestore(id, updates); closeAllSheets(); setLibraryTab(newStatus);
         }
-        function toggleEditMode(isEditing) { if(isEditing) { document.getElementById('detailsContent').classList.add('hidden'); document.getElementById('editContent').classList.remove('hidden'); } else { document.getElementById('detailsContent').classList.remove('hidden'); document.getElementById('editContent').classList.add('hidden'); } }
-        function saveBookEdits() {
+        window.toggleEditMode = function(isEditing) { if(isEditing) { document.getElementById('detailsContent').classList.add('hidden'); document.getElementById('editContent').classList.remove('hidden'); } else { document.getElementById('detailsContent').classList.remove('hidden'); document.getElementById('editContent').classList.add('hidden'); } }
+        window.saveBookEdits = function() {
             const updates = { title: document.getElementById('editTitle').value.trim() || 'Без назви', author: document.getElementById('editAuthor').value.trim() || 'Невідомий', pagesTotal: parseInt(document.getElementById('editPages').value) || 300, image: document.getElementById('editImage').value.trim() };
             if(tempSelectedBook === 'manual') { tempSelectedBook = { ...updates, description: 'Додано вручну.' }; } else { updateBookInFirestore(tempSelectedBook.id, updates); showBookDetails({ ...tempSelectedBook, ...updates }); } 
         }
-        function saveReview(id) { updateBookInFirestore(id, { review: document.getElementById(`reviewText_${id}`).value }); }
+        window.saveReview = function(id) { updateBookInFirestore(id, { review: document.getElementById(`reviewText_${id}`).value }); }
         
-        async function addBookWithStatus(status) {
+        window.addBookWithStatus = async function(status) {
             if (!currentUser) return; if(tempSelectedBook === 'manual') saveBookEdits(); 
             let newBookData = { ...tempSelectedBook, status: status, pagesRead: status === 'finished' ? tempSelectedBook.pagesTotal : 0, dateAdded: Date.now(), rating: 0, review: '', epubUrl: null, timeSpent: 0, lastFileName: null, dateStarted: status === 'reading' ? new Date().toISOString().slice(0, 10) : null, dateFinished: status === 'finished' ? new Date().toISOString().slice(0, 10) : null, tags: [] };
             await db.collection('users').doc(currentUser.uid).collection('books').add(newBookData); tempSelectedBook = null; closeAllSheets();
         }
 
-        function changeStatus(id, newStatus, event) {
+        window.changeStatus = function(id, newStatus, event) {
             event.stopPropagation(); const updates = { status: newStatus }; const book = myLibrary.find(b => b.id === id); 
             if (newStatus === 'reading' && !book.dateStarted) updates.dateStarted = new Date().toISOString().slice(0, 10);
             if (newStatus === 'finished') { updates.pagesRead = book.pagesTotal; updates.dateFinished = new Date().toISOString().slice(0, 10); }
             updateBookInFirestore(id, updates); setLibraryTab(newStatus); 
         }
 
-        function saveManualDate(id, field, dateEl) { updateBookInFirestore(id, { [field]: dateEl.value }); const book = myLibrary.find(b => b.id === id); if (book) book[field] = dateEl.value; render(); }
+        window.saveManualDate = function(id, field, dateEl) { updateBookInFirestore(id, { [field]: dateEl.value }); const book = myLibrary.find(b => b.id === id); if (book) book[field] = dateEl.value; render(); }
 
         function startTimer() { readingStartTime = Date.now(); currentSessionSeconds = 0; document.getElementById('readerTimer').innerText = "00:00"; readingTimer = setInterval(() => { currentSessionSeconds = Math.floor((Date.now() - readingStartTime) / 1000); const m = String(Math.floor(currentSessionSeconds / 60)).padStart(2, '0'), s = String(currentSessionSeconds % 60).padStart(2, '0'), h = Math.floor(currentSessionSeconds / 3600); document.getElementById('readerTimer').innerText = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`; }, 1000); }
         function stopTimer() { if (readingTimer && currentReaderBookId) { clearInterval(readingTimer); readingTimer = null; const book = myLibrary.find(b => b.id === currentReaderBookId); if (book && currentSessionSeconds > 5) { const totalTime = (book.timeSpent || 0) + currentSessionSeconds; db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ timeSpent: totalTime }); } } }
         window.addEventListener('beforeunload', stopTimer);
-        function toggleReaderSettings() { document.getElementById('readerSettingsMenu').classList.toggle('hidden'); }
+        window.toggleReaderSettings = function() { document.getElementById('readerSettingsMenu').classList.toggle('hidden'); }
         function applyReaderSettings() { if(!rendition) return; rendition.themes.fontSize(readerFontSize + "%"); rendition.themes.select(readerTheme); }
-        function changeFontSize(delta) { readerFontSize = Math.max(50, Math.min(200, readerFontSize + delta)); localStorage.setItem('readerFontSize', readerFontSize); applyReaderSettings(); }
-        function changeReaderTheme(theme) { readerTheme = theme; localStorage.setItem('readerTheme', theme); applyReaderSettings(); }
+        window.changeFontSize = function(delta) { readerFontSize = Math.max(50, Math.min(200, readerFontSize + delta)); localStorage.setItem('readerFontSize', readerFontSize); applyReaderSettings(); }
+        window.changeReaderTheme = function(theme) { readerTheme = theme; localStorage.setItem('readerTheme', theme); applyReaderSettings(); }
         function initSwipeGestures() { const viewerEl = document.getElementById('viewer'); if(!window.mc) { window.mc = new Hammer(viewerEl); window.mc.get('swipe').set({ direction: Hammer.DIRECTION_HORIZONTAL }); window.mc.on("swipeleft", () => { if (rendition) rendition.next(); }); window.mc.on("swiperight", () => { if (rendition) rendition.prev(); }); } }
 
         window.saveQuoteFromReader = function() {
@@ -869,7 +847,7 @@
             }
         }
 
-        async function handleFileSelect(event, bookId) {
+        window.handleFileSelect = async function(event, bookId) {
             const file = event.target.files[0]; if (!file) return; 
             if (!file.name.toLowerCase().endsWith('.epub')) { alert("Будь ласка, виберіть файл у форматі .epub"); event.target.value = ''; return; }
             const bookData = myLibrary.find(b => b.id === bookId);
@@ -888,7 +866,7 @@
             }
         }
 
-        async function openOfflineReader(bookId) {
+        window.openOfflineReader = async function(bookId) {
             const bookData = myLibrary.find(b => b.id === bookId);
             const file = await idb.get(bookId);
             if (!file) { alert("Файл не знайдено на пристрої. Схоже, кеш було очищено. Завантажте файл знову."); return; }
@@ -898,8 +876,8 @@
             reader.readAsArrayBuffer(file);
         }
 
-        function promptForEpubUrl(bookId, event) { event.stopPropagation(); const url = prompt("Пряме веб-посилання на файл .epub:"); if(url) updateBookInFirestore(bookId, { epubUrl: url }); }
-        function openReaderFromUrl(bookId, url, event) { event.stopPropagation(); const bookData = myLibrary.find(b => b.id === bookId); startReaderUI(bookData); loadEpubData('https://corsproxy.io/?' + encodeURIComponent(url), bookData); }
+        window.promptForEpubUrl = function(bookId, event) { event.stopPropagation(); const url = prompt("Пряме веб-посилання на файл .epub:"); if(url) updateBookInFirestore(bookId, { epubUrl: url }); }
+        window.openReaderFromUrl = function(bookId, url, event) { event.stopPropagation(); const bookData = myLibrary.find(b => b.id === bookId); startReaderUI(bookData); loadEpubData('https://corsproxy.io/?' + encodeURIComponent(url), bookData); }
 
         function startReaderUI(bookData) { currentReaderBookId = bookData.id; document.getElementById('readerOverlay').style.display = 'flex'; document.getElementById('readerTitle').innerText = bookData.title; document.getElementById('readerProgress').innerText = "Завантаження..."; document.getElementById('librarySections').classList.add('hidden'); startTimer(); initSwipeGestures(); }
 
@@ -939,11 +917,11 @@
             } catch (err) { console.error(err); document.getElementById('readerProgress').innerText = "Помилка"; stopTimer(); }
         }
 
-        function closeReader() { stopTimer(); document.getElementById('readerOverlay').style.display = 'none'; document.getElementById('readerSettingsMenu').classList.add('hidden'); document.getElementById('quoteFloatingBtn').classList.add('hidden'); if(currentBookInstance) { currentBookInstance.destroy(); currentBookInstance = null; rendition = null; } document.getElementById('viewer').innerHTML = ''; document.getElementById('librarySections').classList.remove('hidden'); }
-        function deleteBook(id, event) { event.stopPropagation(); if(confirm("Видалити книгу?")) db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); }
+        window.closeReader = function() { stopTimer(); document.getElementById('readerOverlay').style.display = 'none'; document.getElementById('readerSettingsMenu').classList.add('hidden'); document.getElementById('quoteFloatingBtn').classList.add('hidden'); if(currentBookInstance) { currentBookInstance.destroy(); currentBookInstance = null; rendition = null; } document.getElementById('viewer').innerHTML = ''; document.getElementById('librarySections').classList.remove('hidden'); }
+        window.deleteBook = function(id, event) { event.stopPropagation(); if(confirm("Видалити книгу?")) db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete(); }
         function formatTime(secs) { if (!secs) return "0 хв"; const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60); return h > 0 ? `${h} год ${m} хв` : `${m} хв`; }
 
-        function setLibraryTab(tab) { 
+        window.setLibraryTab = function(tab) { 
             currentLibraryTab = tab; 
             activeTagFilter = null; 
             document.querySelectorAll('#libraryTabs button').forEach(btn => { btn.className = 'px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95'; }); 
@@ -1027,7 +1005,7 @@
             }
         }
 
-        function switchTab(tab) {
+        window.switchTab = function(tab) {
             document.getElementById('appScreen').classList.remove('hidden'); document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             const navItems = document.querySelectorAll('.nav-item');
             if (tab === 'library') { 
@@ -1044,16 +1022,16 @@
         }
 
         const curatedCategories = {
-            'Академія магії': ['академия магии', 'магическая академия', 'ромфант', 'фэнтези академия'],
-            'Фентезі': ['фентезі', 'фэнтези', 'боевое фэнтези', 'эпическое фэнтези', 'Джон Толкин'],
-            'Детектив': ['детектив', 'остросюжетный детектив', 'Агата Кристи', 'Артур Конан Дойл'],
-            'Трилер': ['триллер', 'психологический триллер', 'Стивен Кинг', 'Джиллиан Флинн'],
-            'Романтика': ['любовний роман', 'современный любовный роман', 'Николас Спаркс', 'Джоджо Мойес'],
-            'Саморозвиток': ['саморозвиток', 'саморазвитие', 'психология успеха', 'Джеймс Клир'],
-            'Фантастика': ['наукова фантастика', 'научная фантастика', 'космическая фантастика', 'Рэй Брэдбери']
+            'Академія магії': ['"академия магии" фэнтези', 'магическая академия роман', 'ромфант', 'фэнтези академия'],
+            'Фентезі': ['фентезі роман', 'фэнтези бестселлер', 'боевое фэнтези', 'эпическое фэнтези', 'попаданцы фэнтези'],
+            'Детектив': ['детектив бестселер', 'остросюжетный детектив', 'детективний роман', 'психологический детектив'],
+            'Трилер': ['трилер бестселер', 'психологический триллер', 'мистический триллер'],
+            'Романтика': ['любовний роман', 'современный любовный роман', 'романтика бестселлер'],
+            'Саморозвиток': ['саморозвиток', 'саморазвитие', 'психология успеха', 'мотивация'],
+            'Фантастика': ['наукова фантастика', 'научная фантастика', 'космическая фантастика', 'киберпанк']
         };
 
-        async function loadRealRecommendations(category = 'auto', btnId = 'rec_auto') {
+        window.loadRealRecommendations = async function(category = 'auto', btnId = 'rec_auto') {
             if (currentRecCategory === category) return;
             currentRecCategory = category;
             recStartIndex = 0;
@@ -1075,7 +1053,7 @@
                     let topAuthors = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 5);
                     pool.push(...topAuthors.map(a => `inauthor:"${a}"`));
                 }
-                let generic = ['фентезі', 'детектив', 'триллер', 'саморозвиток', 'романтика'];
+                let generic = ['фентезі роман', 'детективний роман', 'психологический триллер', 'саморозвиток', 'любовний роман'];
                 generic.sort(() => 0.5 - Math.random());
                 pool.push(...generic);
             } else {
@@ -1106,11 +1084,11 @@
             while (finalBooks.length < 10 && currentRecQueryIndex < currentRecQueries.length && apiFetches < 4) {
                 apiFetches++;
                 const q = currentRecQueries[currentRecQueryIndex];
-                let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}&key=${GOOGLE_BOOKS_API_KEY}`;
+                let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&printType=books&maxResults=40&startIndex=${recStartIndex}&key=${GOOGLE_BOOKS_API_KEY}`;
                 
                 try {
                     const res = await fetch(url);
-                    if (!res.ok) throw new Error('API Rate Limit або помилка з\'єднання');
+                    if (!res.ok) throw new Error('API Error');
                     const data = await res.json();
                     let items = data.items || [];
                     
@@ -1126,16 +1104,13 @@
                     let valid = items.filter(item => {
                         const b = item.volumeInfo;
                         if (!b.imageLinks || !b.imageLinks.thumbnail) return false;
-                        
-                        const t = (b.title || '').toLowerCase();
-                        if (JUNK_WORDS.some(w => t.includes(w))) return false;
-                        
-                        if (b.pageCount !== undefined && b.pageCount < 10) return false;
-                        if (!/[а-яА-ЯіІїЇєЄґҐ]/.test(b.title)) return false;
+                        if (!isCleanFiction(b)) return false;
+                        if (b.pageCount !== undefined && b.pageCount < 40) return false;
 
-                        if (existingTitles.has(t)) return false;
+                        const tLower = b.title.toLowerCase();
+                        if (existingTitles.has(tLower)) return false;
                         
-                        const key = t + (b.authors ? b.authors[0] : '');
+                        const key = tLower + (b.authors ? b.authors[0] : '');
                         if (shownRecTitles.has(key)) return false;
                         
                         return true;
