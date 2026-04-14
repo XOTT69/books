@@ -58,6 +58,7 @@
         .date-input { border: none; background: transparent; color: #334155; outline: none; font-size: 14px; font-weight: 500; cursor: pointer; text-align: right; }
         body.dark .date-input { color: #f8fafc; }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
 </head>
 <body class="bg-[#f5f5f7] font-sans pb-32 text-slate-900 antialiased selection:bg-indigo-100">
 
@@ -528,6 +529,19 @@
                 </div>`;
             
             if (!isNewFromSearch) {
+
+                html += `
+                <div class="mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl shadow-sm fade-in">
+                    <h4 class="text-[9px] font-black uppercase text-indigo-500 tracking-wider mb-3 flex items-center gap-1">📖 Читалка (Офлайн)</h4>
+                    <div class="space-y-2">
+                        <button onclick="readSavedEpub('${libBook.id}')" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">📱 Читати збережений файл</button>
+                        <div class="relative w-full">
+                            <input type="file" id="epubFileModal_${libBook.id}" accept=".epub" class="hidden" onchange="handleFileSelectAndSave(event, '${libBook.id}')">
+                            <button onclick="document.getElementById('epubFileModal_${libBook.id}').click()" class="w-full py-3 bg-white text-indigo-700 border border-indigo-200 rounded-xl font-bold text-sm active:scale-95 transition-transform shadow-sm flex items-center justify-center gap-2">📥 Завантажити новий .epub</button>
+                        </div>
+                    </div>
+                </div>`;
+
                 html += `
                 <div class="mb-6 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm fade-in">
                     <h4 class="text-[9px] font-black uppercase text-indigo-500 tracking-wider mb-3 flex items-center gap-1">🗓 Дати читання</h4>
@@ -612,6 +626,61 @@
             startReaderUI(bookData); const reader = new FileReader(); reader.onload = function(e) { loadEpubData(e.target.result, bookData); }; reader.onerror = function() { alert("Помилка."); closeReader(); }; reader.readAsArrayBuffer(file); event.target.value = ''; 
         }
 
+        
+        function handleFileSelectAndSave(event, bookId) {
+            const file = event.target.files[0]; 
+            if (!file) return; 
+            if (!file.name.toLowerCase().endsWith('.epub')) { alert("Будь ласка, виберіть файл .epub"); event.target.value = ''; return; }
+
+            const bookData = myLibrary.find(b => b.id === bookId);
+            if (bookData && bookData.lastFileName && bookData.lastFileName !== file.name) { 
+                const isSure = confirm(`⚠️ Увага!\nМинулого разу ви читали: "${bookData.lastFileName}"\nЗараз обрали: "${file.name}"\nЯкщо це інша книга, прогрес зіб'ється. Ви впевнені?`); 
+                if (!isSure) { event.target.value = ''; return; } 
+            }
+            if (bookData && bookData.lastFileName !== file.name) updateBookInFirestore(bookId, { lastFileName: file.name });
+
+            const reader = new FileReader(); 
+            document.getElementById('readerProgress').innerText = "Збереження...";
+            startReaderUI(bookData); 
+
+            reader.onload = async function(e) { 
+                const arrayBuffer = e.target.result;
+                try {
+                    if (window.localforage) await localforage.setItem(`epub_${bookId}`, arrayBuffer);
+                } catch(err) { console.error("Error saving offline:", err); }
+
+                document.getElementById('readerProgress').innerText = "Завантаження...";
+                loadEpubData(arrayBuffer, bookData); 
+                closeAllSheets();
+            }; 
+            reader.onerror = function() { alert("Помилка читання файлу."); closeReader(); }; 
+            reader.readAsArrayBuffer(file); 
+            event.target.value = ''; 
+        }
+
+        async function readSavedEpub(bookId) {
+            if (!window.localforage) { alert("Офлайн сховище не підтримується."); return; }
+            const bookData = myLibrary.find(b => b.id === bookId);
+            if (!bookData) return;
+
+            startReaderUI(bookData);
+            document.getElementById('readerProgress').innerText = "Завантаження з пам'яті...";
+
+            try {
+                const arrayBuffer = await localforage.getItem(`epub_${bookId}`);
+                if (!arrayBuffer) {
+                    closeReader();
+                    alert("Книгу не знайдено на пристрої! Завантажте новий файл .epub.");
+                    return;
+                }
+                loadEpubData(arrayBuffer, bookData);
+                closeAllSheets();
+            } catch(e) {
+                closeReader();
+                alert("Помилка завантаження збереженого файлу.");
+            }
+        }
+
         function promptForEpubUrl(bookId, event) { event.stopPropagation(); const url = prompt("Пряме веб-посилання на файл .epub:"); if(url) updateBookInFirestore(bookId, { epubUrl: url }); }
         function openReaderFromUrl(bookId, url, event) { event.stopPropagation(); const bookData = myLibrary.find(b => b.id === bookId); startReaderUI(bookData); loadEpubData('https://corsproxy.io/?' + encodeURIComponent(url), bookData); }
 
@@ -623,6 +692,22 @@
                 currentBookInstance = ePub(source); rendition = currentBookInstance.renderTo("viewer", { width: "100%", height: "100%", spread: "none", manager: "continuous", flow: "paginated" });
                 rendition.themes.register("light", { "body": { "background": "#f8fafc", "color": "#0f172a" }}); rendition.themes.register("sepia", { "body": { "background": "#f4ecd8", "color": "#5b4636" }}); rendition.themes.register("dark", { "body": { "background": "#0f172a", "color": "#cbd5e1" }});
                 applyReaderSettings();
+
+                // ПРОГРЕС ЧИТАННЯ (СИНХРОНІЗАЦІЯ)
+                if (bookData.lastCfi) {
+                    rendition.display(bookData.lastCfi);
+                } else {
+                    rendition.display();
+                }
+                rendition.on("relocated", function(location) {
+                    if (location && location.start && location.start.cfi) {
+                        bookData.lastCfi = location.start.cfi;
+                        if (window.syncProgressTimeout) clearTimeout(window.syncProgressTimeout);
+                        window.syncProgressTimeout = setTimeout(() => {
+                            updateBookInFirestore(bookData.id, { lastCfi: location.start.cfi });
+                        }, 5000);
+                    }
+                });
                 const safeCfi = (bookData.lastCfi && typeof bookData.lastCfi === 'string' && bookData.lastCfi.startsWith('epubcfi')) ? bookData.lastCfi : undefined;
                 rendition.display(safeCfi).catch(() => rendition.display());
                 currentBookInstance.ready.then(() => currentBookInstance.locations.generate(1600)).then(() => { const loc = rendition.currentLocation(); if(loc && loc.start) document.getElementById('readerProgress').innerText = Math.round(loc.start.percentage * 100) + "%"; else document.getElementById('readerProgress').innerText = "Відкрито"; }).catch(err => console.log(err));
@@ -663,7 +748,7 @@
                         </div>
                         <div class="mt-3 flex flex-col gap-1.5 border-t border-slate-50 pt-3">
                             ${book.epubUrl ? `<button onclick="openReaderFromUrl('${book.id}', '${book.epubUrl}', event)" class="w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">☁️ Читати онлайн</button><button onclick="promptForEpubUrl('${book.id}', event)" class="w-full text-[10px] text-slate-400">Змінити посилання</button>` : `<button onclick="promptForEpubUrl('${book.id}', event)" class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold active:scale-95 transition-transform">🔗 Додати URL (.epub)</button>`}
-                            <div class="relative w-full"><input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelect(event, '${book.id}')"><button onclick="event.stopPropagation(); document.getElementById('epubFile_${book.id}').click();" class="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">📁 Файл з пристрою</button></div>
+                            <div class="relative w-full"><input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelectAndSave(event, '${book.id}')"><button onclick="event.stopPropagation(); document.getElementById('epubFile_${book.id}').click();" class="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold active:scale-95 transition-transform shadow-sm">📁 Файл з пристрою</button></div>
                         </div>
                     `}
                 </div>
