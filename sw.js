@@ -1,53 +1,49 @@
-const CACHE_NAME = "chitayko-cache-v13";
-
+const CACHE_NAME = 'chitayko-v2';
 const urlsToCache = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./icon.png"
+  '/',
+  '/index.html',
+  '/manifest.json'
 ];
 
-// Встановлення і кешування файлів
-self.addEventListener("install", (event) => {
-  self.skipWaiting(); // Змушуємо новий SW активуватися відразу
+self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log("Відкрито кеш");
-      return cache.addAll(urlsToCache);
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
+      );
     })
   );
 });
 
-// Активація і видалення старого кешу (щоб на телефонах завжди була свіжа версія)
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log("Видаляємо старий кеш:", cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
+self.addEventListener('fetch', event => {
+  const url = event.request.url;
 
-// Перехоплення запитів
-self.addEventListener("fetch", (event) => {
-  // Пропускаємо запити до API (Firebase, Google Books), щоб вони йшли в інтернет
-  if (!event.request.url.startsWith(self.location.origin)) {
-    return;
+  // Пропускаємо API запити (щоб Firebase та пошук працювали наживо)
+  if (url.includes('firestore') || url.includes('googleapis') || url.includes('itunes.apple.com')) {
+      return;
   }
 
-  // Для наших локальних файлів беремо з кешу, або йдемо в інтернет
+  // Стратегія: Stale-While-Revalidate (спочатку кеш, потім оновлення у фоні)
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    }).catch(() => {
-      // Якщо взагалі немає інтернету і файл не знайдено, показуємо головну сторінку
-      return caches.match('./index.html');
+    caches.match(event.request).then(cachedResponse => {
+      const networkFetch = fetch(event.request).then(response => {
+        // Кешуємо тільки успішні GET запити
+        if(event.request.method === 'GET' && response.status === 200 && response.type === 'basic') {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+        }
+        return response;
+      }).catch(() => {
+          // Якщо немає інтернету і немає в кеші
+      });
+      return cachedResponse || networkFetch;
     })
   );
 });
