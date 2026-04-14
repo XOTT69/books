@@ -431,7 +431,14 @@
                     const safeQueryQuote = encodeURIComponent('"' + rawQuery + '"');
                     
                     let promises = [];
-                    if (isAuthorSearch) {
+                    const isIsbnSearch = /^[0-9-]{10,17}$/.test(rawQuery);
+
+                    if (isIsbnSearch) {
+                        const cleanIsbn = rawQuery.replace(/[^0-9]/g, '');
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}&key=AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${cleanIsbn}&key=AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://itunes.apple.com/search?term=${cleanIsbn}&entity=ebook&country=ua&limit=5`).catch(()=>({ok:false})));
+                    } else if (isAuthorSearch) {
                         // 1. Google (точний пошук автора)
                         promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?key=AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME&q=inauthor:"${safeQuery}"&printType=books&maxResults=40`).catch(()=>({ok:false})));
                         // 2. Google (якщо автор вказаний як звичайний текст, щоб обійти баги Google)
@@ -509,7 +516,7 @@
 
                         const isExactTitle = b.title.toLowerCase().includes(rawQuery.toLowerCase());
                         
-                        if (!isExactTitle && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
+                        if (!isIsbnSearch && !isExactTitle && b.categories && b.categories.some(c => badCategories.includes(c))) return false;
                         return true;
                     });
 
