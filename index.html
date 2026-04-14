@@ -16,7 +16,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
+    
     <style>
+        #reader { border: none !important; }
+        #reader video { object-fit: cover !important; border-radius: 1.5rem !important; }
+        #reader__dashboard_section_csr span { display: none !important; }
+
         body { -webkit-tap-highlight-color: transparent; transition: background-color 0.3s, color 0.3s; }
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -176,12 +181,13 @@
     </div>
 
     
-    <div id="scannerSheet" class="hidden fixed inset-0 z-[150] bg-black flex flex-col">
-        <div class="flex justify-between items-center p-4 bg-slate-900 text-white">
-            <h3 class="font-bold">Наведіть на штрих-код</h3>
-            <button onclick="closeScanner()" class="bg-red-500 px-4 py-2 rounded-xl font-bold active:scale-95 transition-transform">Закрити</button>
+    <div id="scannerSheet" class="hidden fixed inset-0 z-[150] bg-slate-900 flex flex-col items-center justify-center">
+        <div class="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/70 to-transparent">
+            <h3 class="font-bold text-white text-lg drop-shadow-md">Наведіть камеру на штрих-код</h3>
+            <button onclick="closeScanner()" class="bg-white/20 backdrop-blur-md text-white size-10 rounded-full flex justify-center items-center font-bold active:scale-95 transition-transform">✕</button>
         </div>
-        <div id="reader" class="w-full flex-1"></div>
+        <div id="reader" class="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-slate-700 aspect-square"></div>
+        <p class="text-slate-400 text-xs mt-8 px-8 text-center max-w-sm">Система автоматично розпізнає ISBN-код книги. Тримайте телефон рівно.</p>
     </div>
 
     <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="height: 85vh;">
@@ -325,18 +331,44 @@
         }
 
         
-        let html5QrcodeScanner;
+        let html5QrCode;
         function openScanner() {
             document.getElementById('scannerSheet').classList.remove('hidden');
-            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 150} }, false);
-            html5QrcodeScanner.render((decodedText) => {
+            html5QrCode = new Html5Qrcode("reader");
+
+            const config = { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
+
+            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+                // Success
+                if(navigator.vibrate) navigator.vibrate(100);
                 closeScanner();
-                document.getElementById('searchInput').value = decodedText;
-                document.getElementById('searchInput').dispatchEvent(new Event('input'));
-            }, (error) => {});
+
+                // Переходимо до пошуку
+                const searchInput = document.getElementById('searchInput');
+                searchInput.value = decodedText;
+
+                // Тригеримо подію input щоб почався пошук
+                searchInput.dispatchEvent(new Event('input'));
+
+                // Зворотний зв'язок
+                searchItems.innerHTML = `<div class="p-8 text-slate-400 text-sm text-center animate-pulse">Знайдено штрих-код: ${decodedText}<br>Шукаю книгу...</div>`;
+
+            }, (errorMessage) => {
+                // Ignore parse errors (they happen every frame)
+            })
+            .catch((err) => {
+                alert("Помилка доступу до камери: " + err);
+                closeScanner();
+            });
         }
+
         function closeScanner() {
-            if(html5QrcodeScanner) { html5QrcodeScanner.clear(); html5QrcodeScanner = null; }
+            if(html5QrCode) { 
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    html5QrCode = null;
+                }).catch(err => console.log("Error stopping scanner", err));
+            }
             document.getElementById('scannerSheet').classList.add('hidden');
         }
 
