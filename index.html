@@ -59,7 +59,11 @@
         body.dark .date-input { color: #f8fafc; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
+
 <body class="bg-[#f5f5f7] font-sans pb-32 text-slate-900 antialiased selection:bg-indigo-100">
 
     <div id="authScreen" class="fixed inset-0 z-[100] bg-[#f5f5f7] flex items-center justify-center p-6 overflow-y-auto fade-in">
@@ -134,11 +138,14 @@
     <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height: 90vh; overflow-y: auto;">
         <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <h2 class="text-2xl font-bold mb-4">Налаштування</h2>
+        
         <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-4">
             <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400 mb-3">📊 Моя статистика</h3>
             <div class="flex justify-between items-center mb-2"><span class="text-sm font-bold text-slate-700">Всього прочитано книг:</span><span id="statBooks" class="text-lg font-black text-indigo-600">0</span></div>
             <div class="flex justify-between items-center"><span class="text-sm font-bold text-slate-700">Прочитано сторінок:</span><span id="statPages" class="text-lg font-black text-indigo-600">0</span></div>
+            <div class="mt-4 h-40 w-full"><canvas id="statsChart"></canvas></div>
         </div>
+
         <div class="space-y-3">
             <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors"><span class="font-bold text-sm">Темна тема</span><button onclick="toggleAppTheme()" class="text-2xl p-1 bg-white rounded-full shadow-sm border border-slate-200 active:scale-95 transition-transform">🌓</button></div>
             <button onclick="exportLibrary()" class="w-full p-4 bg-emerald-50 text-emerald-600 font-bold text-sm rounded-2xl active:scale-95 transition-transform">📥 Експортувати бібліотеку (JSON)</button>
@@ -168,6 +175,15 @@
         </div>
     </div>
 
+    
+    <div id="scannerSheet" class="hidden fixed inset-0 z-[150] bg-black flex flex-col">
+        <div class="flex justify-between items-center p-4 bg-slate-900 text-white">
+            <h3 class="font-bold">Наведіть на штрих-код</h3>
+            <button onclick="closeScanner()" class="bg-red-500 px-4 py-2 rounded-xl font-bold active:scale-95 transition-transform">Закрити</button>
+        </div>
+        <div id="reader" class="w-full flex-1"></div>
+    </div>
+
     <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="height: 85vh;">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
         <div class="px-5 pb-4 shrink-0">
@@ -178,6 +194,7 @@
             </div>
         </div>
         <div id="searchResults" class="px-3 pb-6 overflow-y-auto flex-1">
+            <button onclick="openScanner()" class="w-[calc(100%-24px)] mx-auto mb-2 p-3 text-center text-sm font-semibold text-white bg-slate-800 rounded-xl active:bg-slate-700 transition-colors flex items-center justify-center gap-2">📷 Сканувати штрих-код (ISBN)</button>
             <button onclick="openManualForm()" class="w-[calc(100%-24px)] mx-auto mb-2 p-3 text-center text-sm font-semibold text-indigo-600 bg-indigo-50 rounded-xl active:bg-indigo-100 transition-colors">✍️ Не знайшли? Додати вручну</button>
             <div id="searchItems" class="space-y-1"></div>
         </div>
@@ -222,7 +239,14 @@
         let currentRecCategory = null;
         let shownRecTitles = new Set();
 
+        
         document.addEventListener('DOMContentLoaded', () => {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('SW зареєстровано!', reg))
+                .catch(err => console.log('Помилка реєстрації SW', err));
+            }
+
             document.querySelectorAll('.bottom-sheet').forEach(sheet => {
                 let startY = 0, currentY = 0, isDragging = false;
                 sheet.addEventListener('touchstart', e => { 
@@ -258,6 +282,25 @@
             const finished = myLibrary.filter(b => b.status === 'finished');
             const totalPages = finished.reduce((sum, b) => sum + (parseInt(b.pagesTotal) || 0), 0);
             document.getElementById('statBooks').innerText = finished.length; document.getElementById('statPages').innerText = totalPages;
+
+            const ctx = document.getElementById('statsChart');
+            if(!ctx) return;
+            const months = {};
+            finished.forEach(b => {
+                if(b.dateFinished) {
+                    const m = (typeof b.dateFinished === 'string' && b.dateFinished.length >= 7) ? b.dateFinished.substring(0, 7) : 'Без дати';
+                    if(m !== 'Без дати') months[m] = (months[m] || 0) + 1;
+                }
+            });
+            const labels = Object.keys(months).sort();
+            const data = labels.map(l => months[l]);
+
+            if(window.myChart) window.myChart.destroy();
+            window.myChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Прочитано книг', data: data, backgroundColor: '#4f46e5', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
         }
 
         function exportLibrary() {
@@ -279,6 +322,22 @@
             const actCls = 'px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-900 bg-white shadow-sm transition-all';
             const inactCls = 'px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-all';
             document.getElementById('view_list').className = viewMode === 'list' ? actCls : inactCls; document.getElementById('view_grid').className = viewMode === 'grid' ? actCls : inactCls;
+        }
+
+        
+        let html5QrcodeScanner;
+        function openScanner() {
+            document.getElementById('scannerSheet').classList.remove('hidden');
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 150} }, false);
+            html5QrcodeScanner.render((decodedText) => {
+                closeScanner();
+                document.getElementById('searchInput').value = decodedText;
+                document.getElementById('searchInput').dispatchEvent(new Event('input'));
+            }, (error) => {});
+        }
+        function closeScanner() {
+            if(html5QrcodeScanner) { html5QrcodeScanner.clear(); html5QrcodeScanner = null; }
+            document.getElementById('scannerSheet').classList.add('hidden');
         }
 
         const searchInput = document.getElementById('searchInput'), searchItems = document.getElementById('searchItems');
@@ -705,6 +764,24 @@
                         if (window.syncProgressTimeout) clearTimeout(window.syncProgressTimeout);
                         window.syncProgressTimeout = setTimeout(() => {
                             updateBookInFirestore(bookData.id, { lastCfi: location.start.cfi });
+
+                // ЦИТАТИ ТА ВИДІЛЕННЯ
+                rendition.on("selected", function(cfiRange, contents) {
+                    rendition.annotations.highlight(cfiRange, {}, (e) => {});
+                    currentBookInstance.getRange(cfiRange).then(function(range) {
+                        if (range) {
+                            const text = range.toString();
+                            const reviewEl = document.getElementById(`reviewText_${bookData.id}`);
+                            if(reviewEl) {
+                                reviewEl.value += `\n\n> "${text}"\n`;
+                                saveReview(bookData.id);
+                                if(navigator.vibrate) navigator.vibrate([50, 50, 50]); // Подвійна вібрація
+                            }
+                        }
+                    });
+                    contents.window.getSelection().removeAllRanges();
+                });
+
                         }, 5000);
                     }
                 });
