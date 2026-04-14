@@ -341,16 +341,16 @@
                     let promises = [];
                     if (isAuthorSearch) {
                         // 1. Google (точний пошук автора)
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=inauthor:"${safeQuery}"&printType=books&maxResults=40`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?key=AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME&q=inauthor:"${safeQuery}"&printType=books&maxResults=40`).catch(()=>({ok:false})));
                         // 2. Google (якщо автор вказаний як звичайний текст, щоб обійти баги Google)
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQueryQuote}&printType=books&maxResults=40`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?key=AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME&q=${safeQueryQuote}&printType=books&maxResults=40`).catch(()=>({ok:false})));
                         // 3. Apple Books (ЛитРес, електронні книги)
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&entity=ebook&attribute=authorTerm&country=ua&limit=30`).catch(()=>({ok:false})));
                     } else {
                         // 1. Google (точна назва)
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${safeQueryQuote}&printType=books&maxResults=20`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?key=AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME&q=intitle:${safeQueryQuote}&printType=books&maxResults=20`).catch(()=>({ok:false})));
                         // 2. Google (загальний пошук)
-                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?q=${safeQuery}&printType=books&maxResults=20`).catch(()=>({ok:false})));
+                        promises.push(fetch(`https://www.googleapis.com/books/v1/volumes?key=AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME&q=${safeQuery}&printType=books&maxResults=20`).catch(()=>({ok:false})));
                         // 3. Apple Books (ЛитРес, електронні книги)
                         promises.push(fetch(`https://itunes.apple.com/search?term=${safeQuery}&entity=ebook&country=ua&limit=25`).catch(()=>({ok:false})));
                     }
@@ -576,7 +576,7 @@
         function toggleEditMode(isEditing) { if(isEditing) { document.getElementById('detailsContent').classList.add('hidden'); document.getElementById('editContent').classList.remove('hidden'); } else { document.getElementById('detailsContent').classList.remove('hidden'); document.getElementById('editContent').classList.add('hidden'); } }
         function saveBookEdits() {
             const updates = { title: document.getElementById('editTitle').value.trim() || 'Без назви', author: document.getElementById('editAuthor').value.trim() || 'Невідомий', pagesTotal: parseInt(document.getElementById('editPages').value) || 300, image: document.getElementById('editImage').value.trim() };
-            if(tempSelectedBook === 'manual') { tempSelectedBook = { ...updates, description: 'Додано вручну.' }; } else { updateBookInFirestore(tempSelectedBook.id, updates); showBookDetails({ ...tempSelectedBook, ...updates }); } 
+            if(tempSelectedBook === 'manual') { tempSelectedBook = { ...updates, description: 'Додано вручну.' }; toggleEditMode(false); showBookDetails(tempSelectedBook, true); } else { updateBookInFirestore(tempSelectedBook.id, updates); showBookDetails({ ...tempSelectedBook, ...updates }); } 
         }
         function saveReview(id) { updateBookInFirestore(id, { review: document.getElementById(`reviewText_${id}`).value }); }
         
@@ -774,7 +774,7 @@
 
             while (finalBooks.length < 5 && currentRecQueryIndex < currentRecQueries.length && consecutiveEmptyFetches < 3) {
                 const q = currentRecQueries[currentRecQueryIndex];
-                const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}`;
+                const url = `https://www.googleapis.com/books/v1/volumes?key=AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME&q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}`;
                 
                 try {
                     const res = await fetch(url).then(r => r.ok ? r.json() : {items:[]}).catch(()=>({items:[]}));
