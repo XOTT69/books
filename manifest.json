@@ -1,150 +1,341 @@
-{
-  "name": "ЧитайКо — Хмарний Трекер Книг",
-  "short_name": "ЧитайКо",
-  "description": "Ваша персональна хмарна бібліотека для відстеження прочитаних книг",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#f5f5f7",
-  "theme_color": "#4f46e5",
-  "orientation": "portrait-primary",
-  "scope": "/",
-  "lang": "uk",
-  "dir": "ltr",
-  "categories": ["books", "education", "lifestyle", "productivity"],
-  "icons": [
-    {
-      "src": "icon.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable any"
+// Service Worker для ЧитайКо PWA
+// Версія 2.0 - Оптимізований для Vercel
+
+const CACHE_NAME = 'chitayko-v2';
+const STATIC_CACHE = 'chitayko-static-v2';
+const DYNAMIC_CACHE = 'chitayko-dynamic-v2';
+
+// Статичні ресурси для кешування
+const STATIC_ASSETS = [
+    '/',
+    '/index.html',
+    '/app.js',
+    '/app-extended.js',
+    '/manifest.json',
+    'https://cdn.tailwindcss.com',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js',
+    'https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js',
+    'https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
+    'https://cdn.jsdelivr.net/npm/chart.js',
+    'https://unpkg.com/html5-qrcode',
+    'https://via.placeholder.com/128x192/f1f5f9/94a3b8?text=No+Cover'
+];
+
+// Встановлення Service Worker
+self.addEventListener('install', event => {
+    console.log('🔧 Service Worker installing...');
+    
+    event.waitUntil(
+        caches.open(STATIC_CACHE)
+            .then(cache => {
+                console.log('📦 Caching static assets');
+                return cache.addAll(STATIC_ASSETS);
+            })
+            .then(() => {
+                console.log('✅ Service Worker installed');
+                return self.skipWaiting();
+            })
+            .catch(error => {
+                console.error('❌ Error installing Service Worker:', error);
+            })
+    );
+});
+
+// Активація Service Worker
+self.addEventListener('activate', event => {
+    console.log('🔄 Service Worker activating...');
+    
+    event.waitUntil(
+        caches.keys()
+            .then(cacheNames => {
+                return Promise.all(
+                    cacheNames.map(cacheName => {
+                        if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+                            console.log('🗑️ Deleting old cache:', cacheName);
+                            return caches.delete(cacheName);
+                        }
+                    })
+                );
+            })
+            .then(() => {
+                console.log('✅ Service Worker activated');
+                return self.clients.claim();
+            })
+            .catch(error => {
+                console.error('❌ Error activating Service Worker:', error);
+            })
+    );
+});
+
+// Перехоплення запитів
+self.addEventListener('fetch', event => {
+    const { request } = event;
+    const url = new URL(request.url);
+    
+    // Пропускаємо Chrome DevTools та non-GET запити
+    if (request.method !== 'GET' || url.protocol === 'chrome-extension:') {
+        return;
     }
-  ],
-  "screenshots": [
-    {
-      "src": "screenshot-mobile-1.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Головний екран бібліотеки"
-    },
-    {
-      "src": "screenshot-mobile-2.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Читалка EPUB книг"
-    },
-    {
-      "src": "screenshot-desktop-1.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Веб-версія бібліотеки"
+    
+    // Стратегія для різних типів ресурсів
+    if (isStaticAsset(request.url)) {
+        // Cache First для статичних ресурсів
+        event.respondWith(cacheFirst(request));
+    } else if (isAPIRequest(request.url)) {
+        // Network First для API запитів
+        event.respondWith(networkFirst(request));
+    } else if (isGoogleBooksAPI(request.url)) {
+        // Stale While Revalidate для Google Books API
+        event.respondWith(staleWhileRevalidate(request));
+    } else {
+        // Network First для всього іншого
+        event.respondWith(networkFirst(request));
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Додати книгу",
-      "short_name": "Додати",
-      "description": "Швидко додати нову книгу до бібліотеки",
-      "url": "/?action=add",
-      "icons": [
-        {
-          "src": "icon-96x96.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "Моя статистика",
-      "short_name": "Статистика",
-      "description": "Переглянути статистику читання",
-      "url": "/?action=stats",
-      "icons": [
-        {
-          "src": "icon-96x96.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "Рекомендації",
-      "short_name": "Рекомендації",
-      "description": "Переглянути рекомендації книг",
-      "url": "/?action=recommendations",
-      "icons": [
-        {
-          "src": "icon-96x96.png",
-          "sizes": "96x96"
-        }
-      ]
-    }
-  ],
-  "related_applications": [],
-  "prefer_related_applications": false,
-  "edge_side_panel": {
-    "preferred_width": 400
-  },
-  "launch_handler": {
-    "client_mode": "focus-existing"
-  },
-  "protocol_handlers": [
-    {
-      "protocol": "web+chitayko",
-      "url": "/?handle=%s"
-    }
-  ],
-  "file_handlers": [
-    {
-      "action": "/",
-      "accept": {
-        "application/epub+zip": [".epub"]
-      }
-    }
-  ],
-  "share_target": {
-    "action": "/?action=share",
-    "method": "GET",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  }
+});
+
+// Перевірка чи це статичний ресурс
+function isStaticAsset(url) {
+    return STATIC_ASSETS.some(asset => url.includes(asset)) ||
+           url.includes('.js') ||
+           url.includes('.css') ||
+           url.includes('.png') ||
+           url.includes('.jpg') ||
+           url.includes('.jpeg') ||
+           url.includes('.svg') ||
+           url.includes('.ico') ||
+           url.includes('tailwindcss.com') ||
+           url.includes('firebasejs.com') ||
+           url.includes('cdnjs.cloudflare.com') ||
+           url.includes('cdn.jsdelivr.net');
 }
+
+// Перевірка чи це API запит до Firebase
+function isAPIRequest(url) {
+    return url.includes('firebaseio.com') || 
+           url.includes('firestore.googleapis.com') ||
+           url.includes('googleapis.com/auth');
+}
+
+// Перевірка чи це Google Books API
+function isGoogleBooksAPI(url) {
+    return url.includes('www.googleapis.com/books/v1');
+}
+
+// Cache First стратегія
+async function cacheFirst(request) {
+    try {
+        const cachedResponse = await caches.match(request);
+        if (cachedResponse) {
+            return cachedResponse;
+        }
+        
+        const networkResponse = await fetch(request);
+        if (networkResponse.ok) {
+            const cache = await caches.open(STATIC_CACHE);
+            cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+    } catch (error) {
+        console.error('Cache First failed:', error);
+        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+    }
+}
+
+// Network First стратегія
+async function networkFirst(request) {
+    try {
+        const networkResponse = await fetch(request);
+        if (networkResponse.ok) {
+            const cache = await caches.open(DYNAMIC_CACHE);
+            cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+    } catch (error) {
+        console.log('Network failed, trying cache:', error);
+        const cachedResponse = await caches.match(request);
+        if (cachedResponse) {
+            return cachedResponse;
+        }
+        
+        // Повертаємо офлайн сторінку для HTML запитів
+        if (request.headers.get('accept').includes('text/html')) {
+            return caches.match('/');
+        }
+        
+        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+    }
+}
+
+// Stale While Revalidate стратегія
+async function staleWhileRevalidate(request) {
+    const cache = await caches.open(DYNAMIC_CACHE);
+    const cachedResponse = await cache.match(request);
+    
+    const fetchPromise = fetch(request).then(networkResponse => {
+        if (networkResponse.ok) {
+            cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+    }).catch(error => {
+        console.error('Stale While Revalidate network failed:', error);
+        return cachedResponse;
+    });
+    
+    return cachedResponse || fetchPromise;
+}
+
+// Обробка push повідомлень (для майбутніх функцій)
+self.addEventListener('push', event => {
+    console.log('📬 Push message received:', event);
+    
+    const options = {
+        body: event.data ? event.data.text() : 'Нове повідомлення від ЧитайКо',
+        icon: '/icon.png',
+        badge: '/icon.png',
+        vibrate: [100, 50, 100],
+        data: {
+            dateOfArrival: Date.now(),
+            primaryKey: 1
+        },
+        actions: [
+            {
+                action: 'explore',
+                title: 'Відкрити застосунок',
+                icon: '/icon.png'
+            },
+            {
+                action: 'close',
+                title: 'Закрити',
+                icon: '/icon.png'
+            }
+        ]
+    };
+    
+    event.waitUntil(
+        self.registration.showNotification('ЧитайКо', options)
+    );
+});
+
+// Обробка кліку на push повідомлення
+self.addEventListener('notificationclick', event => {
+    console.log('🔔 Notification click received:', event);
+    
+    event.notification.close();
+    
+    if (event.action === 'explore') {
+        event.waitUntil(
+            clients.openWindow('/')
+        );
+    } else if (event.action === 'close') {
+        // Просто закриваємо повідомлення
+    } else {
+        // Клік на саме повідомлення
+        event.waitUntil(
+            clients.matchAll().then(clientList => {
+                for (const client of clientList) {
+                    if (client.url === '/' && 'focus' in client) {
+                        return client.focus();
+                    }
+                }
+                if (clients.openWindow) {
+                    return clients.openWindow('/');
+                }
+            })
+        );
+    }
+});
+
+// Синхронізація в фоні (для майбутніх функцій)
+self.addEventListener('sync', event => {
+    console.log('🔄 Background sync triggered:', event.tag);
+    
+    if (event.tag === 'background-sync') {
+        event.waitUntil(doBackgroundSync());
+    }
+});
+
+// Функція фонової синхронізації
+async function doBackgroundSync() {
+    try {
+        // Тут може бути логіка синхронізації даних
+        console.log('🔄 Performing background sync...');
+        
+        // Оновлення кешу рекомендованих книг
+        const cache = await caches.open(DYNAMIC_CACHE);
+        const response = await fetch('https://www.googleapis.com/books/v1/volumes?q=українська+література&maxResults=10');
+        if (response.ok) {
+            cache.put(response.url, response);
+        }
+        
+    } catch (error) {
+        console.error('❌ Background sync failed:', error);
+    }
+}
+
+// Обробка повідомлень від клієнта
+self.addEventListener('message', event => {
+    console.log('📨 Message received from client:', event.data);
+    
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+    
+    if (event.data && event.data.type === 'CACHE_URLS') {
+        event.waitUntil(
+            caches.open(DYNAMIC_CACHE)
+                .then(cache => cache.addAll(event.data.urls))
+                .then(() => {
+                    event.ports[0].postMessage({ success: true });
+                })
+                .catch(error => {
+                    console.error('Error caching URLs:', error);
+                    event.ports[0].postMessage({ success: false, error: error.message });
+                })
+        );
+    }
+});
+
+// Очищення старого кешу
+async function cleanupCache() {
+    const cacheNames = await caches.keys();
+    const oldCaches = cacheNames.filter(name => 
+        name !== STATIC_CACHE && name !== DYNAMIC_CACHE
+    );
+    
+    return Promise.all(
+        oldCaches.map(name => {
+            console.log('🗑️ Deleting old cache:', name);
+            return caches.delete(name);
+        })
+    );
+}
+
+// Періодичне оновлення кешу
+setInterval(async () => {
+    try {
+        console.log('🔄 Periodic cache update...');
+        
+        // Оновлюємо статичні ресурси
+        const staticCache = await caches.open(STATIC_CACHE);
+        for (const asset of STATIC_ASSETS) {
+            try {
+                const response = await fetch(asset);
+                if (response.ok) {
+                    await staticCache.put(asset, response);
+                }
+            } catch (error) {
+                console.log('Failed to update asset:', asset, error);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Periodic cache update failed:', error);
+    }
+}, 24 * 60 * 60 * 1000); // Кожні 24 години
+
+console.log('🚀 Service Worker loaded successfully');
