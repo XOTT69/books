@@ -13,8 +13,10 @@ const firebaseConfig = {
     measurementId: "G-1JN4FBQ13K" 
 };
 
-// Ініціалізація Firebase
-firebase.initializeApp(firebaseConfig);
+// Ініціалізація Firebase (перевіряємо чи не ініціалізовано)
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
 const auth = firebase.auth();
 const db = firebase.firestore();
 
