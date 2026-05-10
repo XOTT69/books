@@ -1,21 +1,150 @@
 {
-  "name": "ЧитайКо — Хмарний Трекер",
+  "name": "ЧитайКо — Хмарний Трекер Книг",
   "short_name": "ЧитайКо",
-  "start_url": "./index.html",
+  "description": "Ваша персональна хмарна бібліотека для відстеження прочитаних книг",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#f5f5f7",
   "theme_color": "#4f46e5",
-  "description": "Ваша особиста хмарна бібліотека та читалка",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "uk",
+  "dir": "ltr",
+  "categories": ["books", "education", "lifestyle", "productivity"],
   "icons": [
     {
       "src": "icon.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "maskable any"
     },
     {
-      "src": "icon.png",
+      "src": "icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "maskable any"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot-mobile-1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Головний екран бібліотеки"
+    },
+    {
+      "src": "screenshot-mobile-2.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Читалка EPUB книг"
+    },
+    {
+      "src": "screenshot-desktop-1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Веб-версія бібліотеки"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Додати книгу",
+      "short_name": "Додати",
+      "description": "Швидко додати нову книгу до бібліотеки",
+      "url": "/?action=add",
+      "icons": [
+        {
+          "src": "icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Моя статистика",
+      "short_name": "Статистика",
+      "description": "Переглянути статистику читання",
+      "url": "/?action=stats",
+      "icons": [
+        {
+          "src": "icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Рекомендації",
+      "short_name": "Рекомендації",
+      "description": "Переглянути рекомендації книг",
+      "url": "/?action=recommendations",
+      "icons": [
+        {
+          "src": "icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+chitayko",
+      "url": "/?handle=%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "application/epub+zip": [".epub"]
+      }
+    }
+  ],
+  "share_target": {
+    "action": "/?action=share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }
