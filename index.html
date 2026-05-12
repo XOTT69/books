@@ -257,7 +257,19 @@
         let currentRecCategory = null;
         let shownRecTitles = new Set();
 
-        
+        auth.getRedirectResult().then((result) => {
+            if (result.credential) {
+                // Успішна автентифікація через redirect
+                console.log('Redirect result:', result.user);
+            } else if (result.user) {
+                // Користувач вже був залогінений
+                console.log('User already signed in:', result.user);
+            }
+        }).catch((error) => {
+            console.error('Redirect result error:', error);
+            showErrorMsg("Помилка входу через Google: " + error.message);
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('/sw.js')
