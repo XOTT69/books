@@ -432,14 +432,21 @@
                 console.log('Popup error:', error.code);
                 
                 if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-                    btn.innerText = "Перенаправлення на Google...";
-                    try {
-                        await auth.signInWithRedirect(provider);
-                    } catch (redirectError) {
-                        console.error('Redirect error:', redirectError);
-                        showErrorMsg("Помилка перенаправлення. Спробуйте ще раз або дозвольте спливаючі вікна.");
-                        btn.innerHTML = originalHtml;
-                    }
+                    // Показуємо детальні інструкції
+                    showErrorMsg("Спливаюче вікно заблоковано. Натисніть кнопку нижче для входу через перенаправлення.");
+                    
+                    btn.innerText = "Вхід через перенаправлення";
+                    btn.onclick = async () => {
+                        try {
+                            btn.innerText = "Перенаправлення...";
+                            await auth.signInWithRedirect(provider);
+                        } catch (redirectError) {
+                            console.error('Redirect error:', redirectError);
+                            showErrorMsg("Помилка входу. Спробуйте: 1) Дозволити спливаючі вікна 2) Очистити кеш браузера 3) Використати інший браузер");
+                            btn.innerHTML = originalHtml;
+                            btn.onclick = () => signInWithGoogle(btn);
+                        }
+                    };
                 } else {
                     console.error('Other auth error:', error);
                     showErrorMsg("Помилка входу: " + error.message);
