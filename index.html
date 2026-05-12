@@ -410,20 +410,6 @@
             }
         });
 
-        // Обробка результату redirect від Google
-        auth.getRedirectResult().then((result) => {
-            if (result.credential) {
-                // Успішна автентифікація через redirect
-                console.log('Redirect result:', result.user);
-            } else if (result.user) {
-                // Користувач вже був залогінений
-                console.log('User already signed in:', result.user);
-            }
-        }).catch((error) => {
-            console.error('Redirect result error:', error);
-            showErrorMsg("Помилка входу через Google: " + error.message);
-        });
-
         function showErrorMsg(msg) { const errBox = document.getElementById('authError'); errBox.innerText = msg; errBox.classList.remove('hidden'); setTimeout(() => errBox.classList.add('hidden'), 6000); }
         async function handleAuth(type, btn) {
             const originalText = btn.innerText; btn.innerText = "Зачекайте...";
