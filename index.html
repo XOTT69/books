@@ -398,20 +398,6 @@
             }
         });
 
-        // Обробка результату redirect від Google
-        auth.getRedirectResult().then((result) => {
-            if (result.credential) {
-                // Успішна автентифікація через redirect
-                console.log('Redirect result:', result.user);
-            } else if (result.user) {
-                // Користувач вже був залогінений
-                console.log('User already signed in:', result.user);
-            }
-        }).catch((error) => {
-            console.error('Redirect result error:', error);
-            showErrorMsg("Помилка входу через Google: " + error.message);
-        });
-
         function showErrorMsg(msg) { const errBox = document.getElementById('authError'); errBox.innerText = msg; errBox.classList.remove('hidden'); setTimeout(() => errBox.classList.add('hidden'), 6000); }
         async function handleAuth(type, btn) {
             const originalText = btn.innerText; btn.innerText = "Зачекайте...";
@@ -422,37 +408,8 @@
         }
 
         async function signInWithGoogle(btn) { 
-            const originalHtml = btn.innerHTML; 
-            btn.innerText = "З'єднання з Google..."; 
-            const provider = new firebase.auth.GoogleAuthProvider();
-            
-            try { 
-                await auth.signInWithPopup(provider); 
-            } catch (error) {
-                console.log('Popup error:', error.code);
-                
-                if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-                    // Показуємо детальні інструкції
-                    showErrorMsg("Спливаюче вікно заблоковано. Натисніть кнопку нижче для входу через перенаправлення.");
-                    
-                    btn.innerText = "Вхід через перенаправлення";
-                    btn.onclick = async () => {
-                        try {
-                            btn.innerText = "Перенаправлення...";
-                            await auth.signInWithRedirect(provider);
-                        } catch (redirectError) {
-                            console.error('Redirect error:', redirectError);
-                            showErrorMsg("Помилка входу. Спробуйте: 1) Дозволити спливаючі вікна 2) Очистити кеш браузера 3) Використати інший браузер");
-                            btn.innerHTML = originalHtml;
-                            btn.onclick = () => signInWithGoogle(btn);
-                        }
-                    };
-                } else {
-                    console.error('Other auth error:', error);
-                    showErrorMsg("Помилка входу: " + error.message);
-                    btn.innerHTML = originalHtml;
-                }
-            }
+            const originalHtml = btn.innerHTML; btn.innerText = "З'єднання з Google..."; const provider = new firebase.auth.GoogleAuthProvider();
+            try { await auth.signInWithPopup(provider); } catch (error) { if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') { btn.innerText = "Перенаправлення..."; await auth.signInWithRedirect(provider); } else { showErrorMsg("Помилка: " + error.message); btn.innerHTML = originalHtml; } }
         }
         
         function logout() { auth.signOut(); closeAllSheets(); }
