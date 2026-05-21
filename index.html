@@ -18,7 +18,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script>tailwind.config={theme:{extend:{colors:{primary:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca'}}}}};</script>
     <style>
-        *{-webkit-tap-highlight-color:transparent}
+        *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
         ::-webkit-scrollbar{width:0;background:transparent}
         .scrollbar-hide::-webkit-scrollbar{display:none}
         .scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}
@@ -28,12 +28,14 @@
         body.dark .card-elevated{background:#1c1c20;border-color:#2a2a2e}
         body.dark .text-muted{color:#a1a1aa}
         body.dark .bg-surface{background:#09090b}
-        body.dark .nav-bar{background:rgba(9,9,11,.9);border-color:#27272a}
+        body.dark .nav-bar{background:rgba(9,9,11,.92);border-color:#27272a}
         body.dark .pill.inactive{background:#27272a;color:#a1a1aa}
         body.dark .stat-card{background:linear-gradient(135deg,#18181b,#1c1c20);border-color:#27272a}
         body.dark input,body.dark textarea,body.dark select{background:#18181b!important;color:#f4f4f5!important;border-color:#27272a!important}
         body.dark .search-box{background:#18181b;border-color:#27272a}
-        body.dark .celebration-text{color:#f4f4f5}
+        body.dark .skeleton{background:#27272a}
+        body.dark .toast{background:#27272a;color:#f4f4f5;border-color:#3f3f46}
+        body.dark .welcome-card{background:#18181b;border-color:#27272a}
         .card{background:#fff;border:1px solid #f4f4f5;border-radius:18px;transition:transform .12s}
         .card:active{transform:scale(.98)}
         .card-elevated{background:#fff;border:1px solid #e4e4e7;border-radius:22px;box-shadow:0 2px 20px rgba(0,0,0,.03)}
@@ -47,7 +49,7 @@
         .backdrop{opacity:0;pointer-events:none;transition:opacity .25s}
         body.modal-open .backdrop{opacity:1;pointer-events:auto}
         .progress-bar{transition:width .5s cubic-bezier(.4,0,.2,1)}
-        .pill{padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;white-space:nowrap;transition:all .2s}
+        .pill{padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;white-space:nowrap;transition:all .2s;cursor:pointer}
         .pill.active{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.25)}
         .pill.inactive{background:#f4f4f5;color:#71717a}
         .desc-scroll{max-height:25vh;overflow-y:auto;overscroll-behavior:contain}
@@ -63,10 +65,11 @@
         .sortable-ghost{opacity:.3;transform:scale(.96)}
         .date-input{border:none;background:transparent;color:#3f3f46;outline:none;font-size:13px;font-weight:500;cursor:pointer;text-align:right}
         body.dark .date-input{color:#e4e4e7!important;background:transparent!important}
-        .streak-cell{width:12px;height:12px;border-radius:3px}
-        .streak-cell.active{background:#6366f1}
+        .streak-cell{width:18px;height:18px;border-radius:5px;transition:all .2s}
+        .streak-cell.active{background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 2px 6px rgba(99,102,241,.3)}
         .streak-cell.inactive{background:#f4f4f5}
         body.dark .streak-cell.inactive{background:#27272a}
+        .streak-cell.today{ring:2px;ring-color:#6366f1;ring-offset:2px}
         .stat-card{background:linear-gradient(135deg,#fafaff,#f0f0ff);border:1px solid #e8e8f4;border-radius:16px;padding:14px;text-align:center}
         .search-box{background:#fff;border:1px solid #f4f4f5;border-radius:14px}
         .tab-content{display:none}
@@ -74,17 +77,41 @@
         #reader{border:none!important}
         #reader video{object-fit:cover!important;border-radius:1.5rem!important}
         .celebration{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;pointer-events:none}
-        .celebration-text{font-size:48px;animation:celebPop .8s cubic-bezier(.17,.67,.3,1.33) forwards}
-        @keyframes celebPop{0%{transform:scale(0);opacity:0}50%{transform:scale(1.3);opacity:1}100%{transform:scale(1);opacity:0}}
+        .celebration-text{font-size:56px;animation:celebPop 1s cubic-bezier(.17,.67,.3,1.33) forwards}
+        @keyframes celebPop{0%{transform:scale(0) rotate(-10deg);opacity:0}40%{transform:scale(1.4) rotate(5deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:0}}
         .progress-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:#e4e4e7;outline:none}
-        .progress-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#6366f1;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,.3)}
+        .progress-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#6366f1;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,.3)}
         body.dark .progress-slider{background:#27272a}
+        /* Toast */
+        .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-100px);background:#fff;border:1px solid #e4e4e7;border-radius:14px;padding:12px 20px;font-size:14px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.1);z-index:9999;transition:transform .4s cubic-bezier(.32,.72,0,1);max-width:90vw;text-align:center}
+        .toast.show{transform:translateX(-50%) translateY(0)}
+        /* Skeleton */
+        .skeleton{background:#f4f4f5;border-radius:12px;animation:pulse 1.5s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+        /* Pull to refresh */
+        .ptr-indicator{position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-60px);z-index:100;transition:transform .3s;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e4e4e7;border-radius:100px;padding:8px 16px;box-shadow:0 4px 16px rgba(0,0,0,.08);font-size:13px;font-weight:600;color:#6366f1}
+        body.dark .ptr-indicator{background:#18181b;border-color:#27272a}
+        .ptr-indicator.visible{transform:translateX(-50%) translateY(16px)}
+        .ptr-spinner{width:18px;height:18px;border:2.5px solid #e4e4e7;border-top-color:#6366f1;border-radius:50%;animation:spin .6s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        /* Swipe card */
+        .swipe-card{position:relative;overflow:hidden}
+        .swipe-card .swipe-bg{position:absolute;top:0;bottom:0;right:0;width:80px;background:#ef4444;display:flex;align-items:center;justify-content:center;border-radius:18px;color:#fff;font-weight:700;font-size:13px;opacity:0;transition:opacity .2s}
+        .swipe-card.swiping .swipe-bg{opacity:1}
+        /* Welcome */
+        .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
 </head>
 <body class="bg-surface font-sans pb-24 text-slate-900 antialiased">
 
-    <!-- CELEBRATION -->
-    <div id="celebration" class="celebration hidden"><span class="celebration-text">🎉📚</span></div>
+    <!-- Toast -->
+    <div id="toast" class="toast">✓</div>
+
+    <!-- Pull to refresh indicator -->
+    <div id="ptrIndicator" class="ptr-indicator"><div class="ptr-spinner"></div><span>Оновлення...</span></div>
+
+    <!-- Celebration -->
+    <div id="celebration" class="celebration hidden"><span class="celebration-text">🎉📚✨</span></div>
 
     <!-- AUTH -->
     <div id="authScreen" class="fixed inset-0 z-[100] bg-surface flex items-center justify-center p-6 overflow-y-auto fade-in">
@@ -107,16 +134,28 @@
     <!-- APP -->
     <div id="appScreen" class="max-w-lg mx-auto px-4 pt-6 hidden">
 
+        <!-- Welcome (first time) -->
+        <div id="welcomeScreen" class="hidden fade-in mb-6">
+            <div class="welcome-card">
+                <div class="text-4xl mb-3">👋</div>
+                <h2 class="text-xl font-bold mb-2">Вітаємо у ЧитайКо!</h2>
+                <p class="text-muted text-sm mb-4">Тут ви можете відстежувати свої книги, ставити цілі та читати epub-файли прямо в браузері.</p>
+                <div class="space-y-2 text-left text-sm mb-4">
+                    <div class="flex gap-2 items-center"><span class="text-lg">➕</span><span>Натисніть <b>+</b> щоб знайти та додати книгу</span></div>
+                    <div class="flex gap-2 items-center"><span class="text-lg">📖</span><span>Завантажте .epub щоб читати офлайн</span></div>
+                    <div class="flex gap-2 items-center"><span class="text-lg">🎯</span><span>Встановіть ціль у <b>Профілі</b></span></div>
+                </div>
+                <button onclick="dismissWelcome()" class="w-full py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-xl active:scale-95 transition-transform shadow-md shadow-primary-200">Почати! 🚀</button>
+            </div>
+        </div>
+
         <!-- TAB: LIBRARY -->
         <div id="tabLibrary" class="tab-content active fade-in">
             <header class="flex justify-between items-center mb-4">
                 <h1 class="text-2xl font-black tracking-tight">Бібліотека</h1>
                 <button onclick="openSheet('searchSheet')" class="size-11 flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-full shadow-lg shadow-primary-200 active:scale-90 transition-transform text-lg font-bold">+</button>
             </header>
-
-            <!-- Quick Resume -->
             <div id="quickResume" class="mb-4 hidden"></div>
-
             <div class="relative mb-4">
                 <span class="absolute left-3.5 top-[10px] text-muted text-sm pointer-events-none">🔍</span>
                 <input type="search" id="librarySearchInput" placeholder="Пошук у бібліотеці..." class="w-full pl-10 pr-4 py-2.5 search-box text-sm font-medium outline-none focus:ring-2 ring-primary-300 transition-shadow" oninput="filterLibrary(this.value)">
@@ -127,7 +166,7 @@
                 <button onclick="setLibraryTab('finished')" id="tab_finished" class="pill inactive">✅ Прочитано</button>
             </div>
             <div class="flex justify-end mb-3">
-                <div class="flex gap-1 bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg">
+                <div class="flex gap-1 bg-slate-100 p-0.5 rounded-lg">
                     <button onclick="setViewMode('list')" id="view_list" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-white shadow-sm text-slate-800">☰</button>
                     <button onclick="setViewMode('grid')" id="view_grid" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase text-slate-400">⊞</button>
                 </div>
@@ -161,7 +200,7 @@
             </header>
             <div class="card-elevated p-5 mb-4">
                 <div class="flex items-center justify-between mb-3"><span class="text-sm font-bold">🔥 Серія читання</span><span id="streakCount" class="text-sm font-black text-primary-600">0 днів</span></div>
-                <div id="streakDots" class="flex gap-[5px] justify-center flex-wrap"></div>
+                <div id="streakDots" class="flex gap-[6px] justify-center flex-wrap"></div>
             </div>
             <div class="card-elevated p-5 mb-4">
                 <div class="flex items-center justify-between mb-3"><span class="text-sm font-bold">🎯 Ціль на <span id="goalYear"></span></span><span id="goalProgress" class="text-sm font-black text-primary-600">0/12</span></div>
@@ -219,9 +258,7 @@
     <!-- SEARCH -->
     <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="height:85vh">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
-        <div class="px-5 pb-4 shrink-0">
-            <div class="relative"><span class="absolute left-4 top-3 text-muted">🔍</span><input type="text" id="searchInput" placeholder="Назва, автор або ISBN..." class="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm"></div>
-        </div>
+        <div class="px-5 pb-4 shrink-0"><div class="relative"><span class="absolute left-4 top-3 text-muted">🔍</span><input type="text" id="searchInput" placeholder="Назва, автор або ISBN..." class="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm"></div></div>
         <div id="searchResults" class="px-4 pb-6 overflow-y-auto flex-1">
             <button onclick="openScanner()" class="w-full mb-2 p-3 text-center text-sm font-semibold text-white bg-zinc-800 rounded-xl active:scale-95 transition-transform">📷 Сканувати штрих-код</button>
             <button onclick="openManualForm()" class="w-full mb-3 p-3 text-center text-sm font-semibold text-primary-600 bg-primary-50 rounded-xl active:scale-95 transition-transform">✍️ Додати вручну</button>
