@@ -75,6 +75,24 @@ async function updateStreakWidget(){
 }
 async function markReadingDay(){if(!currentUser)return;const t=new Date().toISOString().slice(0,10);try{await db.collection('users').doc(currentUser.uid).collection('readingDays').doc(t).set({minutes:Math.round(currentSessionSeconds/60),timestamp:Date.now()},{merge:true});}catch(e){}}
 
+// ===== CELEBRATION =====
+function showCelebration(){
+    const el=document.getElementById('celebration');
+    el.classList.remove('hidden');
+    setTimeout(()=>el.classList.add('hidden'),1200);
+    if(navigator.vibrate)navigator.vibrate([100,50,100,50,200]);
+}
+
+// ===== QUICK RESUME =====
+function renderQuickResume(){
+    const qr=document.getElementById('quickResume');
+    const lastRead=myLibrary.filter(b=>b.status==='reading'&&b.lastCfi).sort((a,b)=>(b.timeSpent||0)-(a.timeSpent||0))[0];
+    if(!lastRead){qr.classList.add('hidden');return;}
+    const pct=Math.round((lastRead.pagesRead/lastRead.pagesTotal)*100)||0;
+    qr.classList.remove('hidden');
+    qr.innerHTML=`<div class="card-elevated p-4 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-transform" onclick="readSavedEpub('${lastRead.id}')"><img src="${lastRead.image||PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-10 h-14 rounded-lg object-cover shadow-sm"><div class="flex-1 min-w-0"><p class="text-[10px] font-bold text-primary-600 uppercase">Продовжити</p><p class="font-bold text-sm truncate">${lastRead.title}</p><div class="flex items-center gap-2 mt-1"><div class="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="bg-primary-500 h-full rounded-full" style="width:${pct}%"></div></div><span class="text-[10px] font-bold text-muted">${pct}%</span></div></div><div class="bg-primary-600 text-white size-9 rounded-full flex items-center justify-center text-lg shadow-md shadow-primary-200">▶</div></div>`;
+}
+
 // ===== STATS =====
 async function calculateStats(){
     await loadChartJS();
@@ -88,7 +106,7 @@ async function calculateStats(){
     const months={};fin.forEach(b=>{if(b.dateFinished&&typeof b.dateFinished==='string'&&b.dateFinished.length>=7){const m=b.dateFinished.substring(0,7);months[m]=(months[m]||0)+1;}});
     const labels=Object.keys(months).sort().slice(-8);const data=labels.map(l=>months[l]);
     if(window.myChart)window.myChart.destroy();
-    window.myChart=new Chart(ctx,{type:'bar',data:{labels:labels.map(l=>l.slice(5)),datasets:[{data,backgroundColor:'#6366f1',borderRadius:8,barThickness:20}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}}});
+    window.myChart=new Chart(ctx,{type:'bar',data:{labels:labels.map(l=>l.slice(5)),datasets:[{data,backgroundColor:'#6366f1',borderRadius:8,barThickness:20}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});
 }
 
 // ===== EXPORT/IMPORT =====
@@ -107,10 +125,7 @@ auth.onAuthStateChanged(async user=>{
         updateViewButtons();
         try{const ud=await db.collection('users').doc(user.uid).get();if(ud.exists&&ud.data().readingGoal)localStorage.setItem('readingGoal',ud.data().readingGoal);}catch(e){}
         loadLibrary();
-    }else{
-        currentUser=null;myLibrary=[];as.classList.remove('hidden');as.classList.add('flex');ap.classList.add('hidden');
-        document.getElementById('mainBottomNav').classList.add('hidden');
-    }
+    }else{currentUser=null;myLibrary=[];as.classList.remove('hidden');as.classList.add('flex');ap.classList.add('hidden');document.getElementById('mainBottomNav').classList.add('hidden');}
 });
 function showErrorMsg(m){const e=document.getElementById('authError');e.innerText=m;e.classList.remove('hidden');setTimeout(()=>e.classList.add('hidden'),6000);}
 async function handleAuth(type,btn){const ot=btn.innerText;btn.innerText="...";const em=document.getElementById('authEmail').value,pw=document.getElementById('authPassword').value;if(em.length<5||pw.length<6){btn.innerText=ot;return showErrorMsg("Email + пароль (6+)");}try{if(type==='login')await auth.signInWithEmailAndPassword(em,pw);else await auth.createUserWithEmailAndPassword(em,pw);}catch(er){showErrorMsg(er.message);}finally{btn.innerText=ot;}}
@@ -119,8 +134,8 @@ function logout(){auth.signOut();closeAllSheets();}
 
 // ===== LIBRARY =====
 function loadLibrary(){
-    localforage.getItem('library_cache_'+currentUser.uid).then(c=>{if(c&&myLibrary.length===0){myLibrary=c;render();updateGoalWidget();}});
-    db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded','desc').onSnapshot(snap=>{myLibrary=snap.docs.map(d=>({id:d.id,...d.data()}));localforage.setItem('library_cache_'+currentUser.uid,myLibrary);render();updateGoalWidget();});
+    localforage.getItem('library_cache_'+currentUser.uid).then(c=>{if(c&&myLibrary.length===0){myLibrary=c;render();updateGoalWidget();renderQuickResume();}});
+    db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded','desc').onSnapshot(snap=>{myLibrary=snap.docs.map(d=>({id:d.id,...d.data()}));localforage.setItem('library_cache_'+currentUser.uid,myLibrary);render();updateGoalWidget();renderQuickResume();});
 }
 async function updateBookInFirestore(id,u){if(currentUser)await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(u);}
 function filterLibrary(q){libraryFilterQuery=q.toLowerCase().trim();render();}
@@ -167,15 +182,19 @@ searchInput.addEventListener('input',e=>{
 
 window.searchAuthorBooks=function(a){closeAllSheets();setTimeout(()=>{const i=document.getElementById('searchInput');i.value=`author:"${a}"`;openSheet('searchSheet');i.dispatchEvent(new Event('input'));},350);}
 function openManualForm(){tempSelectedBook='manual';toggleEditMode(true);document.getElementById('editTitle').value='';document.getElementById('editAuthor').value='';document.getElementById('editPages').value='';document.getElementById('editImage').value='';document.getElementById('statusButtons').classList.remove('hidden');openSheet('detailsSheet');}
-
 // ===== DETAILS =====
 function showBookDetails(bookData,isNew=false){
     if(!bookData||!bookData.title)return;
     const lb=myLibrary.find(b=>(b.googleId&&b.googleId===bookData.googleId)||b.id===bookData.id)||bookData;
     tempSelectedBook=isNew?bookData:null;toggleEditMode(false);
     const sa=(lb.author||'Невідомий').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const pct=Math.round((lb.pagesRead/lb.pagesTotal)*100)||0;
     let h=`<div class="flex gap-4 mb-5 fade-in"><img loading="lazy" src="${lb.image||PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${lb.title||'Без назви'}</h3><button onclick="window.searchAuthorBooks('${sa}')" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">👤 ${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal||300} стор.</span>${!isNew?`<select onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
     if(!isNew){
+        // Progress slider
+        if(lb.status==='reading'){
+            h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-muted mb-2">📊 Прогрес: <span id="sliderVal">${lb.pagesRead||0}</span> / ${lb.pagesTotal||300} стор.</p><input type="range" min="0" max="${lb.pagesTotal||300}" value="${lb.pagesRead||0}" class="progress-slider" oninput="document.getElementById('sliderVal').innerText=this.value" onchange="updateProgress('${lb.id}',this.value,${lb.pagesTotal||300})"></div>`;
+        }
         h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-muted mb-2">📖 Читалка</p><div class="flex gap-2"><button onclick="readSavedEpub('${lb.id}')" class="flex-1 py-2.5 bg-primary-600 text-white rounded-xl font-bold text-xs active:scale-95 shadow-md shadow-primary-200">Читати</button><div class="relative flex-1"><input type="file" id="epubFileModal_${lb.id}" accept=".epub" class="hidden" onchange="handleFileSelectAndSave(event,'${lb.id}')"><button onclick="document.getElementById('epubFileModal_${lb.id}').click()" class="w-full py-2.5 bg-slate-100 rounded-xl font-bold text-xs active:scale-95">📥 .epub</button></div></div></div>`;
         h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-muted mb-2">🗓 Дати</p><div class="space-y-2"><div class="flex justify-between items-center"><span class="text-xs font-medium">Початок</span><input type="date" value="${lb.dateStarted||''}" onchange="saveManualDate('${lb.id}','dateStarted',this)" class="date-input text-xs"></div><div class="flex justify-between items-center"><span class="text-xs font-medium">Кінець</span><input type="date" value="${lb.dateFinished||''}" onchange="saveManualDate('${lb.id}','dateFinished',this)" class="date-input text-xs"></div></div></div>`;
         const hl=lb.highlights||[];
@@ -191,15 +210,31 @@ function showBookDetails(bookData,isNew=false){
     openSheet('detailsSheet');
 }
 
+function updateProgress(id,val,total){
+    const pagesRead=parseInt(val);
+    updateBookInFirestore(id,{pagesRead});
+    const book=myLibrary.find(b=>b.id===id);if(book)book.pagesRead=pagesRead;
+}
+
 function deleteHighlight(id,i){const b=myLibrary.find(x=>x.id===id);if(!b||!b.highlights)return;b.highlights.splice(i,1);updateBookInFirestore(id,{highlights:b.highlights});showBookDetails(b);}
 function deleteBookFromDetails(id){if(confirm("Видалити?")){db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete();closeAllSheets();}}
 function setRating(id,r){updateBookInFirestore(id,{rating:r});setTimeout(()=>showBookDetails(myLibrary.find(b=>b.id===id)),100);}
-function changeStatusFromDetails(id,ns){const u={status:ns};const b=myLibrary.find(x=>x.id===id);if(ns==='finished'){u.pagesRead=b.pagesTotal;u.dateFinished=b.dateFinished||new Date().toISOString().slice(0,10);}else if(ns==='reading'){u.dateStarted=b.dateStarted||new Date().toISOString().slice(0,10);}updateBookInFirestore(id,u);closeAllSheets();setLibraryTab(ns);}
+function changeStatusFromDetails(id,ns){
+    const u={status:ns};const b=myLibrary.find(x=>x.id===id);
+    if(ns==='finished'){u.pagesRead=b.pagesTotal;u.dateFinished=b.dateFinished||new Date().toISOString().slice(0,10);showCelebration();}
+    else if(ns==='reading'){u.dateStarted=b.dateStarted||new Date().toISOString().slice(0,10);}
+    updateBookInFirestore(id,u);closeAllSheets();setLibraryTab(ns);
+}
 function toggleEditMode(v){if(v){document.getElementById('detailsContent').classList.add('hidden');document.getElementById('editContent').classList.remove('hidden');}else{document.getElementById('detailsContent').classList.remove('hidden');document.getElementById('editContent').classList.add('hidden');}}
 function saveBookEdits(){const u={title:document.getElementById('editTitle').value.trim()||'Без назви',author:document.getElementById('editAuthor').value.trim()||'Невідомий',pagesTotal:parseInt(document.getElementById('editPages').value)||300,image:document.getElementById('editImage').value.trim()};if(tempSelectedBook==='manual'){tempSelectedBook={...u,description:'Вручну.'};toggleEditMode(false);showBookDetails(tempSelectedBook,true);}else{updateBookInFirestore(tempSelectedBook.id,u);showBookDetails({...tempSelectedBook,...u});}}
 function saveReview(id){updateBookInFirestore(id,{review:document.getElementById(`reviewText_${id}`).value});if(navigator.vibrate)navigator.vibrate(50);}
-async function addBookWithStatus(s){if(!currentUser)return;if(tempSelectedBook==='manual')saveBookEdits();let nd={...tempSelectedBook,status:s,pagesRead:s==='finished'?tempSelectedBook.pagesTotal:0,dateAdded:Date.now(),rating:0,review:'',highlights:[],timeSpent:0,lastFileName:null,dateStarted:s==='reading'?new Date().toISOString().slice(0,10):null,dateFinished:s==='finished'?new Date().toISOString().slice(0,10):null,sortOrder:0};await db.collection('users').doc(currentUser.uid).collection('books').add(nd);tempSelectedBook=null;closeAllSheets();}
-function changeStatus(id,ns,ev){ev.stopPropagation();const u={status:ns};const b=myLibrary.find(x=>x.id===id);if(ns==='reading'&&!b.dateStarted)u.dateStarted=new Date().toISOString().slice(0,10);if(ns==='finished'){u.pagesRead=b.pagesTotal;u.dateFinished=new Date().toISOString().slice(0,10);}updateBookInFirestore(id,u);setLibraryTab(ns);}
+async function addBookWithStatus(s){if(!currentUser)return;if(tempSelectedBook==='manual')saveBookEdits();let nd={...tempSelectedBook,status:s,pagesRead:s==='finished'?tempSelectedBook.pagesTotal:0,dateAdded:Date.now(),rating:0,review:'',highlights:[],timeSpent:0,lastFileName:null,dateStarted:s==='reading'?new Date().toISOString().slice(0,10):null,dateFinished:s==='finished'?new Date().toISOString().slice(0,10):null,sortOrder:0};await db.collection('users').doc(currentUser.uid).collection('books').add(nd);tempSelectedBook=null;closeAllSheets();if(s==='finished')showCelebration();}
+function changeStatus(id,ns,ev){
+    ev.stopPropagation();const u={status:ns};const b=myLibrary.find(x=>x.id===id);
+    if(ns==='reading'&&!b.dateStarted)u.dateStarted=new Date().toISOString().slice(0,10);
+    if(ns==='finished'){u.pagesRead=b.pagesTotal;u.dateFinished=new Date().toISOString().slice(0,10);showCelebration();}
+    updateBookInFirestore(id,u);setLibraryTab(ns);
+}
 function saveManualDate(id,f,el){updateBookInFirestore(id,{[f]:el.value});const b=myLibrary.find(x=>x.id===id);if(b)b[f]=el.value;}
 
 // ===== READER =====
@@ -213,7 +248,7 @@ function changeReaderTheme(t){readerTheme=t;localStorage.setItem('readerTheme',t
 function initSwipeGestures(){if(!window.Hammer)return;const v=document.getElementById('viewer');if(!window.mc){window.mc=new Hammer(v);window.mc.get('swipe').set({direction:Hammer.DIRECTION_HORIZONTAL});window.mc.on("swipeleft",()=>{if(rendition)rendition.next();});window.mc.on("swiperight",()=>{if(rendition)rendition.prev();});}}
 
 function handleFileSelectAndSave(ev,bookId){const file=ev.target.files[0];if(!file)return;if(!file.name.toLowerCase().endsWith('.epub')){alert(".epub!");ev.target.value='';return;}const bd=myLibrary.find(b=>b.id===bookId);if(bd&&bd.lastFileName&&bd.lastFileName!==file.name&&!confirm('Інший файл. Продовжити?')){ev.target.value='';return;}if(bd&&bd.lastFileName!==file.name)updateBookInFirestore(bookId,{lastFileName:file.name});const r=new FileReader();r.onload=async function(e){const ab=e.target.result;try{await localforage.setItem(`epub_${bookId}`,ab);}catch(er){}await openEpubReader(bookId,ab);closeAllSheets();};r.readAsArrayBuffer(file);ev.target.value='';}
-async function readSavedEpub(bookId){try{const ab=await localforage.getItem(`epub_${bookId}`);if(!ab){alert("Файл не знайдено!");return;}await openEpubReader(bookId,ab);closeAllSheets();}catch(e){alert("Помилка");}}
+async function readSavedEpub(bookId){try{const ab=await localforage.getItem(`epub_${bookId}`);if(!ab){alert("Файл не знайдено! Завантажте .epub");return;}await openEpubReader(bookId,ab);closeAllSheets();}catch(e){alert("Помилка");}}
 function readSavedEpubFromCard(id,ev){ev.stopPropagation();readSavedEpub(id);}
 
 async function openEpubReader(bookId,source){
@@ -222,7 +257,7 @@ async function openEpubReader(bookId,source){
     currentReaderBookId=bookId;document.getElementById('readerOverlay').style.display='flex';document.getElementById('readerTitle').innerText=bd.title;document.getElementById('readerProgress').innerText="...";startTimer();document.getElementById('viewer').innerHTML='';
     try{
         currentBookInstance=ePub(source);rendition=currentBookInstance.renderTo("viewer",{width:"100%",height:"100%",spread:"none",manager:"continuous",flow:"paginated"});
-        rendition.themes.register("light",{"body":{"background":"#f8fafc","color":"#0f172a"}});rendition.themes.register("sepia",{"body":{"background":"#f4ecd8","color":"#5b4636"}});rendition.themes.register("dark",{"body":{"background":"#0a0a0f","color":"#cbd5e1"}});applyReaderSettings();
+        rendition.themes.register("light",{"body":{"background":"#fafafa","color":"#18181b"}});rendition.themes.register("sepia",{"body":{"background":"#f4ecd8","color":"#5b4636"}});rendition.themes.register("dark",{"body":{"background":"#09090b","color":"#d4d4d8"}});applyReaderSettings();
         rendition.on("selected",function(cfi,contents){rendition.annotations.highlight(cfi);currentBookInstance.getRange(cfi).then(function(range){if(!range)return;const text=range.toString().trim();if(text.length<3)return;const bk=myLibrary.find(b=>b.id===currentReaderBookId);if(bk){const hl=bk.highlights||[];hl.push({text,cfi,date:Date.now()});bk.highlights=hl;updateBookInFirestore(currentReaderBookId,{highlights:hl});}if(navigator.vibrate)navigator.vibrate([50,50,50]);});contents.window.getSelection().removeAllRanges();});
         rendition.on("relocated",loc=>{if(!loc||!loc.start)return;const p=Math.round((loc.start.percentage||0)*100);document.getElementById('readerProgress').innerText=p>0?p+"%":"...";clearTimeout(window.syncProgressTimeout);window.syncProgressTimeout=setTimeout(()=>{const u={lastCfi:loc.start.cfi};if(p>0)u.pagesRead=Math.round((p/100)*(bd.pagesTotal||300));updateBookInFirestore(currentReaderBookId,u);},3000);});
         const safeCfi=(bd.lastCfi&&typeof bd.lastCfi==='string'&&bd.lastCfi.startsWith('epubcfi'))?bd.lastCfi:undefined;
@@ -231,20 +266,18 @@ async function openEpubReader(bookId,source){
         initSwipeGestures();
     }catch(er){console.error(er);document.getElementById('readerProgress').innerText="Помилка";stopTimer();}
 }
-function closeReader(){stopTimer();document.getElementById('readerOverlay').style.display='none';document.getElementById('readerSettingsMenu').classList.add('hidden');if(currentBookInstance){currentBookInstance.destroy();currentBookInstance=null;rendition=null;}document.getElementById('viewer').innerHTML='';currentReaderBookId=null;}
+function closeReader(){stopTimer();document.getElementById('readerOverlay').style.display='none';document.getElementById('readerSettingsMenu').classList.add('hidden');if(currentBookInstance){currentBookInstance.destroy();currentBookInstance=null;rendition=null;}document.getElementById('viewer').innerHTML='';currentReaderBookId=null;updateStreakWidget();}
 
 // ===== RENDER =====
 function deleteBook(id,ev){ev.stopPropagation();if(confirm("Видалити?"))db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete();}
-function formatTime(s){if(!s)return"0хв";const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h>0?`${h}г${m}хв`:`${m}хв`;}
+function formatTime(s){if(!s)return"0хв";const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h>0?`${h}г ${m}хв`:`${m}хв`;}
 function setLibraryTab(t){currentLibraryTab=t;document.querySelectorAll('#libraryTabs .pill').forEach(b=>{b.className='pill inactive';});document.getElementById('tab_'+t).className='pill active';render();}
 
 function renderBookCard(book){
     const pct=Math.round((book.pagesRead/book.pagesTotal)*100)||0,isFin=book.status==='finished',isPlan=book.status==='planned',isRead=book.status==='reading';
     const bj=JSON.stringify(book).replace(/"/g,'&quot;');
-    if(viewMode==='grid')return`<div data-id="${book.id}" onclick="showBookDetails(${bj})" class="flex flex-col items-center cursor-pointer active:scale-[0.97] transition-transform ${''}
-"><div class="relative w-full aspect-[2/3]"><img loading="lazy" src="${book.image||PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-full h-full rounded-2xl shadow-md object-cover">${isFin&&book.rating?`<div class="absolute -bottom-1.5 -right-1.5 bg-white text-amber-400 text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-sm">★${book.rating}</div>`:''}${isRead&&pct>0?`<div class="absolute bottom-0 left-0 right-0 h-1 bg-black/20 rounded-b-2xl overflow-hidden"><div class="h-full bg-primary-500" style="width:${pct}%"></div></div>`:''}</div><h3 class="font-semibold text-[11px] mt-2 w-full text-center truncate px-1">${book.title}</h3></div>`;
-    return`<div data-id="${book.id}" onclick="showBookDetails(${bj})" class="card p-3.5 flex gap-3 items-start cursor-pointer ${''}
-"><img loading="lazy" src="${book.image||PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-14 h-20 rounded-xl shadow-sm object-cover flex-shrink-0"><div class="flex-1 min-w-0"><div class="flex justify-between items-start gap-1"><div class="min-w-0"><h3 class="font-bold text-sm leading-snug truncate">${book.title}</h3><p class="text-xs text-muted mt-0.5 truncate">${book.author}</p></div><button onclick="deleteBook('${book.id}',event)" class="text-slate-200 hover:text-red-400 text-xs p-1">✕</button></div>${isPlan?`<button onclick="changeStatus('${book.id}','reading',event)" class="w-full mt-3 py-2 bg-primary-50 text-primary-700 font-bold text-xs rounded-lg active:scale-95">🚀 Читати</button>`:`<div class="mt-2.5 flex items-center gap-2"><div class="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="progress-bar bg-primary-500 h-full rounded-full" style="width:${pct}%"></div></div><span class="text-[10px] font-bold text-primary-600">${pct}%</span>${isRead?`<button onclick="changeStatus('${book.id}','finished',event)" class="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold active:scale-95">✅</button>`:''}</div>${isRead?`<div class="flex gap-1.5 mt-2.5"><button onclick="readSavedEpubFromCard('${book.id}',event)" class="flex-1 py-1.5 bg-primary-600 text-white rounded-lg text-[11px] font-bold active:scale-95 shadow-sm">📱 Читати</button><div class="relative flex-1"><input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelectAndSave(event,'${book.id}')"><button onclick="event.stopPropagation();document.getElementById('epubFile_${book.id}').click();" class="w-full py-1.5 bg-slate-100 rounded-lg text-[11px] font-bold active:scale-95">📥</button></div></div>`:''}${isRead?`<div class="text-[10px] text-muted mt-1.5">⏱ ${formatTime(book.timeSpent)}</div>`:''}`}${isFin&&book.rating?`<div class="mt-2 text-amber-400 text-xs">${'★'.repeat(book.rating)}${'☆'.repeat(5-book.rating)}</div>`:''}</div></div>`;
+    if(viewMode==='grid')return`<div data-id="${book.id}" onclick="showBookDetails(${bj})" class="flex flex-col items-center cursor-pointer active:scale-[0.97] transition-transform"><div class="relative w-full aspect-[2/3]"><img loading="lazy" src="${book.image||PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-full h-full rounded-2xl shadow-md object-cover">${isFin&&book.rating?`<div class="absolute -bottom-1.5 -right-1.5 bg-white text-amber-400 text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-sm">★${book.rating}</div>`:''}${isRead&&pct>0?`<div class="absolute bottom-0 left-0 right-0 h-1 bg-black/20 rounded-b-2xl overflow-hidden"><div class="h-full bg-primary-500" style="width:${pct}%"></div></div>`:''}</div><h3 class="font-semibold text-[11px] mt-2 w-full text-center truncate px-1">${book.title}</h3></div>`;
+    return`<div data-id="${book.id}" onclick="showBookDetails(${bj})" class="card p-3.5 flex gap-3 items-start cursor-pointer"><img loading="lazy" src="${book.image||PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-14 h-20 rounded-xl shadow-sm object-cover flex-shrink-0"><div class="flex-1 min-w-0"><div class="flex justify-between items-start gap-1"><div class="min-w-0"><h3 class="font-bold text-sm leading-snug truncate">${book.title}</h3><p class="text-xs text-muted mt-0.5 truncate">${book.author}</p></div><button onclick="deleteBook('${book.id}',event)" class="text-slate-200 hover:text-red-400 text-xs p-1">✕</button></div>${isPlan?`<button onclick="changeStatus('${book.id}','reading',event)" class="w-full mt-3 py-2 bg-primary-50 text-primary-700 font-bold text-xs rounded-lg active:scale-95">🚀 Читати</button>`:`<div class="mt-2.5 flex items-center gap-2"><div class="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden"><div class="progress-bar bg-primary-500 h-full rounded-full" style="width:${pct}%"></div></div><span class="text-[10px] font-bold text-primary-600">${pct}%</span>${isRead?`<button onclick="changeStatus('${book.id}','finished',event)" class="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold active:scale-95">✅</button>`:''}</div>${isRead?`<div class="flex gap-1.5 mt-2.5"><button onclick="readSavedEpubFromCard('${book.id}',event)" class="flex-1 py-1.5 bg-primary-600 text-white rounded-lg text-[11px] font-bold active:scale-95 shadow-sm">📱 Читати</button><div class="relative flex-1"><input type="file" id="epubFile_${book.id}" accept=".epub" class="hidden" onchange="handleFileSelectAndSave(event,'${book.id}')"><button onclick="event.stopPropagation();document.getElementById('epubFile_${book.id}').click();" class="w-full py-1.5 bg-slate-100 rounded-lg text-[11px] font-bold active:scale-95">📥</button></div></div><div class="text-[10px] text-muted mt-1.5">⏱ ${formatTime(book.timeSpent)}</div>`:''}`}${isFin&&book.rating?`<div class="mt-2 text-amber-400 text-xs">${'★'.repeat(book.rating)}${'☆'.repeat(5-book.rating)}</div>`:''}</div></div>`;
 }
 
 function render(){
@@ -256,7 +289,10 @@ function render(){
     document.getElementById('tab_finished').innerHTML=`✅ Прочитано <span class="ml-1 text-[10px] opacity-70">${finished.length}</span>`;
     const c=document.getElementById('myBooksContainer');let list=[];
     if(currentLibraryTab==='reading')list=reading;else if(currentLibraryTab==='planned')list=planned;else list=finished;
-    if(list.length===0){c.innerHTML=`<div class="mt-12 text-center"><span class="text-5xl block mb-3 opacity-60">📚</span><p class="text-muted text-sm font-medium">${q?'Не знайдено':'Поки порожньо'}</p></div>`;return;}
+    if(list.length===0){
+        const tips={reading:'Натисніть + щоб знайти книгу і почати читати',planned:'Додайте книги які хочете прочитати пізніше',finished:'Завершені книги з\'являться тут'};
+        c.innerHTML=`<div class="mt-12 text-center px-8"><span class="text-5xl block mb-3">📚</span><p class="font-bold text-lg mb-1">${q?'Не знайдено':'Поки порожньо'}</p><p class="text-muted text-sm">${q?'Спробуйте інший запит':tips[currentLibraryTab]}</p></div>`;return;
+    }
     const wc=viewMode==='grid'?'grid grid-cols-3 gap-3 sortable-list':'space-y-2.5 sortable-list';
     if(currentLibraryTab==='finished'){
         finished.sort((a,b)=>(b.dateFinished||'1970').localeCompare(a.dateFinished||'1970'));
@@ -267,7 +303,15 @@ function render(){
 }
 
 // ===== RECOMMENDATIONS =====
-const curatedCategories={'Академія магії':['"академия магии" фэнтези','"магическая академия"','ромфант академия','академия волшебства'],'Фентезі':['"фэнтези" бестселлер','эпическое фэнтези','Джон Толкин','Джордж Мартин','Брэндон Сандерсон','Робин Хобб','Ник Перумов','боевое фэнтези'],'Детектив':['"детектив" бестселлер','Агата Кристи','Ю Несбё','Стиг Ларссон','Борис Акунин','психологический детектив'],'Трилер':['"триллер" бестселлер','Стивен Кинг','Джиллиан Флинн','Дэн Браун','Франк Тилье','психологический триллер'],'Романтика':['"любовный роман" бестселлер','Николас Спаркс','Джоджо Мойес','Колин Гувер','современный любовный роман'],'Саморозвиток':['"саморазвитие" бестселлер','Роберт Кийосаки','Марк Мэнсон','Джо Диспенза','Джеймс Клир','психология успеха'],'Фантастика':['"научная фантастика" бестселлер','Айзек Азимов','Рэй Брэдбери','Энди Вейер','Сергей Лукьяненко','космическая фантастика']};
+const curatedCategories={
+    'Академія магії':['"академия магии" фэнтези','"магическая академия"','ромфант академия','академия волшебства'],
+    'Фентезі':['"фэнтези" бестселлер','эпическое фэнтези','Джон Толкин','Джордж Мартин','Брэндон Сандерсон','Робин Хобб','Ник Перумов','боевое фэнтези'],
+    'Детектив':['"детектив" бестселлер','Агата Кристи','Ю Несбё','Стиг Ларссон','Борис Акунин','психологический детектив'],
+    'Трилер':['"триллер" бестселлер','Стивен Кинг','Джиллиан Флинн','Дэн Браун','Франк Тилье','психологический триллер'],
+    'Романтика':['"любовный роман" бестселлер','Николас Спаркс','Джоджо Мойес','Колин Гувер','современный любовный роман'],
+    'Саморозвиток':['"саморазвитие" бестселлер','Роберт Кийосаки','Марк Мэнсон','Джо Диспенза','Джеймс Клир','психология успеха'],
+    'Фантастика':['"научная фантастика" бестселлер','Айзек Азимов','Рэй Брэдбери','Энди Вейер','Сергей Лукьяненко','космическая фантастика']
+};
 
 async function loadRealRecommendations(cat='auto',btnId='rec_auto'){
     if(currentRecCategory===cat)return;currentRecCategory=cat;recStartIndex=0;currentRecQueryIndex=0;currentRecQueries=[];shownRecTitles.clear();
@@ -275,8 +319,11 @@ async function loadRealRecommendations(cat='auto',btnId='rec_auto'){
     document.querySelectorAll('#recTabs .pill').forEach(b=>{b.className='pill inactive';});
     if(document.getElementById(btnId))document.getElementById(btnId).className='pill active';
     let pool=[];
-    if(cat==='auto'){let authors=myLibrary.map(b=>b.author).filter(a=>a&&a.length>2&&!a.toLowerCase().includes('невідомий'));if(authors.length>0){let counts={};authors.forEach(a=>counts[a]=(counts[a]||0)+1);pool.push(...Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,10).map(a=>`inauthor:"${a}"`));}let gen=Object.values(curatedCategories).flat();gen.sort(()=>0.5-Math.random());pool.push(...gen);}
-    else{pool=[...curatedCategories[cat]];pool.sort(()=>0.5-Math.random());}
+    if(cat==='auto'){
+        let authors=myLibrary.map(b=>b.author).filter(a=>a&&a.length>2&&!a.toLowerCase().includes('невідомий'));
+        if(authors.length>0){let counts={};authors.forEach(a=>counts[a]=(counts[a]||0)+1);pool.push(...Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,10).map(a=>`inauthor:"${a}"`));}
+        let gen=Object.values(curatedCategories).flat();gen.sort(()=>0.5-Math.random());pool.push(...gen);
+    }else{pool=[...curatedCategories[cat]];pool.sort(()=>0.5-Math.random());}
     currentRecQueries=pool;await fetchMoreRecommendations(true);
 }
 
@@ -295,16 +342,19 @@ async function fetchMoreRecommendations(isFirst=false){
             const badWords=['учебник','словарь','журнал','комикс','манга','підручник','словник','вісник','сборник','збірник','посібник','пособие','том ','випуск','выпуск','зошит','тетрадь','хрестоматия','дневник'];
             const existingTitles=new Set(myLibrary.map(b=>(b.title||'').trim().toLowerCase()));
             let valid=items.filter(item=>{
-                const b=item.volumeInfo;if(!b.title||!b.description||b.description.length<20)return false;
+                const b=item.volumeInfo;
+                if(!b.title||!b.description||b.description.length<20)return false;
                 if(b.pageCount!==undefined&&b.pageCount>0&&b.pageCount<40)return false;
                 if(!isCyrillic(b.title)||isEnglishTitle(b.title))return false;
-                const tL=b.title.toLowerCase();if(badWords.some(w=>tL.includes(w)))return false;
+                const tL=b.title.toLowerCase();
+                if(badWords.some(w=>tL.includes(w)))return false;
                 if(existingTitles.has(tL))return false;
-                                const key=tL+(b.authors?b.authors[0]:'');
+                const key=tL+(b.authors?b.authors[0]:'');
                 if(shownRecTitles.has(key))return false;
                 return true;
             });
-            const u=new Map();valid.forEach(i=>{const b=i.volumeInfo;const key=b.title.toLowerCase()+(b.authors?b.authors[0]:'');u.set(key,i);});
+            const u=new Map();
+            valid.forEach(i=>{const b=i.volumeInfo;const key=b.title.toLowerCase()+(b.authors?b.authors[0]:'');u.set(key,i);});
             let ub=Array.from(u.values());
             ub.forEach(i=>{const b=i.volumeInfo;shownRecTitles.add(b.title.toLowerCase()+(b.authors?b.authors[0]:''));finalBooks.push(i);});
             if(ub.length===0)empty++;else empty=0;
@@ -312,7 +362,7 @@ async function fetchMoreRecommendations(isFirst=false){
     }
     if(isFirst)lst.innerHTML='';
     if(document.getElementById('recLoadingMore'))document.getElementById('recLoadingMore').remove();
-    if(finalBooks.length===0&&isFirst){lst.innerHTML='<div class="p-10 text-center text-muted text-sm">Не знайшли 😔</div>';}
+    if(finalBooks.length===0&&isFirst){lst.innerHTML='<div class="p-10 text-center text-muted text-sm">Не знайшли нових книг 😔<br><span class="text-xs">Спробуйте іншу категорію</span></div>';}
     else if(finalBooks.length>0){
         finalBooks.sort(()=>0.5-Math.random());
         let h='';
@@ -320,7 +370,14 @@ async function fetchMoreRecommendations(isFirst=false){
             const b=i.volumeInfo;
             const img=(b.imageLinks?.thumbnail||PLACEHOLDER_IMG).replace(/^http:\/\//i,'https://');
             const bk={googleId:i.id||Math.random().toString(),title:b.title,author:b.authors?b.authors[0]:'Невідомий',pagesTotal:b.pageCount||300,image:img,description:b.description||'',genre:(b.categories&&b.categories[0])||''};
-            h+=`<div onclick="showBookDetails(${JSON.stringify(bk).replace(/"/g,'&quot;')},true)" class="card p-3.5 flex gap-3 items-start cursor-pointer active:scale-[0.98] transition-transform fade-in"><img loading="lazy" src="${bk.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-13 h-[72px] rounded-xl shadow-sm object-cover flex-shrink-0"><div class="flex-1 min-w-0"><div class="font-bold text-sm leading-tight truncate">${bk.title}</div><div class="text-xs text-muted mt-0.5">${bk.author}</div><div class="text-[11px] text-muted mt-1 line-clamp-2 leading-snug opacity-70">${bk.description}</div></div></div>`;
+            h+=`<div onclick="showBookDetails(${JSON.stringify(bk).replace(/"/g,'&quot;')},true)" class="card p-3.5 flex gap-3 items-start cursor-pointer active:scale-[0.98] transition-transform fade-in">
+                <img loading="lazy" src="${bk.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-13 h-[72px] rounded-xl shadow-sm object-cover flex-shrink-0">
+                <div class="flex-1 min-w-0">
+                    <div class="font-bold text-sm leading-tight truncate">${bk.title}</div>
+                    <div class="text-xs text-muted mt-0.5">${bk.author}</div>
+                    <div class="text-[11px] text-muted mt-1 line-clamp-2 leading-snug opacity-70">${bk.description}</div>
+                </div>
+            </div>`;
         });
         const tmp=document.createElement('div');tmp.innerHTML=h;while(tmp.firstChild)lst.appendChild(tmp.firstChild);
     }
