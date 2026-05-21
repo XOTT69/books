@@ -16,66 +16,75 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <script>tailwind.config={theme:{extend:{colors:{primary:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca'}},fontFamily:{sans:['-apple-system','BlinkMacSystemFont','SF Pro Display','Inter','sans-serif']}}}};</script>
+    <script>tailwind.config={theme:{extend:{colors:{primary:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca'}}}}};</script>
     <style>
         *{-webkit-tap-highlight-color:transparent}
         ::-webkit-scrollbar{width:0;background:transparent}
         .scrollbar-hide::-webkit-scrollbar{display:none}
         .scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}
-        body{transition:background .3s,color .3s;overflow-x:hidden}
-        body.dark{background:#0a0a0f;color:#f1f5f9}
-        body.dark .card{background:#16161f;border-color:#1e1e2e}
-        body.dark .card-elevated{background:#1a1a25;border-color:#252535}
-        body.dark .text-muted{color:#94a3b8}
-        body.dark .bg-surface{background:#0f0f17}
-        body.dark .nav-bar{background:rgba(10,10,15,.85);border-color:#1e1e2e}
-        body.dark input,body.dark textarea,body.dark select{background:#16161f!important;color:#f1f5f9!important;border-color:#252535!important}
-        .card{background:#fff;border:1px solid #f1f5f9;border-radius:20px;transition:transform .15s,box-shadow .15s}
+        body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-serif;transition:background .3s,color .3s;overflow-x:hidden}
+        body.dark{background:#09090b;color:#f4f4f5}
+        body.dark .card{background:#18181b;border-color:#27272a}
+        body.dark .card-elevated{background:#1c1c20;border-color:#2a2a2e}
+        body.dark .text-muted{color:#a1a1aa}
+        body.dark .bg-surface{background:#09090b}
+        body.dark .nav-bar{background:rgba(9,9,11,.9);border-color:#27272a}
+        body.dark .pill.inactive{background:#27272a;color:#a1a1aa}
+        body.dark .stat-card{background:linear-gradient(135deg,#18181b,#1c1c20);border-color:#27272a}
+        body.dark input,body.dark textarea,body.dark select{background:#18181b!important;color:#f4f4f5!important;border-color:#27272a!important}
+        body.dark .search-box{background:#18181b;border-color:#27272a}
+        body.dark .celebration-text{color:#f4f4f5}
+        .card{background:#fff;border:1px solid #f4f4f5;border-radius:18px;transition:transform .12s}
         .card:active{transform:scale(.98)}
-        .card-elevated{background:#fff;border:1px solid #e8ecf0;border-radius:24px;box-shadow:0 4px 24px rgba(0,0,0,.04)}
-        .bg-surface{background:#f8f9fb}
-        .text-muted{color:#64748b}
-        .nav-bar{background:rgba(255,255,255,.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid #f1f5f9}
-        .fade-in{animation:fadeIn .25s ease forwards}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        .slide-up{animation:slideUp .35s cubic-bezier(.32,.72,0,1) forwards}
-        @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+        .card-elevated{background:#fff;border:1px solid #e4e4e7;border-radius:22px;box-shadow:0 2px 20px rgba(0,0,0,.03)}
+        .bg-surface{background:#fafafa}
+        .text-muted{color:#71717a}
+        .nav-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid #f4f4f5;z-index:30}
+        .fade-in{animation:fadeIn .2s ease forwards}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
         .bottom-sheet{transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1)}
         .bottom-sheet.open{transform:translateY(0)}
-        .backdrop{opacity:0;pointer-events:none;transition:opacity .3s}
+        .backdrop{opacity:0;pointer-events:none;transition:opacity .25s}
         body.modal-open .backdrop{opacity:1;pointer-events:auto}
-        .progress-ring{transition:stroke-dashoffset .6s ease}
         .progress-bar{transition:width .5s cubic-bezier(.4,0,.2,1)}
-        .pill{padding:6px 14px;border-radius:100px;font-size:13px;font-weight:600;white-space:nowrap;transition:all .2s}
-        .pill.active{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;box-shadow:0 4px 12px rgba(99,102,241,.3)}
-        .pill.inactive{background:#f1f5f9;color:#64748b}
-        body.dark .pill.inactive{background:#1e1e2e;color:#94a3b8}
+        .pill{padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;white-space:nowrap;transition:all .2s}
+        .pill.active{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.25)}
+        .pill.inactive{background:#f4f4f5;color:#71717a}
         .desc-scroll{max-height:25vh;overflow-y:auto;overscroll-behavior:contain}
         .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-        #readerOverlay{display:none;position:fixed;inset:0;z-index:200;background:#f8fafc;flex-direction:column}
-        body.dark #readerOverlay{background:#0a0a0f}
+        #readerOverlay{display:none;position:fixed;inset:0;z-index:200;background:#fafafa;flex-direction:column}
+        body.dark #readerOverlay{background:#09090b}
         #viewer{flex:1;width:100%;height:100%;overflow:hidden}
-        .reader-controls{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.04);z-index:10}
-        body.dark .reader-controls{background:#16161f}
-        .nav-btn{background:#f1f5f9;padding:11px 18px;border-radius:12px;font-weight:700;font-size:13px;color:#475569;transition:transform .1s}
-        body.dark .nav-btn{background:#1e1e2e;color:#e2e8f0}
+        .reader-controls{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.03);z-index:10}
+        body.dark .reader-controls{background:#18181b}
+        .nav-btn{background:#f4f4f5;padding:10px 18px;border-radius:12px;font-weight:700;font-size:13px;color:#52525b;transition:transform .1s}
+        body.dark .nav-btn{background:#27272a;color:#e4e4e7}
         .nav-btn:active{transform:scale(.93)}
-        .sortable-ghost{opacity:.3;transform:scale(.95)}
-        .date-input{border:none;background:transparent;color:#334155;outline:none;font-size:13px;font-weight:500;cursor:pointer;text-align:right}
-        body.dark .date-input{color:#e2e8f0!important;background:transparent!important}
-        .streak-cell{width:14px;height:14px;border-radius:4px;transition:background .2s}
+        .sortable-ghost{opacity:.3;transform:scale(.96)}
+        .date-input{border:none;background:transparent;color:#3f3f46;outline:none;font-size:13px;font-weight:500;cursor:pointer;text-align:right}
+        body.dark .date-input{color:#e4e4e7!important;background:transparent!important}
+        .streak-cell{width:12px;height:12px;border-radius:3px}
         .streak-cell.active{background:#6366f1}
-        .streak-cell.inactive{background:#f1f5f9}
-        body.dark .streak-cell.inactive{background:#1e1e2e}
-        .stat-card{background:linear-gradient(135deg,#f8f9ff 0%,#f0f1ff 100%);border:1px solid #e8ecff;border-radius:16px;padding:16px;text-align:center}
-        body.dark .stat-card{background:linear-gradient(135deg,#16161f 0%,#1a1a28 100%);border-color:#252535}
-        #reader{border:none!important}
-        #reader video{object-fit:cover!important;border-radius:1.5rem!important}
+        .streak-cell.inactive{background:#f4f4f5}
+        body.dark .streak-cell.inactive{background:#27272a}
+        .stat-card{background:linear-gradient(135deg,#fafaff,#f0f0ff);border:1px solid #e8e8f4;border-radius:16px;padding:14px;text-align:center}
+        .search-box{background:#fff;border:1px solid #f4f4f5;border-radius:14px}
         .tab-content{display:none}
         .tab-content.active{display:block}
+        #reader{border:none!important}
+        #reader video{object-fit:cover!important;border-radius:1.5rem!important}
+        .celebration{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;pointer-events:none}
+        .celebration-text{font-size:48px;animation:celebPop .8s cubic-bezier(.17,.67,.3,1.33) forwards}
+        @keyframes celebPop{0%{transform:scale(0);opacity:0}50%{transform:scale(1.3);opacity:1}100%{transform:scale(1);opacity:0}}
+        .progress-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:#e4e4e7;outline:none}
+        .progress-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#6366f1;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,.3)}
+        body.dark .progress-slider{background:#27272a}
     </style>
 </head>
 <body class="bg-surface font-sans pb-24 text-slate-900 antialiased">
+
+    <!-- CELEBRATION -->
+    <div id="celebration" class="celebration hidden"><span class="celebration-text">🎉📚</span></div>
 
     <!-- AUTH -->
     <div id="authScreen" class="fixed inset-0 z-[100] bg-surface flex items-center justify-center p-6 overflow-y-auto fade-in">
@@ -90,10 +99,8 @@
                     <button onclick="handleAuth('signup',this)" class="flex-1 p-3.5 text-slate-700 bg-slate-100 rounded-xl font-bold text-sm active:scale-95 transition-transform">Створити</button>
                 </div>
             </div>
-            <div class="relative flex py-5 items-center"><div class="flex-grow border-t border-slate-100"></div><span class="mx-3 text-slate-400 text-[10px] font-bold uppercase">або</span><div class="flex-grow border-t border-slate-100"></div></div>
-            <button onclick="signInWithGoogle(this)" class="w-full p-3.5 card flex items-center justify-center gap-3 font-bold text-sm text-slate-700 active:scale-95 transition-transform">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5">Google
-            </button>
+            <div class="relative flex py-5 items-center"><div class="flex-grow border-t border-slate-100"></div><span class="mx-3 text-muted text-[10px] font-bold uppercase">або</span><div class="flex-grow border-t border-slate-100"></div></div>
+            <button onclick="signInWithGoogle(this)" class="w-full p-3.5 card flex items-center justify-center gap-3 font-bold text-sm active:scale-95 transition-transform"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5">Google</button>
         </div>
     </div>
 
@@ -102,13 +109,17 @@
 
         <!-- TAB: LIBRARY -->
         <div id="tabLibrary" class="tab-content active fade-in">
-            <header class="flex justify-between items-center mb-5">
+            <header class="flex justify-between items-center mb-4">
                 <h1 class="text-2xl font-black tracking-tight">Бібліотека</h1>
-                <button onclick="openSheet('searchSheet')" class="size-11 flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-full shadow-lg shadow-primary-200 active:scale-90 transition-transform text-lg">+</button>
+                <button onclick="openSheet('searchSheet')" class="size-11 flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-full shadow-lg shadow-primary-200 active:scale-90 transition-transform text-lg font-bold">+</button>
             </header>
+
+            <!-- Quick Resume -->
+            <div id="quickResume" class="mb-4 hidden"></div>
+
             <div class="relative mb-4">
-                <span class="absolute left-3.5 top-[11px] text-slate-400 text-sm pointer-events-none">🔍</span>
-                <input type="search" id="librarySearchInput" placeholder="Пошук..." class="w-full pl-10 pr-4 py-2.5 bg-white card text-sm font-medium outline-none focus:ring-2 ring-primary-300" oninput="filterLibrary(this.value)">
+                <span class="absolute left-3.5 top-[10px] text-muted text-sm pointer-events-none">🔍</span>
+                <input type="search" id="librarySearchInput" placeholder="Пошук у бібліотеці..." class="w-full pl-10 pr-4 py-2.5 search-box text-sm font-medium outline-none focus:ring-2 ring-primary-300 transition-shadow" oninput="filterLibrary(this.value)">
             </div>
             <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="libraryTabs">
                 <button onclick="setLibraryTab('reading')" id="tab_reading" class="pill active">📖 Читаю</button>
@@ -116,7 +127,7 @@
                 <button onclick="setLibraryTab('finished')" id="tab_finished" class="pill inactive">✅ Прочитано</button>
             </div>
             <div class="flex justify-end mb-3">
-                <div class="flex gap-1 bg-slate-100 p-1 rounded-lg">
+                <div class="flex gap-1 bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg">
                     <button onclick="setViewMode('list')" id="view_list" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-white shadow-sm text-slate-800">☰</button>
                     <button onclick="setViewMode('grid')" id="view_grid" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase text-slate-400">⊞</button>
                 </div>
@@ -124,9 +135,9 @@
             <div id="myBooksContainer" class="pb-4"></div>
         </div>
 
-        <!-- TAB: DISCOVER -->
+        <!-- TAB: RECOMMENDATIONS -->
         <div id="tabDiscover" class="tab-content fade-in">
-            <header class="mb-5"><h1 class="text-2xl font-black tracking-tight">Рекомендації</h1><p class="text-muted text-sm mt-0.5">Рекомендації для вас</p></header>
+            <header class="mb-5"><h1 class="text-2xl font-black tracking-tight">Рекомендації</h1><p class="text-muted text-sm mt-0.5">Підібрано для вас</p></header>
             <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="recTabs">
                 <button onclick="loadRealRecommendations('auto','rec_auto')" id="rec_auto" class="pill active">✨ Для вас</button>
                 <button onclick="loadRealRecommendations('Академія магії','rec_magic')" id="rec_magic" class="pill inactive">🔮 Магія</button>
@@ -145,67 +156,46 @@
         <div id="tabProfile" class="tab-content fade-in">
             <header class="mb-6 text-center pt-4">
                 <div class="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full mx-auto mb-3 flex items-center justify-center text-3xl shadow-lg shadow-primary-200">📖</div>
-                <h2 id="profileName" class="text-lg font-bold">Користувач</h2>
-                <p id="profileEmail" class="text-muted text-sm"></p>
+                <h2 id="profileName" class="text-lg font-bold">Читач</h2>
+                <p id="profileEmail" class="text-muted text-xs"></p>
             </header>
-
-            <!-- Streak -->
             <div class="card-elevated p-5 mb-4">
-                <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm font-bold">🔥 Серія читання</span>
-                    <span id="streakCount" class="text-sm font-black text-primary-600">0 днів</span>
-                </div>
+                <div class="flex items-center justify-between mb-3"><span class="text-sm font-bold">🔥 Серія читання</span><span id="streakCount" class="text-sm font-black text-primary-600">0 днів</span></div>
                 <div id="streakDots" class="flex gap-[5px] justify-center flex-wrap"></div>
             </div>
-
-            <!-- Goal -->
             <div class="card-elevated p-5 mb-4">
-                <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm font-bold">🎯 Ціль на <span id="goalYear"></span></span>
-                    <span id="goalProgress" class="text-sm font-black text-primary-600">0/12</span>
-                </div>
-                <div class="w-full bg-primary-100 h-2.5 rounded-full overflow-hidden">
-                    <div id="goalBar" class="bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full transition-all duration-500" style="width:0%"></div>
-                </div>
-                <div class="flex items-center gap-2 mt-3">
-                    <input type="number" id="goalInput" min="1" max="200" value="12" class="w-16 p-2 bg-surface rounded-lg text-center font-bold text-sm border border-slate-100 outline-none" onchange="saveGoal(this.value)">
-                    <span class="text-xs text-muted">книг на рік</span>
-                </div>
+                <div class="flex items-center justify-between mb-3"><span class="text-sm font-bold">🎯 Ціль на <span id="goalYear"></span></span><span id="goalProgress" class="text-sm font-black text-primary-600">0/12</span></div>
+                <div class="w-full bg-primary-100 h-2.5 rounded-full overflow-hidden"><div id="goalBar" class="bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full transition-all duration-500" style="width:0%"></div></div>
+                <div class="flex items-center gap-2 mt-3"><input type="number" id="goalInput" min="1" max="200" value="12" class="w-16 p-2 bg-surface rounded-lg text-center font-bold text-sm border border-slate-100 outline-none" onchange="saveGoal(this.value)"><span class="text-xs text-muted">книг на рік</span></div>
             </div>
-
-            <!-- Stats -->
             <div class="grid grid-cols-3 gap-3 mb-4">
-                <div class="stat-card"><div id="statBooks" class="text-2xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Книг</div></div>
-                <div class="stat-card"><div id="statPages" class="text-2xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Сторінок</div></div>
-                <div class="stat-card"><div id="statTime" class="text-2xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Годин</div></div>
+                <div class="stat-card"><div id="statBooks" class="text-xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Книг</div></div>
+                <div class="stat-card"><div id="statPages" class="text-xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Сторінок</div></div>
+                <div class="stat-card"><div id="statTime" class="text-xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Годин</div></div>
             </div>
-
-            <!-- Chart -->
-            <div class="card-elevated p-4 mb-4"><div class="h-36 w-full"><canvas id="statsChart"></canvas></div></div>
-
-            <!-- Actions -->
+            <div class="card-elevated p-4 mb-4"><p class="text-[10px] font-bold uppercase text-muted mb-2">📊 Книг по місяцях</p><div class="h-36 w-full"><canvas id="statsChart"></canvas></div></div>
             <div class="space-y-2 mb-8">
                 <button onclick="toggleAppTheme()" class="w-full p-4 card flex justify-between items-center"><span class="font-bold text-sm">Тема оформлення</span><span class="text-xl">🌓</span></button>
                 <button onclick="exportLibrary()" class="w-full p-4 card text-left font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</button>
                 <button onclick="importLibrary()" class="w-full p-4 card text-left font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</button>
                 <button onclick="clearAppCache()" class="w-full p-4 card text-left font-bold text-sm text-amber-600">🔄 Очистити кеш</button>
-                <button onclick="logout()" class="w-full p-4 card text-left font-bold text-sm text-red-500">🚪 Вийти з акаунту</button>
+                <button onclick="logout()" class="w-full p-4 card text-left font-bold text-sm text-red-500">🚪 Вийти</button>
             </div>
         </div>
     </div>
 
     <!-- BOTTOM NAV -->
-    <nav id="mainBottomNav" class="fixed bottom-0 left-0 right-0 nav-bar z-30 hidden">
+    <nav id="mainBottomNav" class="nav-bar hidden">
         <div class="max-w-lg mx-auto flex items-center justify-around px-2 py-2">
-            <button onclick="switchTab('library')" class="nav-tab active flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all"><span class="text-[20px]">📚</span><span class="text-[10px] font-bold uppercase tracking-wide">Книги</span></button>
-            <button onclick="switchTab('discover')" class="nav-tab flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">🧭</span><span class="text-[10px] font-bold uppercase tracking-wide">Рекомендації</span></button>
-            <button onclick="switchTab('profile')" class="nav-tab flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">👤</span><span class="text-[10px] font-bold uppercase tracking-wide">Профіль</span></button>
+            <button onclick="switchTab('library')" class="nav-tab active flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all"><span class="text-[20px]">📚</span><span class="text-[10px] font-bold uppercase tracking-wide">Книги</span></button>
+            <button onclick="switchTab('discover')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">⭐</span><span class="text-[10px] font-bold uppercase tracking-wide">Поради</span></button>
+            <button onclick="switchTab('profile')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">👤</span><span class="text-[10px] font-bold uppercase tracking-wide">Профіль</span></button>
         </div>
     </nav>
 
     <div class="backdrop fixed inset-0 z-40 bg-black/40 backdrop-blur-sm hidden" onclick="closeAllSheets()"></div>
 
-    <!-- READER OVERLAY -->
+    <!-- READER -->
     <div id="readerOverlay">
         <div class="reader-controls relative">
             <button onclick="closeReader()" class="font-bold text-red-500 bg-red-50 px-4 py-2 rounded-xl text-sm active:scale-95">✕</button>
@@ -221,25 +211,25 @@
     </div>
 
     <!-- SCANNER -->
-    <div id="scannerSheet" class="hidden fixed inset-0 z-[150] bg-slate-900 flex flex-col items-center justify-center">
+    <div id="scannerSheet" class="hidden fixed inset-0 z-[150] bg-zinc-900 flex flex-col items-center justify-center">
         <div class="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/70 to-transparent"><h3 class="font-bold text-white">Сканувати ISBN</h3><button onclick="closeScanner()" class="bg-white/20 backdrop-blur text-white size-10 rounded-full flex justify-center items-center font-bold active:scale-95">✕</button></div>
-        <div id="reader" class="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-slate-700 aspect-square"></div>
+        <div id="reader" class="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-zinc-700 aspect-square"></div>
     </div>
 
-    <!-- SEARCH SHEET -->
+    <!-- SEARCH -->
     <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="height:85vh">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
         <div class="px-5 pb-4 shrink-0">
-            <div class="relative"><span class="absolute left-4 top-3 text-slate-400">🔍</span><input type="text" id="searchInput" placeholder="Назва, автор або ISBN..." class="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm"></div>
+            <div class="relative"><span class="absolute left-4 top-3 text-muted">🔍</span><input type="text" id="searchInput" placeholder="Назва, автор або ISBN..." class="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm"></div>
         </div>
         <div id="searchResults" class="px-4 pb-6 overflow-y-auto flex-1">
-            <button onclick="openScanner()" class="w-full mb-2 p-3 text-center text-sm font-semibold text-white bg-slate-800 rounded-xl active:scale-95 transition-transform">📷 Сканувати штрих-код</button>
+            <button onclick="openScanner()" class="w-full mb-2 p-3 text-center text-sm font-semibold text-white bg-zinc-800 rounded-xl active:scale-95 transition-transform">📷 Сканувати штрих-код</button>
             <button onclick="openManualForm()" class="w-full mb-3 p-3 text-center text-sm font-semibold text-primary-600 bg-primary-50 rounded-xl active:scale-95 transition-transform">✍️ Додати вручну</button>
             <div id="searchItems" class="space-y-1"></div>
         </div>
     </div>
 
-    <!-- DETAILS SHEET -->
+    <!-- DETAILS -->
     <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="max-height:92vh">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
         <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
