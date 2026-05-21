@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ЧитайКо — Хмарний Трекер</title>
+    <title>ЧитайКо</title>
     <link rel="icon" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#4f46e5">
+    <meta name="theme-color" content="#6366f1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,245 +16,249 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script>tailwind.config={theme:{extend:{colors:{primary:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca'}},fontFamily:{sans:['-apple-system','BlinkMacSystemFont','SF Pro Display','Inter','sans-serif']}}}};</script>
     <style>
-        #reader{border:none!important}
-        #reader video{object-fit:cover!important;border-radius:1.5rem!important}
-        #reader__dashboard_section_csr span{display:none!important}
-        body{-webkit-tap-highlight-color:transparent;transition:background-color .3s,color .3s}
+        *{-webkit-tap-highlight-color:transparent}
         ::-webkit-scrollbar{width:0;background:transparent}
         .scrollbar-hide::-webkit-scrollbar{display:none}
         .scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}
-        body.dark{background-color:#0f172a;color:#f8fafc}
-        body.dark .bg-white{background-color:#1e293b;border-color:#334155}
-        body.dark .text-slate-900{color:#f8fafc}
-        body.dark .text-slate-500{color:#cbd5e1}
-        body.dark .bg-slate-50,body.dark .bg-slate-100{background-color:#0f172a}
-        body.dark .border-slate-100,body.dark .border-slate-200{border-color:#334155}
-        body.dark .dark-inactive-tab{background-color:#334155!important;color:#94a3b8!important}
-        body.dark input,body.dark textarea,body.dark select{background-color:#1e293b!important;color:#f8fafc!important;border-color:#334155!important}
-        .fade-in{animation:fadeIn .2s cubic-bezier(.4,0,.2,1) forwards}
-        @keyframes fadeIn{0%{opacity:0;transform:translateY(5px)}100%{opacity:1;transform:translateY(0)}}
+        body{transition:background .3s,color .3s;overflow-x:hidden}
+        body.dark{background:#0a0a0f;color:#f1f5f9}
+        body.dark .card{background:#16161f;border-color:#1e1e2e}
+        body.dark .card-elevated{background:#1a1a25;border-color:#252535}
+        body.dark .text-muted{color:#94a3b8}
+        body.dark .bg-surface{background:#0f0f17}
+        body.dark .nav-bar{background:rgba(10,10,15,.85);border-color:#1e1e2e}
+        body.dark input,body.dark textarea,body.dark select{background:#16161f!important;color:#f1f5f9!important;border-color:#252535!important}
+        .card{background:#fff;border:1px solid #f1f5f9;border-radius:20px;transition:transform .15s,box-shadow .15s}
+        .card:active{transform:scale(.98)}
+        .card-elevated{background:#fff;border:1px solid #e8ecf0;border-radius:24px;box-shadow:0 4px 24px rgba(0,0,0,.04)}
+        .bg-surface{background:#f8f9fb}
+        .text-muted{color:#64748b}
+        .nav-bar{background:rgba(255,255,255,.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid #f1f5f9}
+        .fade-in{animation:fadeIn .25s ease forwards}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .slide-up{animation:slideUp .35s cubic-bezier(.32,.72,0,1) forwards}
+        @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
         .bottom-sheet{transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1)}
         .bottom-sheet.open{transform:translateY(0)}
-        .backdrop{opacity:0;pointer-events:none;transition:opacity .3s ease}
+        .backdrop{opacity:0;pointer-events:none;transition:opacity .3s}
         body.modal-open .backdrop{opacity:1;pointer-events:auto}
+        .progress-ring{transition:stroke-dashoffset .6s ease}
         .progress-bar{transition:width .5s cubic-bezier(.4,0,.2,1)}
+        .pill{padding:6px 14px;border-radius:100px;font-size:13px;font-weight:600;white-space:nowrap;transition:all .2s}
+        .pill.active{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;box-shadow:0 4px 12px rgba(99,102,241,.3)}
+        .pill.inactive{background:#f1f5f9;color:#64748b}
+        body.dark .pill.inactive{background:#1e1e2e;color:#94a3b8}
         .desc-scroll{max-height:25vh;overflow-y:auto;overscroll-behavior:contain}
         .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
         #readerOverlay{display:none;position:fixed;inset:0;z-index:200;background:#f8fafc;flex-direction:column}
-        body.dark #readerOverlay{background:#0f172a}
+        body.dark #readerOverlay{background:#0a0a0f}
         #viewer{flex:1;width:100%;height:100%;overflow:hidden}
-        .reader-controls{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.05);z-index:10}
-        body.dark .reader-controls{background:#1e293b}
-        .nav-btn{background:#f1f5f9;padding:12px 20px;border-radius:12px;font-weight:bold;color:#475569;transition:transform .1s}
-        body.dark .nav-btn{background:#334155;color:#f8fafc}
-        .nav-btn:active{transform:scale(.95)}
-        .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;z-index:30;border-top:1px solid #f1f5f9;box-shadow:0 -2px 10px rgba(0,0,0,.02)}
-        body.dark .bottom-nav{background:#1e293b;border-color:#334155}
-        .nav-item{flex:1;text-align:center;color:#94a3b8;font-weight:bold;padding:12px 0;font-size:11px;text-transform:uppercase;letter-spacing:.05em;transition:color .2s;cursor:pointer;background:transparent;border:none}
-        .nav-item.active{color:#4f46e5}
-        body.dark .nav-item{color:#94a3b8}
-        body.dark .nav-item.active{color:#818cf8}
-        .nav-icon{font-size:20px;margin-bottom:3px;display:block;transition:transform .2s}
-        .nav-item:active .nav-icon{transform:scale(.85)}
-        .sortable-ghost{opacity:.4;transform:scale(.95)}
-        .sortable-drag{cursor:grabbing!important}
-        .date-input{border:none;background:transparent;color:#334155;outline:none;font-size:14px;font-weight:500;cursor:pointer;text-align:right}
-        body.dark .date-input{color:#f8fafc!important;background:transparent!important}
-        .streak-dot{width:10px;height:10px;border-radius:50%}
-        .streak-dot.active{background:#4f46e5}
-        .streak-dot.inactive{background:#e2e8f0}
-        body.dark .streak-dot.inactive{background:#334155}
+        .reader-controls{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.04);z-index:10}
+        body.dark .reader-controls{background:#16161f}
+        .nav-btn{background:#f1f5f9;padding:11px 18px;border-radius:12px;font-weight:700;font-size:13px;color:#475569;transition:transform .1s}
+        body.dark .nav-btn{background:#1e1e2e;color:#e2e8f0}
+        .nav-btn:active{transform:scale(.93)}
+        .sortable-ghost{opacity:.3;transform:scale(.95)}
+        .date-input{border:none;background:transparent;color:#334155;outline:none;font-size:13px;font-weight:500;cursor:pointer;text-align:right}
+        body.dark .date-input{color:#e2e8f0!important;background:transparent!important}
+        .streak-cell{width:14px;height:14px;border-radius:4px;transition:background .2s}
+        .streak-cell.active{background:#6366f1}
+        .streak-cell.inactive{background:#f1f5f9}
+        body.dark .streak-cell.inactive{background:#1e1e2e}
+        .stat-card{background:linear-gradient(135deg,#f8f9ff 0%,#f0f1ff 100%);border:1px solid #e8ecff;border-radius:16px;padding:16px;text-align:center}
+        body.dark .stat-card{background:linear-gradient(135deg,#16161f 0%,#1a1a28 100%);border-color:#252535}
+        #reader{border:none!important}
+        #reader video{object-fit:cover!important;border-radius:1.5rem!important}
+        .tab-content{display:none}
+        .tab-content.active{display:block}
     </style>
 </head>
-<body class="bg-[#f5f5f7] font-sans pb-32 text-slate-900 antialiased selection:bg-indigo-100">
+<body class="bg-surface font-sans pb-24 text-slate-900 antialiased">
 
-    <div id="authScreen" class="fixed inset-0 z-[100] bg-[#f5f5f7] flex items-center justify-center p-6 overflow-y-auto fade-in">
-        <div class="w-full max-w-sm bg-white p-8 rounded-3xl shadow-xl border border-slate-100 my-auto">
-            <div class="text-center mb-6"><span class="text-6xl mb-4 block">📚</span><h1 class="text-3xl font-black tracking-tight text-slate-950">ЧитайКо</h1><p class="text-slate-500 mt-1 font-medium">Ваша хмарна бібліотека</p></div>
-            <div id="authError" class="text-center text-sm text-white bg-red-500 font-medium p-3 rounded-xl mb-4 hidden shadow-sm fade-in"></div>
-            <div id="emailAuthBlock" class="space-y-4">
-                <input type="email" id="authEmail" placeholder="Email" class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-medium transition-shadow">
-                <input type="password" id="authPassword" placeholder="Пароль (мін. 6 символів)" class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-medium transition-shadow">
-                <div class="flex gap-3 pt-2">
-                    <button onclick="handleAuth('login', this)" class="flex-1 p-4 text-white bg-indigo-600 rounded-xl font-bold active:scale-95 transition-all">Увійти</button>
-                    <button onclick="handleAuth('signup', this)" class="flex-1 p-4 text-slate-700 bg-slate-100 rounded-xl font-bold active:scale-95 transition-all">Створити</button>
-                </div>
-            </div>
-            <div class="relative flex py-6 items-center"><div class="flex-grow border-t border-slate-200"></div><span class="flex-shrink-0 mx-4 text-slate-400 text-xs font-bold uppercase">Або</span><div class="flex-grow border-t border-slate-200"></div></div>
+    <!-- AUTH -->
+    <div id="authScreen" class="fixed inset-0 z-[100] bg-surface flex items-center justify-center p-6 overflow-y-auto fade-in">
+        <div class="w-full max-w-sm card-elevated p-8 my-auto">
+            <div class="text-center mb-8"><div class="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-[22px] mx-auto mb-4 flex items-center justify-center shadow-lg shadow-primary-200"><span class="text-4xl">📚</span></div><h1 class="text-2xl font-black tracking-tight">ЧитайКо</h1><p class="text-muted text-sm mt-1">Ваша хмарна бібліотека</p></div>
+            <div id="authError" class="text-center text-sm text-white bg-red-500 font-medium p-3 rounded-xl mb-4 hidden"></div>
             <div class="space-y-3">
-                <button onclick="signInWithGoogle(this)" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 flex items-center justify-center gap-3 hover:bg-slate-50 active:scale-95 transition-all shadow-sm">
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5"> Увійти через Google
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div id="appScreen" class="max-w-xl mx-auto p-4 md:p-6 pt-8 hidden">
-        <header class="mb-4 flex justify-between items-start fade-in">
-            <div><h1 class="text-3xl font-black tracking-tight text-slate-900">Бібліотека</h1><p id="userEmailDisplay" class="text-xs text-slate-400 font-medium mt-1"></p></div>
-            <button onclick="openSheet('settingsSheet'); calculateStats();" class="size-10 flex items-center justify-center bg-white rounded-full shadow-sm border border-slate-100 text-xl hover:bg-slate-50 active:scale-95 transition-all">⚙️</button>
-        </header>
-
-        <div id="streakWidget" class="mb-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm fade-in hidden">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-black uppercase text-slate-400 tracking-wider">🔥 Серія читання</span>
-                <span id="streakCount" class="text-sm font-black text-indigo-600">0 днів</span>
-            </div>
-            <div id="streakDots" class="flex gap-1.5 justify-center flex-wrap"></div>
-        </div>
-
-        <div id="goalWidget" class="mb-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 shadow-sm fade-in hidden">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-black uppercase text-indigo-400 tracking-wider">🎯 Ціль на <span id="goalYear"></span></span>
-                <span id="goalProgress" class="text-sm font-black text-indigo-600">0/12</span>
-            </div>
-            <div class="w-full bg-indigo-100 h-3 rounded-full overflow-hidden">
-                <div id="goalBar" class="bg-indigo-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
-            </div>
-        </div>
-
-        <div class="mb-3 fade-in">
-            <div class="relative">
-                <span class="absolute left-3.5 top-3 text-slate-400 text-sm">🔍</span>
-                <input type="search" id="librarySearchInput" placeholder="Шукати в бібліотеці..." class="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium text-sm transition-all" oninput="filterLibrary(this.value)">
-            </div>
-        </div>
-
-        <div id="librarySections" class="space-y-2 fade-in">
-            <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="libraryTabs">
-                <button onclick="setLibraryTab('reading')" id="tab_reading" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-indigo-600 text-white shadow-md active:scale-95">Читаю зараз</button>
-                <button onclick="setLibraryTab('planned')" id="tab_planned" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Хочу прочитати</button>
-                <button onclick="setLibraryTab('finished')" id="tab_finished" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 bg-slate-200 text-slate-600 dark-inactive-tab active:scale-95">Прочитано</button>
-            </div>
-            <div class="flex justify-end mb-2 fade-in">
-                <div class="bg-slate-200/60 p-1 rounded-xl flex gap-1 items-center">
-                    <button onclick="setViewMode('list')" id="view_list" class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-900 bg-white shadow-sm transition-all">☰ Списком</button>
-                    <button onclick="setViewMode('grid')" id="view_grid" class="px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-all">⊞ Полицями</button>
+                <input type="email" id="authEmail" placeholder="Email" class="w-full p-3.5 bg-surface rounded-xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm border border-slate-100">
+                <input type="password" id="authPassword" placeholder="Пароль (мін. 6)" class="w-full p-3.5 bg-surface rounded-xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm border border-slate-100">
+                <div class="flex gap-2 pt-1">
+                    <button onclick="handleAuth('login',this)" class="flex-1 p-3.5 text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl font-bold text-sm active:scale-95 transition-transform shadow-md shadow-primary-200">Увійти</button>
+                    <button onclick="handleAuth('signup',this)" class="flex-1 p-3.5 text-slate-700 bg-slate-100 rounded-xl font-bold text-sm active:scale-95 transition-transform">Створити</button>
                 </div>
             </div>
-            <div id="myBooksContainer" class="pb-8"></div>
-        </div>
-
-        <div id="recommendationsScreen" class="hidden flex-col h-full mt-2 fade-in">
-            <h2 class="text-xs font-bold uppercase text-slate-400 mb-3 ml-1 tracking-wide">Категорії</h2>
-            <div class="flex gap-2 overflow-x-auto pb-3 mb-2 scrollbar-hide px-1" id="recTabs">
-                <button onclick="loadRealRecommendations('auto','rec_auto')" id="rec_auto" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md transition-all active:scale-95">✨ Для вас</button>
-                <button onclick="loadRealRecommendations('Академія магії','rec_magic')" id="rec_magic" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">🔮 Академія магії</button>
-                <button onclick="loadRealRecommendations('Фентезі','rec_fantasy')" id="rec_fantasy" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фентезі</button>
-                <button onclick="loadRealRecommendations('Детектив','rec_detective')" id="rec_detective" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Детектив</button>
-                <button onclick="loadRealRecommendations('Трилер','rec_thriller')" id="rec_thriller" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Трилер</button>
-                <button onclick="loadRealRecommendations('Романтика','rec_romance')" id="rec_romance" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Романтика</button>
-                <button onclick="loadRealRecommendations('Саморозвиток','rec_self')" id="rec_self" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Саморозвиток</button>
-                <button onclick="loadRealRecommendations('Фантастика','rec_scifi')" id="rec_scifi" class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-slate-200 text-slate-600 dark-inactive-tab transition-all active:scale-95">Фантастика</button>
-            </div>
-            <div id="recommendationsList" class="space-y-4 pb-2 mt-2"></div>
-            <div id="recScrollTarget" class="h-10 w-full pb-24"></div>
+            <div class="relative flex py-5 items-center"><div class="flex-grow border-t border-slate-100"></div><span class="mx-3 text-slate-400 text-[10px] font-bold uppercase">або</span><div class="flex-grow border-t border-slate-100"></div></div>
+            <button onclick="signInWithGoogle(this)" class="w-full p-3.5 card flex items-center justify-center gap-3 font-bold text-sm text-slate-700 active:scale-95 transition-transform">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5">Google
+            </button>
         </div>
     </div>
 
-    <button id="searchFab" onclick="openSheet('searchSheet')" class="fixed bottom-24 right-6 z-40 size-14 bg-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-300 flex items-center justify-center text-2xl hover:scale-105 active:scale-95 transition-transform duration-200 hidden">➕</button>
-    <div class="backdrop fixed inset-0 z-40 bg-black/50 backdrop-blur-sm hidden" onclick="closeAllSheets()"></div>
+    <!-- APP -->
+    <div id="appScreen" class="max-w-lg mx-auto px-4 pt-6 hidden">
 
-    <nav id="mainBottomNav" class="bottom-nav hidden fade-in">
-        <div class="max-w-xl mx-auto flex items-center justify-between px-3">
-            <button onclick="switchTab('library')" class="nav-item active"><span class="nav-icon">📚</span>Бібліотека</button>
-            <button onclick="switchTab('recommendations')" class="nav-item"><span class="nav-icon">⭐</span>Рекомендації</button>
+        <!-- TAB: LIBRARY -->
+        <div id="tabLibrary" class="tab-content active fade-in">
+            <header class="flex justify-between items-center mb-5">
+                <h1 class="text-2xl font-black tracking-tight">Бібліотека</h1>
+                <button onclick="openSheet('searchSheet')" class="size-11 flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-full shadow-lg shadow-primary-200 active:scale-90 transition-transform text-lg">+</button>
+            </header>
+            <div class="relative mb-4">
+                <span class="absolute left-3.5 top-[11px] text-slate-400 text-sm pointer-events-none">🔍</span>
+                <input type="search" id="librarySearchInput" placeholder="Пошук..." class="w-full pl-10 pr-4 py-2.5 bg-white card text-sm font-medium outline-none focus:ring-2 ring-primary-300" oninput="filterLibrary(this.value)">
+            </div>
+            <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="libraryTabs">
+                <button onclick="setLibraryTab('reading')" id="tab_reading" class="pill active">📖 Читаю</button>
+                <button onclick="setLibraryTab('planned')" id="tab_planned" class="pill inactive">🕒 В планах</button>
+                <button onclick="setLibraryTab('finished')" id="tab_finished" class="pill inactive">✅ Прочитано</button>
+            </div>
+            <div class="flex justify-end mb-3">
+                <div class="flex gap-1 bg-slate-100 p-1 rounded-lg">
+                    <button onclick="setViewMode('list')" id="view_list" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-white shadow-sm text-slate-800">☰</button>
+                    <button onclick="setViewMode('grid')" id="view_grid" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase text-slate-400">⊞</button>
+                </div>
+            </div>
+            <div id="myBooksContainer" class="pb-4"></div>
+        </div>
+
+        <!-- TAB: DISCOVER -->
+        <div id="tabDiscover" class="tab-content fade-in">
+            <header class="mb-5"><h1 class="text-2xl font-black tracking-tight">Відкрити</h1><p class="text-muted text-sm mt-0.5">Рекомендації для вас</p></header>
+            <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="recTabs">
+                <button onclick="loadRealRecommendations('auto','rec_auto')" id="rec_auto" class="pill active">✨ Для вас</button>
+                <button onclick="loadRealRecommendations('Академія магії','rec_magic')" id="rec_magic" class="pill inactive">🔮 Магія</button>
+                <button onclick="loadRealRecommendations('Фентезі','rec_fantasy')" id="rec_fantasy" class="pill inactive">⚔️ Фентезі</button>
+                <button onclick="loadRealRecommendations('Детектив','rec_detective')" id="rec_detective" class="pill inactive">🔍 Детектив</button>
+                <button onclick="loadRealRecommendations('Трилер','rec_thriller')" id="rec_thriller" class="pill inactive">😱 Трилер</button>
+                <button onclick="loadRealRecommendations('Романтика','rec_romance')" id="rec_romance" class="pill inactive">💕 Романтика</button>
+                <button onclick="loadRealRecommendations('Саморозвиток','rec_self')" id="rec_self" class="pill inactive">🧠 Саморозвиток</button>
+                <button onclick="loadRealRecommendations('Фантастика','rec_scifi')" id="rec_scifi" class="pill inactive">🚀 Фантастика</button>
+            </div>
+            <div id="recommendationsList" class="space-y-3 mt-3"></div>
+            <div id="recScrollTarget" class="h-10 w-full pb-20"></div>
+        </div>
+
+        <!-- TAB: PROFILE -->
+        <div id="tabProfile" class="tab-content fade-in">
+            <header class="mb-6 text-center pt-4">
+                <div class="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full mx-auto mb-3 flex items-center justify-center text-3xl shadow-lg shadow-primary-200">📖</div>
+                <h2 id="profileName" class="text-lg font-bold">Користувач</h2>
+                <p id="profileEmail" class="text-muted text-sm"></p>
+            </header>
+
+            <!-- Streak -->
+            <div class="card-elevated p-5 mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-bold">🔥 Серія читання</span>
+                    <span id="streakCount" class="text-sm font-black text-primary-600">0 днів</span>
+                </div>
+                <div id="streakDots" class="flex gap-[5px] justify-center flex-wrap"></div>
+            </div>
+
+            <!-- Goal -->
+            <div class="card-elevated p-5 mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-bold">🎯 Ціль на <span id="goalYear"></span></span>
+                    <span id="goalProgress" class="text-sm font-black text-primary-600">0/12</span>
+                </div>
+                <div class="w-full bg-primary-100 h-2.5 rounded-full overflow-hidden">
+                    <div id="goalBar" class="bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full transition-all duration-500" style="width:0%"></div>
+                </div>
+                <div class="flex items-center gap-2 mt-3">
+                    <input type="number" id="goalInput" min="1" max="200" value="12" class="w-16 p-2 bg-surface rounded-lg text-center font-bold text-sm border border-slate-100 outline-none" onchange="saveGoal(this.value)">
+                    <span class="text-xs text-muted">книг на рік</span>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <div class="stat-card"><div id="statBooks" class="text-2xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Книг</div></div>
+                <div class="stat-card"><div id="statPages" class="text-2xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Сторінок</div></div>
+                <div class="stat-card"><div id="statTime" class="text-2xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Годин</div></div>
+            </div>
+
+            <!-- Chart -->
+            <div class="card-elevated p-4 mb-4"><div class="h-36 w-full"><canvas id="statsChart"></canvas></div></div>
+
+            <!-- Actions -->
+            <div class="space-y-2 mb-8">
+                <button onclick="toggleAppTheme()" class="w-full p-4 card flex justify-between items-center"><span class="font-bold text-sm">Тема оформлення</span><span class="text-xl">🌓</span></button>
+                <button onclick="exportLibrary()" class="w-full p-4 card text-left font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</button>
+                <button onclick="importLibrary()" class="w-full p-4 card text-left font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</button>
+                <button onclick="clearAppCache()" class="w-full p-4 card text-left font-bold text-sm text-amber-600">🔄 Очистити кеш</button>
+                <button onclick="logout()" class="w-full p-4 card text-left font-bold text-sm text-red-500">🚪 Вийти з акаунту</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <nav id="mainBottomNav" class="fixed bottom-0 left-0 right-0 nav-bar z-30 hidden">
+        <div class="max-w-lg mx-auto flex items-center justify-around px-2 py-2">
+            <button onclick="switchTab('library')" class="nav-tab active flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all"><span class="text-[20px]">📚</span><span class="text-[10px] font-bold uppercase tracking-wide">Книги</span></button>
+            <button onclick="switchTab('discover')" class="nav-tab flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">🧭</span><span class="text-[10px] font-bold uppercase tracking-wide">Відкрити</span></button>
+            <button onclick="switchTab('profile')" class="nav-tab flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">👤</span><span class="text-[10px] font-bold uppercase tracking-wide">Профіль</span></button>
         </div>
     </nav>
 
-    <div id="settingsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto p-6" style="max-height:90vh;overflow-y:auto;">
-        <div class="drag-handle w-full flex justify-center pb-4 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
-        <h2 class="text-2xl font-bold mb-4">Налаштування</h2>
-        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-4">
-            <h3 class="text-xs font-black uppercase tracking-wider text-emerald-500 mb-3">🎯 Ціль на рік</h3>
-            <div class="flex items-center gap-3">
-                <input type="number" id="goalInput" min="1" max="200" value="12" class="w-20 p-2 bg-white rounded-xl text-center font-bold border border-emerald-200 outline-none focus:ring-2 ring-emerald-400" onchange="saveGoal(this.value)">
-                <span class="text-sm font-bold text-slate-600">книг на рік</span>
-            </div>
-        </div>
-        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-4">
-            <h3 class="text-xs font-black uppercase tracking-wider text-indigo-400 mb-3">📊 Статистика</h3>
-            <div class="flex justify-between items-center mb-2"><span class="text-sm font-bold text-slate-700">Прочитано книг:</span><span id="statBooks" class="text-lg font-black text-indigo-600">0</span></div>
-            <div class="flex justify-between items-center mb-2"><span class="text-sm font-bold text-slate-700">Сторінок:</span><span id="statPages" class="text-lg font-black text-indigo-600">0</span></div>
-            <div class="flex justify-between items-center"><span class="text-sm font-bold text-slate-700">Час читання:</span><span id="statTime" class="text-lg font-black text-indigo-600">0</span></div>
-            <div class="mt-4 h-40 w-full"><canvas id="statsChart"></canvas></div>
-        </div>
-        <div class="space-y-3">
-            <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100"><span class="font-bold text-sm">Темна тема</span><button onclick="toggleAppTheme()" class="text-2xl p-1 bg-white rounded-full shadow-sm border border-slate-200 active:scale-95">🌓</button></div>
-            <button onclick="exportLibrary()" class="w-full p-4 bg-emerald-50 text-emerald-600 font-bold text-sm rounded-2xl active:scale-95">📥 Експорт (JSON)</button>
-            <button onclick="importLibrary()" class="w-full p-4 bg-blue-50 text-blue-600 font-bold text-sm rounded-2xl active:scale-95">📤 Імпорт (JSON)</button>
-            <button onclick="clearAppCache()" class="w-full p-4 bg-amber-50 text-amber-600 font-bold text-sm rounded-2xl active:scale-95">🔄 Очистити кеш</button>
-            <button onclick="logout()" class="w-full p-4 bg-red-50 text-red-600 font-bold text-sm rounded-2xl active:scale-95">🚪 Вийти</button>
-        </div>
-    </div>
+    <div class="backdrop fixed inset-0 z-40 bg-black/40 backdrop-blur-sm hidden" onclick="closeAllSheets()"></div>
 
+    <!-- READER OVERLAY -->
     <div id="readerOverlay">
         <div class="reader-controls relative">
-            <button onclick="closeReader()" class="font-bold text-red-500 bg-red-50 px-4 py-2 rounded-lg active:scale-95">✕</button>
-            <div class="flex flex-col items-center justify-center max-w-[50%]">
-                <div id="readerTitle" class="text-xs font-bold truncate text-slate-500 w-full text-center">Книга</div>
-                <div id="readerTimer" class="text-[10px] font-mono font-bold text-slate-400 tracking-widest mt-0.5">00:00</div>
-            </div>
-            <button onclick="toggleReaderSettings()" class="font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-lg active:scale-95">⚙️</button>
-            <div id="readerSettingsMenu" class="hidden absolute top-16 right-4 w-56 bg-white shadow-2xl rounded-2xl p-4 border border-slate-100 space-y-4 z-50 fade-in">
-                <div><p class="text-[10px] font-bold uppercase text-slate-400 mb-2">Розмір</p><div class="flex gap-2"><button onclick="changeFontSize(-10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold active:scale-95">A-</button><button onclick="changeFontSize(10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold active:scale-95">A+</button></div></div>
-                <div><p class="text-[10px] font-bold uppercase text-slate-400 mb-2">Тема</p><div class="flex gap-2 justify-between"><button onclick="changeReaderTheme('light')" class="size-10 rounded-full bg-[#f8fafc] border-2 border-slate-200 active:scale-90"></button><button onclick="changeReaderTheme('sepia')" class="size-10 rounded-full bg-[#f4ecd8] border-2 border-slate-200 active:scale-90"></button><button onclick="changeReaderTheme('dark')" class="size-10 rounded-full bg-[#0f172a] border-2 border-slate-500 active:scale-90"></button></div></div>
+            <button onclick="closeReader()" class="font-bold text-red-500 bg-red-50 px-4 py-2 rounded-xl text-sm active:scale-95">✕</button>
+            <div class="flex flex-col items-center max-w-[50%]"><div id="readerTitle" class="text-xs font-bold truncate text-muted w-full text-center">Книга</div><div id="readerTimer" class="text-[10px] font-mono font-bold text-slate-400 tracking-widest mt-0.5">00:00</div></div>
+            <button onclick="toggleReaderSettings()" class="font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-xl text-sm active:scale-95">⚙️</button>
+            <div id="readerSettingsMenu" class="hidden absolute top-16 right-4 w-52 bg-white shadow-2xl rounded-2xl p-4 border border-slate-100 space-y-4 z-50 fade-in">
+                <div><p class="text-[10px] font-bold uppercase text-muted mb-2">Розмір</p><div class="flex gap-2"><button onclick="changeFontSize(-10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold active:scale-95">A-</button><button onclick="changeFontSize(10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold active:scale-95">A+</button></div></div>
+                <div><p class="text-[10px] font-bold uppercase text-muted mb-2">Тема</p><div class="flex gap-3 justify-between"><button onclick="changeReaderTheme('light')" class="size-9 rounded-full bg-[#f8fafc] border-2 border-slate-200 active:scale-90"></button><button onclick="changeReaderTheme('sepia')" class="size-9 rounded-full bg-[#f4ecd8] border-2 border-slate-200 active:scale-90"></button><button onclick="changeReaderTheme('dark')" class="size-9 rounded-full bg-[#0f172a] border-2 border-slate-500 active:scale-90"></button></div></div>
             </div>
         </div>
         <div id="viewer" onclick="document.getElementById('readerSettingsMenu').classList.add('hidden')"></div>
-        <div class="reader-controls border-t">
-            <button onclick="rendition?.prev()" class="nav-btn">← Назад</button>
-            <div id="readerProgress" class="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg text-center min-w-[80px]">...</div>
-            <button onclick="rendition?.next()" class="nav-btn !bg-indigo-600 !text-white">Вперед →</button>
-        </div>
+        <div class="reader-controls border-t"><button onclick="rendition?.prev()" class="nav-btn">←</button><div id="readerProgress" class="text-[10px] font-black text-primary-600 uppercase tracking-widest bg-primary-50 px-3 py-1.5 rounded-lg text-center min-w-[70px]">...</div><button onclick="rendition?.next()" class="nav-btn !bg-primary-600 !text-white">→</button></div>
     </div>
 
+    <!-- SCANNER -->
     <div id="scannerSheet" class="hidden fixed inset-0 z-[150] bg-slate-900 flex flex-col items-center justify-center">
-        <div class="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/70 to-transparent">
-            <h3 class="font-bold text-white text-lg">Наведіть на штрих-код</h3>
-            <button onclick="closeScanner()" class="bg-white/20 backdrop-blur-md text-white size-10 rounded-full flex justify-center items-center font-bold active:scale-95">✕</button>
-        </div>
+        <div class="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/70 to-transparent"><h3 class="font-bold text-white">Сканувати ISBN</h3><button onclick="closeScanner()" class="bg-white/20 backdrop-blur text-white size-10 rounded-full flex justify-center items-center font-bold active:scale-95">✕</button></div>
         <div id="reader" class="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-slate-700 aspect-square"></div>
     </div>
 
-    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="height:85vh;">
-        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
+    <!-- SEARCH SHEET -->
+    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="height:85vh">
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
         <div class="px-5 pb-4 shrink-0">
-            <h2 class="text-xl font-bold mb-4">Знайти книгу</h2>
-            <div class="relative">
-                <span class="absolute left-4 top-3.5 text-slate-400">🔍</span>
-                <input type="text" id="searchInput" placeholder="Назва або автор..." class="w-full pl-11 pr-4 py-3.5 bg-slate-100/80 rounded-2xl outline-none focus:bg-white focus:ring-2 ring-indigo-500 font-medium transition-all">
-            </div>
+            <div class="relative"><span class="absolute left-4 top-3 text-slate-400">🔍</span><input type="text" id="searchInput" placeholder="Назва, автор або ISBN..." class="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm"></div>
         </div>
-        <div id="searchResults" class="px-3 pb-6 overflow-y-auto flex-1">
-            <button onclick="openScanner()" class="w-[calc(100%-24px)] mx-auto mb-2 p-3 text-center text-sm font-semibold text-white bg-slate-800 rounded-xl active:bg-slate-700 flex items-center justify-center gap-2">📷 Сканувати ISBN</button>
-            <button onclick="openManualForm()" class="w-[calc(100%-24px)] mx-auto mb-2 p-3 text-center text-sm font-semibold text-indigo-600 bg-indigo-50 rounded-xl active:bg-indigo-100">✍️ Додати вручну</button>
+        <div id="searchResults" class="px-4 pb-6 overflow-y-auto flex-1">
+            <button onclick="openScanner()" class="w-full mb-2 p-3 text-center text-sm font-semibold text-white bg-slate-800 rounded-xl active:scale-95 transition-transform">📷 Сканувати штрих-код</button>
+            <button onclick="openManualForm()" class="w-full mb-3 p-3 text-center text-sm font-semibold text-primary-600 bg-primary-50 rounded-xl active:scale-95 transition-transform">✍️ Додати вручну</button>
             <div id="searchItems" class="space-y-1"></div>
         </div>
     </div>
-    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-w-xl mx-auto" style="max-height:92vh;">
-        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab active:cursor-grabbing"><div class="w-12 h-1.5 bg-slate-200 rounded-full pointer-events-none"></div></div>
+
+    <!-- DETAILS SHEET -->
+    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="max-height:92vh">
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
         <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
-        <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-4 fade-in">
-            <h3 class="text-xl font-bold mb-4">Редагувати</h3>
-            <input type="text" id="editTitle" placeholder="Назва" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium">
-            <input type="text" id="editAuthor" placeholder="Автор" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium">
-            <input type="number" id="editPages" placeholder="Сторінок" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium">
-            <input type="url" id="editImage" placeholder="URL обкладинки" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-indigo-500 font-medium text-sm">
-            <div class="flex gap-3 mt-4">
-                <button onclick="saveBookEdits()" class="flex-1 p-4 bg-indigo-600 text-white font-bold rounded-xl active:scale-95">Зберегти</button>
-                <button onclick="toggleEditMode(false)" class="flex-1 p-4 bg-slate-100 text-slate-700 font-bold rounded-xl active:scale-95">Скасувати</button>
-            </div>
+        <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-3 fade-in">
+            <h3 class="text-lg font-bold mb-3">Редагувати</h3>
+            <input type="text" id="editTitle" placeholder="Назва" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
+            <input type="text" id="editAuthor" placeholder="Автор" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
+            <input type="number" id="editPages" placeholder="Сторінок" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
+            <input type="url" id="editImage" placeholder="URL обкладинки" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-xs">
+            <div class="flex gap-2 pt-2"><button onclick="saveBookEdits()" class="flex-1 p-3.5 bg-primary-600 text-white font-bold rounded-xl text-sm active:scale-95">Зберегти</button><button onclick="toggleEditMode(false)" class="flex-1 p-3.5 bg-slate-100 font-bold rounded-xl text-sm active:scale-95">Скасувати</button></div>
         </div>
-        <div id="statusButtons" class="p-5 bg-white border-t border-slate-100 grid grid-cols-3 gap-3 shrink-0 rounded-t-2xl hidden">
-            <button onclick="addBookWithStatus('planned')" class="flex flex-col items-center justify-center p-3 bg-slate-50 rounded-xl active:scale-95 text-indigo-600"><span class="text-xl mb-1">🕒</span><span class="text-[11px] font-bold uppercase">В плани</span></button>
-            <button onclick="addBookWithStatus('reading')" class="flex flex-col items-center justify-center p-3 bg-indigo-600 text-white rounded-xl active:scale-95"><span class="text-xl mb-1">📖</span><span class="text-[11px] font-bold uppercase">Читати</span></button>
-            <button onclick="addBookWithStatus('finished')" class="flex flex-col items-center justify-center p-3 bg-emerald-50 text-emerald-700 rounded-xl active:scale-95"><span class="text-xl mb-1">✅</span><span class="text-[11px] font-bold uppercase">Прочитав</span></button>
+        <div id="statusButtons" class="p-4 bg-white border-t border-slate-100 grid grid-cols-3 gap-2 shrink-0 hidden">
+            <button onclick="addBookWithStatus('planned')" class="flex flex-col items-center p-3 bg-slate-50 rounded-xl active:scale-95 text-primary-600"><span class="text-lg">🕒</span><span class="text-[10px] font-bold mt-0.5">В плани</span></button>
+            <button onclick="addBookWithStatus('reading')" class="flex flex-col items-center p-3 bg-primary-600 text-white rounded-xl active:scale-95"><span class="text-lg">📖</span><span class="text-[10px] font-bold mt-0.5">Читати</span></button>
+            <button onclick="addBookWithStatus('finished')" class="flex flex-col items-center p-3 bg-emerald-50 text-emerald-700 rounded-xl active:scale-95"><span class="text-lg">✅</span><span class="text-[10px] font-bold mt-0.5">Прочитав</span></button>
         </div>
     </div>
     <script>
-        function loadScript(src){return new Promise((resolve,reject)=>{if(document.querySelector(`script[src="${src}"]`)){resolve();return;}const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=reject;document.head.appendChild(s);});}
+        function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`)){res();return;}const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
         async function loadReaderDeps(){await Promise.all([loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js'),loadScript('https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js'),loadScript('https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js')]);}
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
