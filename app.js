@@ -371,11 +371,15 @@ async function calculateStats() {
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(0,0,0,.03)' } },
-                x: { grid: { display: false } }
-            }
-        }
-    });
+    y: { 
+        beginAtZero: true, 
+        ticks: { stepSize: 1, color: document.body.classList.contains('dark') ? '#71717a' : '#a1a1aa' }, 
+        grid: { color: document.body.classList.contains('dark') ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.04)' } 
+    },
+    x: { 
+        grid: { display: false },
+        ticks: { color: document.body.classList.contains('dark') ? '#71717a' : '#a1a1aa' }
+    }
 }
 
 // ===== EXPORT / IMPORT =====
@@ -549,23 +553,6 @@ function filterLibrary(q) {
 }
 
 // ===== SHEETS =====
-function openSheet(id) {
-    document.body.classList.add('modal-open');
-    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
-    document.getElementById(id).classList.add('open');
-    document.querySelector('.backdrop').classList.remove('hidden');
-    if (id === 'searchSheet') {
-        setTimeout(() => document.getElementById('searchInput').focus(), 400);
-    }
-}
-
-function closeAllSheets() {
-    document.body.classList.remove('modal-open');
-    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
-    document.querySelector('.backdrop').classList.add('hidden');
-    toggleEditMode(false);
-}
-
 function closeDetailsSheet() {
     if (!document.getElementById('statusButtons').classList.contains('hidden')) {
         openSheet('searchSheet');
