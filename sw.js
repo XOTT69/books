@@ -1,11 +1,10 @@
-const CACHE_NAME = 'chitayko-v6';
+const CACHE_NAME = 'chitayko-v7';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
     '/app.js',
     '/manifest.json',
-    '/icon-192.png',
-    '/icon-512.png',
+    '/icon.png',
     'https://cdn.tailwindcss.com',
     'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
     'https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js',
@@ -18,7 +17,7 @@ self.addEventListener('install', event => {
     self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache =>
-            Promise.allSettled(STATIC_ASSETS.map(url => cache.add(url).catch(() => console.warn('Failed to cache:', url))))
+            Promise.allSettled(STATIC_ASSETS.map(url => cache.add(url).catch(() => console.warn('SW: failed to cache', url))))
         )
     );
 });
@@ -35,7 +34,6 @@ self.addEventListener('fetch', event => {
     const url = event.request.url;
     if (event.request.method !== 'GET') return;
 
-    // Skip API/auth requests
     if (url.includes('firestore.googleapis.com') ||
         url.includes('googleapis.com/books') ||
         url.includes('googleapis.com/identitytoolkit') ||
@@ -45,7 +43,6 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Navigation — network first
     if (event.request.mode === 'navigate') {
         event.respondWith(
             fetch(event.request)
@@ -59,7 +56,6 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Static — stale while revalidate
     event.respondWith(
         caches.match(event.request).then(cached => {
             const netFetch = fetch(event.request).then(res => {
