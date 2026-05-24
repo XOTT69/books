@@ -2,181 +2,594 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>ЧитайКо</title>
-    <link rel="icon" href="icon.png">
-    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#6366f1">
+    <meta name="theme-color" content="#0a0a0f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <script>tailwind.config={theme:{extend:{colors:{primary:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca'}}}}};</script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'] },
+                    colors: {
+                        primary: {50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81'},
+                        surface: {50:'#fafafa',100:'#f4f4f5',200:'#e4e4e7',300:'#d4d4d8'},
+                        dark: {50:'#18181b',100:'#1c1c22',200:'#27272a',300:'#3f3f46',400:'#52525b',500:'#71717a'}
+                    },
+                    borderRadius: { '4xl': '2rem' },
+                    boxShadow: {
+                        'glow': '0 0 20px rgba(99, 102, 241, 0.15)',
+                        'glow-lg': '0 0 40px rgba(99, 102, 241, 0.2)',
+                        'card': '0 2px 24px rgba(0, 0, 0, 0.04)',
+                        'card-hover': '0 8px 40px rgba(0, 0, 0, 0.08)',
+                        'elevated': '0 12px 48px rgba(0, 0, 0, 0.12)'
+                    }
+                }
+            }
+        };
+    </script>
     <style>
-        *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
-        ::-webkit-scrollbar{width:0;background:transparent}
-        .scrollbar-hide::-webkit-scrollbar{display:none}
-        .scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}
-        body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-serif;transition:background .3s,color .3s;overflow-x:hidden}
-        body.dark{background:#09090b;color:#f4f4f5}
-        body.dark .card{background:#18181b;border-color:#27272a}
-        body.dark .card-elevated{background:#1c1c20;border-color:#2a2a2e}
-        body.dark .text-muted{color:#a1a1aa}
-        body.dark .bg-surface{background:#09090b}
-        body.dark .nav-bar{background:rgba(9,9,11,.92);border-color:#27272a}
-        body.dark .pill.inactive{background:#27272a;color:#a1a1aa}
-        body.dark .stat-card{background:linear-gradient(135deg,#18181b,#1c1c20);border-color:#27272a}
-        body.dark input,body.dark textarea,body.dark select{background:#18181b!important;color:#f4f4f5!important;border-color:#27272a!important}
-        body.dark .search-box{background:#18181b;border-color:#27272a}
-        body.dark .skeleton{background:#27272a}
-        body.dark .toast{background:#27272a;color:#f4f4f5;border-color:#3f3f46}
-        body.dark .welcome-card{background:#18181b;border-color:#27272a}
-        .card{background:#fff;border:1px solid #f4f4f5;border-radius:18px;transition:transform .12s}
-        .card:active{transform:scale(.98)}
-        .card-elevated{background:#fff;border:1px solid #e4e4e7;border-radius:22px;box-shadow:0 2px 20px rgba(0,0,0,.03)}
-        .bg-surface{background:#fafafa}
-        .text-muted{color:#71717a}
-        .nav-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid #f4f4f5;z-index:30}
-        .fade-in{animation:fadeIn .2s ease forwards}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        .bottom-sheet{transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1)}
-        .bottom-sheet.open{transform:translateY(0)}
-        .backdrop{opacity:0;pointer-events:none;transition:opacity .25s}
-        body.modal-open .backdrop{opacity:1;pointer-events:auto}
-        .progress-bar{transition:width .5s cubic-bezier(.4,0,.2,1)}
-        .pill{padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;white-space:nowrap;transition:all .2s;cursor:pointer}
-        .pill.active{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.25)}
-        .pill.inactive{background:#f4f4f5;color:#71717a}
-        .desc-scroll{max-height:25vh;overflow-y:auto;overscroll-behavior:contain}
-        .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-        #readerOverlay{display:none;position:fixed;inset:0;z-index:200;background:#fafafa;flex-direction:column}
-        body.dark #readerOverlay{background:#09090b}
-        #viewer{flex:1;width:100%;height:100%;overflow:hidden}
-        .reader-controls{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.03);z-index:10}
-        body.dark .reader-controls{background:#18181b}
-        .nav-btn{background:#f4f4f5;padding:10px 18px;border-radius:12px;font-weight:700;font-size:13px;color:#52525b;transition:transform .1s}
-        body.dark .nav-btn{background:#27272a;color:#e4e4e7}
-        .nav-btn:active{transform:scale(.93)}
-        .sortable-ghost{opacity:.3;transform:scale(.96)}
-        .date-input{border:none;background:transparent;color:#3f3f46;outline:none;font-size:13px;font-weight:500;cursor:pointer;text-align:right}
-        body.dark .date-input{color:#e4e4e7!important;background:transparent!important}
-        .streak-cell{width:18px;height:18px;border-radius:5px;transition:all .2s}
-        .streak-cell.active{background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 2px 6px rgba(99,102,241,.3)}
-        .streak-cell.inactive{background:#f4f4f5}
-        body.dark .streak-cell.inactive{background:#27272a}
-        .streak-cell.today{ring:2px;ring-color:#6366f1;ring-offset:2px}
-        .stat-card{background:linear-gradient(135deg,#fafaff,#f0f0ff);border:1px solid #e8e8f4;border-radius:16px;padding:14px;text-align:center}
-        .search-box{background:#fff;border:1px solid #f4f4f5;border-radius:14px}
-        .tab-content{display:none}
-        .tab-content.active{display:block}
-        #reader{border:none!important}
-        #reader video{object-fit:cover!important;border-radius:1.5rem!important}
-        .celebration{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;pointer-events:none}
-        .celebration-text{font-size:56px;animation:celebPop 1s cubic-bezier(.17,.67,.3,1.33) forwards}
-        @keyframes celebPop{0%{transform:scale(0) rotate(-10deg);opacity:0}40%{transform:scale(1.4) rotate(5deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:0}}
-        .progress-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:#e4e4e7;outline:none}
-        .progress-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#6366f1;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,.3)}
-        body.dark .progress-slider{background:#27272a}
-        /* Toast */
-        .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-100px);background:#fff;border:1px solid #e4e4e7;border-radius:14px;padding:12px 20px;font-size:14px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.1);z-index:9999;transition:transform .4s cubic-bezier(.32,.72,0,1);max-width:90vw;text-align:center}
-        .toast.show{transform:translateX(-50%) translateY(0)}
-        /* Skeleton */
-        .skeleton{background:#f4f4f5;border-radius:12px;animation:pulse 1.5s infinite}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-        /* Pull to refresh */
-        .ptr-indicator{position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-60px);z-index:100;transition:transform .3s;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e4e4e7;border-radius:100px;padding:8px 16px;box-shadow:0 4px 16px rgba(0,0,0,.08);font-size:13px;font-weight:600;color:#6366f1}
-        body.dark .ptr-indicator{background:#18181b;border-color:#27272a}
-        .ptr-indicator.visible{transform:translateX(-50%) translateY(16px)}
-        .ptr-spinner{width:18px;height:18px;border:2.5px solid #e4e4e7;border-top-color:#6366f1;border-radius:50%;animation:spin .6s linear infinite}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        /* Swipe card */
-        .swipe-card{position:relative;overflow:hidden}
-        .swipe-card .swipe-bg{position:absolute;top:0;bottom:0;right:0;width:80px;background:#ef4444;display:flex;align-items:center;justify-content:center;border-radius:18px;color:#fff;font-weight:700;font-size:13px;opacity:0;transition:opacity .2s}
-        .swipe-card.swiping .swipe-bg{opacity:1}
-        /* Welcome */
-        .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --bg: #fafafa;
+            --card: #ffffff;
+            --card-border: rgba(0,0,0,0.04);
+            --text: #18181b;
+            --text-muted: #71717a;
+            --glass: rgba(255,255,255,0.72);
+            --glass-border: rgba(255,255,255,0.2);
+        }
+        body.dark {
+            --bg: #0a0a0f;
+            --card: #141419;
+            --card-border: rgba(255,255,255,0.06);
+            --text: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --glass: rgba(20,20,25,0.85);
+            --glass-border: rgba(255,255,255,0.08);
+        }
+        ::-webkit-scrollbar { width: 0; background: transparent; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            transition: background .4s ease, color .3s ease;
+            overflow-x: hidden;
+            padding-top: var(--safe-top);
+            padding-bottom: calc(80px + var(--safe-bottom));
+        }
+        
+        /* === PREMIUM CARDS === */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            transition: transform .15s cubic-bezier(.4,0,.2,1), box-shadow .25s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        .card:active { transform: scale(0.97); }
+        .card:hover { box-shadow: var(--shadow-card-hover, 0 4px 20px rgba(0,0,0,0.06)); }
+        
+        .card-glass {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+        }
+        
+        .card-elevated {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            box-shadow: 0 4px 32px rgba(0,0,0,0.04);
+        }
+        
+        /* === GLASS NAV === */
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--glass);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-top: 1px solid var(--glass-border);
+            z-index: 30;
+            padding-bottom: var(--safe-bottom);
+        }
+        
+        /* === ANIMATIONS === */
+        .fade-in { animation: fadeIn .3s cubic-bezier(.4,0,.2,1) forwards; }
+        .fade-up { animation: fadeUp .4s cubic-bezier(.4,0,.2,1) forwards; }
+        .scale-in { animation: scaleIn .3s cubic-bezier(.34,1.56,.64,1) forwards; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        
+        .stagger > * { opacity: 0; animation: fadeUp .4s cubic-bezier(.4,0,.2,1) forwards; }
+        .stagger > *:nth-child(1) { animation-delay: .05s; }
+        .stagger > *:nth-child(2) { animation-delay: .1s; }
+        .stagger > *:nth-child(3) { animation-delay: .15s; }
+        .stagger > *:nth-child(4) { animation-delay: .2s; }
+        .stagger > *:nth-child(5) { animation-delay: .25s; }
+        .stagger > *:nth-child(6) { animation-delay: .3s; }
+        .stagger > *:nth-child(7) { animation-delay: .35s; }
+        .stagger > *:nth-child(8) { animation-delay: .4s; }
+        
+        /* === BOTTOM SHEET === */
+        .bottom-sheet {
+            transform: translateY(100%);
+            transition: transform .4s cubic-bezier(.32,.72,0,1);
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-bottom: none;
+        }
+        .bottom-sheet.open { transform: translateY(0); }
+        
+        .backdrop {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .3s ease;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
+        
+        /* === PILLS === */
+        .pill {
+            padding: 8px 18px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: all .25s cubic-bezier(.4,0,.2,1);
+            cursor: pointer;
+            user-select: none;
+        }
+        .pill.active {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+        }
+        .pill.inactive {
+            background: var(--card);
+            color: var(--text-muted);
+            border: 1px solid var(--card-border);
+        }
+        .pill.inactive:active { transform: scale(0.95); }
+        
+        /* === PROGRESS === */
+        .progress-bar { transition: width .6s cubic-bezier(.4,0,.2,1); }
+        .progress-ring { transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1); }
+        
+        /* === INPUT === */
+        .input-field {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--card);
+            border: 1.5px solid var(--card-border);
+            border-radius: 16px;
+            outline: none;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text);
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .input-field:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
+        }
+        .input-field::placeholder { color: var(--text-muted); }
+        
+        /* === SEARCH === */
+        .search-box {
+            background: var(--card);
+            border: 1.5px solid var(--card-border);
+            border-radius: 16px;
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .search-box:focus-within {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 4px rgba(99,102,241,0.08);
+        }
+        
+        /* === MISC === */
+        .text-muted { color: var(--text-muted); }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .desc-scroll { max-height: 25vh; overflow-y: auto; overscroll-behavior: contain; }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .gradient-border {
+            position: relative;
+            background: var(--card);
+            border-radius: 24px;
+        }
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 25px;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.1), rgba(236,72,153,0.2));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+        
+        /* === STAT CARDS === */
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 16px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(99,102,241,0.04) 0%, transparent 70%);
+        }
+        
+        /* === STREAK === */
+        .streak-cell {
+            width: 20px;
+            height: 20px;
+            border-radius: 6px;
+            transition: all .2s cubic-bezier(.4,0,.2,1);
+        }
+        .streak-cell.active {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+        }
+        .streak-cell.inactive { background: var(--card-border); }
+        .streak-cell.today { box-shadow: 0 0 0 2px #6366f1, 0 0 0 4px rgba(99,102,241,0.2); }
+        
+        /* === READER === */
+        #readerOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            background: var(--bg);
+            flex-direction: column;
+        }
+        #viewer { flex: 1; width: 100%; height: 100%; overflow: hidden; }
+        .reader-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 18px;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 10;
+        }
+        .nav-btn {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            padding: 10px 20px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--text);
+            transition: transform .1s, box-shadow .2s;
+        }
+        .nav-btn:active { transform: scale(0.93); }
+        
+        /* === TOAST === */
+        .toast {
+            position: fixed;
+            top: calc(20px + var(--safe-top));
+            left: 50%;
+            transform: translateX(-50%) translateY(-120px);
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 14px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.15);
+            z-index: 9999;
+            transition: transform .4s cubic-bezier(.32,.72,0,1);
+            max-width: 90vw;
+            text-align: center;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        
+        /* === SKELETON === */
+        .skeleton {
+            background: linear-gradient(90deg, var(--card-border) 25%, rgba(99,102,241,0.05) 50%, var(--card-border) 75%);
+            background-size: 200% 100%;
+            border-radius: 12px;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        
+        /* === PTR === */
+        .ptr-indicator {
+            position: fixed;
+            top: var(--safe-top);
+            left: 50%;
+            transform: translateX(-50%) translateY(-60px);
+            z-index: 100;
+            transition: transform .3s cubic-bezier(.4,0,.2,1);
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 100px;
+            padding: 10px 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            font-size: 13px;
+            font-weight: 600;
+            color: #6366f1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .ptr-indicator.visible { transform: translateX(-50%) translateY(16px); }
+        .ptr-spinner { width: 18px; height: 18px; border: 2.5px solid var(--card-border); border-top-color: #6366f1; border-radius: 50%; animation: spin .6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* === SWIPE === */
+        .swipe-card { position: relative; overflow: hidden; }
+        .swipe-card .swipe-bg {
+            position: absolute; top: 0; bottom: 0; right: 0; width: 80px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 20px; color: #fff; font-weight: 700; font-size: 18px;
+            opacity: 0; transition: opacity .2s;
+        }
+        .swipe-card.swiping .swipe-bg { opacity: 1; }
+        
+        /* === CELEBRATION === */
+        .celebration { position: fixed; inset: 0; z-index: 999; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        .celebration-text { font-size: 64px; animation: celebPop 1.2s cubic-bezier(.17,.67,.3,1.33) forwards; }
+        @keyframes celebPop { 0% { transform: scale(0) rotate(-15deg); opacity: 0; } 40% { transform: scale(1.3) rotate(5deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 0; } }
+        
+        /* === SLIDER === */
+        .progress-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; background: var(--card-border); outline: none; }
+        .progress-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #4f46e5); cursor: pointer; box-shadow: 0 2px 12px rgba(99,102,241,0.4); }
+        
+        /* === WELCOME === */
+        .welcome-card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 28px;
+            padding: 32px 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .welcome-card::before {
+            content: '';
+            position: absolute;
+            top: -100px;
+            right: -100px;
+            width: 250px;
+            height: 250px;
+            background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        
+        /* === NAV TAB ACTIVE === */
+        .nav-tab-active {
+            background: rgba(99,102,241,0.08);
+            border-radius: 16px;
+        }
+        .nav-tab-active span:first-child { transform: scale(1.1); }
+        
+        /* === DATE INPUT === */
+        .date-input {
+            border: none;
+            background: transparent !important;
+            color: var(--text);
+            outline: none;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: right;
+        }
+        
+        /* === SORTABLE === */
+        .sortable-ghost { opacity: 0.3; transform: scale(0.95); }
+        
+        /* === ADD BUTTON === */
+        .fab {
+            width: 52px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(99,102,241,0.35);
+            font-size: 24px;
+            font-weight: 300;
+            transition: transform .15s, box-shadow .25s;
+        }
+        .fab:active { transform: scale(0.9); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+        
+        /* === QUICK RESUME === */
+        .quick-resume {
+            background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.04));
+            border: 1px solid rgba(99,102,241,0.12);
+            border-radius: 20px;
+            padding: 16px;
+            transition: transform .15s;
+        }
+        .quick-resume:active { transform: scale(0.98); }
+        
+        /* === BADGE === */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        /* Scanner */
+        #scannerSheet { display: none; }
+        #scannerSheet.open { display: flex; }
+        #reader { border: none !important; }
+        #reader video { object-fit: cover !important; border-radius: 1.5rem !important; }
+        
+        /* Chart */
+        .chart-container { position: relative; height: 140px; width: 100%; }
     </style>
 </head>
-<body class="bg-surface font-sans pb-24 text-slate-900 antialiased">
+<body class="font-sans antialiased">
 
     <!-- Toast -->
-    <div id="toast" class="toast">✓</div>
+    <div id="toast" class="toast"></div>
 
-    <!-- Pull to refresh indicator -->
+    <!-- Pull to refresh -->
     <div id="ptrIndicator" class="ptr-indicator"><div class="ptr-spinner"></div><span>Оновлення...</span></div>
 
     <!-- Celebration -->
     <div id="celebration" class="celebration hidden"><span class="celebration-text">🎉📚✨</span></div>
 
-    <!-- AUTH -->
-    <div id="authScreen" class="fixed inset-0 z-[100] bg-surface flex items-center justify-center p-6 overflow-y-auto fade-in">
-        <div class="w-full max-w-sm card-elevated p-8 my-auto">
-            <div class="text-center mb-8"><div class="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-[22px] mx-auto mb-4 flex items-center justify-center shadow-lg shadow-primary-200"><span class="text-4xl">📚</span></div><h1 class="text-2xl font-black tracking-tight">ЧитайКо</h1><p class="text-muted text-sm mt-1">Ваша хмарна бібліотека</p></div>
-            <div id="authError" class="text-center text-sm text-white bg-red-500 font-medium p-3 rounded-xl mb-4 hidden"></div>
-            <div class="space-y-3">
-                <input type="email" id="authEmail" placeholder="Email" class="w-full p-3.5 bg-surface rounded-xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm border border-slate-100">
-                <input type="password" id="authPassword" placeholder="Пароль (мін. 6)" class="w-full p-3.5 bg-surface rounded-xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm border border-slate-100">
-                <div class="flex gap-2 pt-1">
-                    <button onclick="handleAuth('login',this)" class="flex-1 p-3.5 text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl font-bold text-sm active:scale-95 transition-transform shadow-md shadow-primary-200">Увійти</button>
-                    <button onclick="handleAuth('signup',this)" class="flex-1 p-3.5 text-slate-700 bg-slate-100 rounded-xl font-bold text-sm active:scale-95 transition-transform">Створити</button>
+    <!-- ========== AUTH SCREEN ========== -->
+    <div id="authScreen" class="fixed inset-0 z-[100] flex items-center justify-center p-6 overflow-y-auto fade-in" style="background: var(--bg);">
+        <div class="w-full max-w-sm my-auto">
+            <!-- Logo -->
+            <div class="text-center mb-10">
+                <div class="w-24 h-24 bg-gradient-to-br from-primary-400 via-primary-500 to-purple-600 rounded-[28px] mx-auto mb-5 flex items-center justify-center shadow-glow-lg rotate-3 hover:rotate-0 transition-transform duration-500">
+                    <span class="text-5xl -rotate-3">📚</span>
                 </div>
+                <h1 class="text-3xl font-black tracking-tight">ЧитайКо</h1>
+                <p class="text-muted text-sm mt-2 font-medium">Ваша хмарна бібліотека</p>
             </div>
-            <div class="relative flex py-5 items-center"><div class="flex-grow border-t border-slate-100"></div><span class="mx-3 text-muted text-[10px] font-bold uppercase">або</span><div class="flex-grow border-t border-slate-100"></div></div>
-            <button onclick="signInWithGoogle(this)" class="w-full p-3.5 card flex items-center justify-center gap-3 font-bold text-sm active:scale-95 transition-transform"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5">Google</button>
+            
+            <!-- Error -->
+            <div id="authError" class="text-center text-sm text-white bg-gradient-to-r from-red-500 to-rose-500 font-semibold p-4 rounded-2xl mb-5 hidden shadow-lg"></div>
+            
+            <!-- Form -->
+            <div class="space-y-3 mb-4">
+                <input type="email" id="authEmail" placeholder="Email" class="input-field">
+                <input type="password" id="authPassword" placeholder="Пароль (мін. 6 символів)" class="input-field">
+            </div>
+            
+            <div class="flex gap-3 mb-6">
+                <button onclick="handleAuth('login',this)" class="flex-1 py-4 text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-2xl font-bold text-sm active:scale-95 transition-transform shadow-glow">Увійти</button>
+                <button onclick="handleAuth('signup',this)" class="flex-1 py-4 font-bold text-sm rounded-2xl active:scale-95 transition-transform" style="background: var(--card); border: 1px solid var(--card-border); color: var(--text);">Створити</button>
+            </div>
+            
+            <div class="relative flex items-center mb-6">
+                <div class="flex-grow h-px" style="background: var(--card-border);"></div>
+                <span class="mx-4 text-muted text-[11px] font-bold uppercase tracking-wider">або</span>
+                <div class="flex-grow h-px" style="background: var(--card-border);"></div>
+            </div>
+            
+            <button onclick="signInWithGoogle(this)" class="w-full py-4 card flex items-center justify-center gap-3 font-bold text-sm active:scale-95 transition-transform">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5">
+                <span>Увійти з Google</span>
+            </button>
         </div>
     </div>
 
-    <!-- APP -->
-    <div id="appScreen" class="max-w-lg mx-auto px-4 pt-6 hidden">
+    <!-- ========== APP ========== -->
+    <div id="appScreen" class="max-w-lg mx-auto px-5 pt-6 hidden">
 
-        <!-- Welcome (first time) -->
-        <div id="welcomeScreen" class="hidden fade-in mb-6">
+        <!-- Welcome -->
+        <div id="welcomeScreen" class="hidden fade-up mb-6">
             <div class="welcome-card">
-                <div class="text-4xl mb-3">👋</div>
-                <h2 class="text-xl font-bold mb-2">Вітаємо у ЧитайКо!</h2>
-                <p class="text-muted text-sm mb-4">Тут ви можете відстежувати свої книги, ставити цілі та читати epub-файли прямо в браузері.</p>
-                <div class="space-y-2 text-left text-sm mb-4">
-                    <div class="flex gap-2 items-center"><span class="text-lg">➕</span><span>Натисніть <b>+</b> щоб знайти та додати книгу</span></div>
-                    <div class="flex gap-2 items-center"><span class="text-lg">📖</span><span>Завантажте .epub щоб читати офлайн</span></div>
-                    <div class="flex gap-2 items-center"><span class="text-lg">🎯</span><span>Встановіть ціль у <b>Профілі</b></span></div>
+                <div class="text-5xl mb-4">👋</div>
+                <h2 class="text-2xl font-black mb-2">Вітаємо у ЧитайКо!</h2>
+                <p class="text-muted text-sm mb-6 leading-relaxed">Відстежуйте книги, ставте цілі та читайте epub прямо в браузері.</p>
+                <div class="space-y-3 text-left text-sm mb-6">
+                    <div class="flex gap-3 items-center p-3 rounded-xl" style="background: rgba(99,102,241,0.05);"><span class="text-xl">➕</span><span>Натисніть <b>+</b> щоб знайти книгу</span></div>
+                    <div class="flex gap-3 items-center p-3 rounded-xl" style="background: rgba(139,92,246,0.05);"><span class="text-xl">📖</span><span>Завантажте .epub для офлайн читання</span></div>
+                    <div class="flex gap-3 items-center p-3 rounded-xl" style="background: rgba(236,72,153,0.05);"><span class="text-xl">🎯</span><span>Встановіть ціль у <b>Профілі</b></span></div>
                 </div>
-                <button onclick="dismissWelcome()" class="w-full py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-xl active:scale-95 transition-transform shadow-md shadow-primary-200">Почати! 🚀</button>
+                <button onclick="dismissWelcome()" class="w-full py-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-2xl active:scale-95 transition-transform shadow-glow">Почати! 🚀</button>
             </div>
         </div>
 
-        <!-- TAB: LIBRARY -->
+        <!-- ===== TAB: LIBRARY ===== -->
         <div id="tabLibrary" class="tab-content active fade-in">
-            <header class="flex justify-between items-center mb-4">
-                <h1 class="text-2xl font-black tracking-tight">Бібліотека</h1>
-                <button onclick="openSheet('searchSheet')" class="size-11 flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-full shadow-lg shadow-primary-200 active:scale-90 transition-transform text-lg font-bold">+</button>
+            <header class="flex justify-between items-center mb-5">
+                <div>
+                    <h1 class="text-2xl font-black tracking-tight">Бібліотека</h1>
+                    <p class="text-muted text-xs font-medium mt-0.5" id="librarySubtitle">Ваші книги</p>
+                </div>
+                <button onclick="openSheet('searchSheet')" class="fab" aria-label="Додати книгу">+</button>
             </header>
-            <div id="quickResume" class="mb-4 hidden"></div>
-            <div class="relative mb-4">
-                <span class="absolute left-3.5 top-[10px] text-muted text-sm pointer-events-none">🔍</span>
-                <input type="search" id="librarySearchInput" placeholder="Пошук у бібліотеці..." class="w-full pl-10 pr-4 py-2.5 search-box text-sm font-medium outline-none focus:ring-2 ring-primary-300 transition-shadow" oninput="filterLibrary(this.value)">
+            
+            <!-- Quick Resume -->
+            <div id="quickResume" class="mb-5 hidden"></div>
+            
+            <!-- Search -->
+            <div class="relative mb-4 search-box">
+                <span class="absolute left-4 top-[13px] text-muted text-sm pointer-events-none">🔍</span>
+                <input type="search" id="librarySearchInput" placeholder="Пошук у бібліотеці..." class="w-full pl-11 pr-4 py-3 bg-transparent text-sm font-medium outline-none rounded-2xl" oninput="filterLibrary(this.value)">
             </div>
+            
+            <!-- Tabs -->
             <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="libraryTabs">
                 <button onclick="setLibraryTab('reading')" id="tab_reading" class="pill active">📖 Читаю</button>
                 <button onclick="setLibraryTab('planned')" id="tab_planned" class="pill inactive">🕒 В планах</button>
                 <button onclick="setLibraryTab('finished')" id="tab_finished" class="pill inactive">✅ Прочитано</button>
             </div>
+            
+            <!-- View Toggle -->
             <div class="flex justify-end mb-3">
-                <div class="flex gap-1 bg-slate-100 p-0.5 rounded-lg">
-                    <button onclick="setViewMode('list')" id="view_list" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-white shadow-sm text-slate-800">☰</button>
-                    <button onclick="setViewMode('grid')" id="view_grid" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase text-slate-400">⊞</button>
+                <div class="flex gap-1 p-1 rounded-xl" style="background: var(--card); border: 1px solid var(--card-border);">
+                    <button onclick="setViewMode('list')" id="view_list" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">☰</button>
+                    <button onclick="setViewMode('grid')" id="view_grid" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">⊞</button>
                 </div>
             </div>
+            
+            <!-- Books Container -->
             <div id="myBooksContainer" class="pb-4"></div>
         </div>
 
-        <!-- TAB: RECOMMENDATIONS -->
+        <!-- ===== TAB: DISCOVER ===== -->
         <div id="tabDiscover" class="tab-content fade-in">
-            <header class="mb-5"><h1 class="text-2xl font-black tracking-tight">Рекомендації</h1><p class="text-muted text-sm mt-0.5">Підібрано для вас</p></header>
+            <header class="mb-5">
+                <h1 class="text-2xl font-black tracking-tight">Рекомендації</h1>
+                <p class="text-muted text-xs font-medium mt-0.5">Підібрано спеціально для вас</p>
+            </header>
             <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="recTabs">
                 <button onclick="loadRealRecommendations('auto','rec_auto')" id="rec_auto" class="pill active">✨ Для вас</button>
                 <button onclick="loadRealRecommendations('Академія магії','rec_magic')" id="rec_magic" class="pill inactive">🔮 Магія</button>
@@ -187,108 +600,226 @@
                 <button onclick="loadRealRecommendations('Саморозвиток','rec_self')" id="rec_self" class="pill inactive">🧠 Саморозвиток</button>
                 <button onclick="loadRealRecommendations('Фантастика','rec_scifi')" id="rec_scifi" class="pill inactive">🚀 Фантастика</button>
             </div>
-            <div id="recommendationsList" class="space-y-3 mt-3"></div>
+            <div id="recommendationsList" class="space-y-3 mt-3 stagger"></div>
             <div id="recScrollTarget" class="h-10 w-full pb-20"></div>
         </div>
 
-        <!-- TAB: PROFILE -->
+        <!-- ===== TAB: PROFILE ===== -->
         <div id="tabProfile" class="tab-content fade-in">
-            <header class="mb-6 text-center pt-4">
-                <div class="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full mx-auto mb-3 flex items-center justify-center text-3xl shadow-lg shadow-primary-200">📖</div>
-                <h2 id="profileName" class="text-lg font-bold">Читач</h2>
-                <p id="profileEmail" class="text-muted text-xs"></p>
+            <header class="mb-8 text-center pt-6">
+                <div class="relative inline-block">
+                    <div class="w-24 h-24 bg-gradient-to-br from-primary-400 via-primary-500 to-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl shadow-glow-lg">📖</div>
+                    <div class="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center text-xs shadow-lg">✓</div>
+                </div>
+                <h2 id="profileName" class="text-xl font-black mt-2">Читач</h2>
+                <p id="profileEmail" class="text-muted text-xs font-medium mt-1"></p>
             </header>
+            
+            <!-- Streak -->
             <div class="card-elevated p-5 mb-4">
-                <div class="flex items-center justify-between mb-3"><span class="text-sm font-bold">🔥 Серія читання</span><span id="streakCount" class="text-sm font-black text-primary-600">0 днів</span></div>
-                <div id="streakDots" class="flex gap-[6px] justify-center flex-wrap"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm font-bold">🔥 Серія читання</span>
+                    <span id="streakCount" class="text-sm font-black text-primary-600 badge" style="background: rgba(99,102,241,0.08);">0 днів</span>
+                </div>
+                <div id="streakDots" class="flex gap-[7px] justify-center flex-wrap"></div>
             </div>
+            
+            <!-- Goal -->
             <div class="card-elevated p-5 mb-4">
-                <div class="flex items-center justify-between mb-3"><span class="text-sm font-bold">🎯 Ціль на <span id="goalYear"></span></span><span id="goalProgress" class="text-sm font-black text-primary-600">0/12</span></div>
-                <div class="w-full bg-primary-100 h-2.5 rounded-full overflow-hidden"><div id="goalBar" class="bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full transition-all duration-500" style="width:0%"></div></div>
-                <div class="flex items-center gap-2 mt-3"><input type="number" id="goalInput" min="1" max="200" value="12" class="w-16 p-2 bg-surface rounded-lg text-center font-bold text-sm border border-slate-100 outline-none" onchange="saveGoal(this.value)"><span class="text-xs text-muted">книг на рік</span></div>
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-bold">🎯 Ціль на <span id="goalYear"></span></span>
+                    <span id="goalProgress" class="text-sm font-black text-primary-600">0/12</span>
+                </div>
+                <div class="w-full bg-primary-100 h-3 rounded-full overflow-hidden" style="background: rgba(99,102,241,0.1);">
+                    <div id="goalBar" class="bg-gradient-to-r from-primary-400 via-primary-500 to-purple-500 h-full rounded-full transition-all duration-700" style="width:0%"></div>
+                </div>
+                <div class="flex items-center gap-3 mt-4">
+                    <input type="number" id="goalInput" min="1" max="200" value="12" class="w-20 py-2.5 px-3 text-center font-bold text-sm rounded-xl outline-none" style="background: var(--card); border: 1px solid var(--card-border);" onchange="saveGoal(this.value)">
+                    <span class="text-xs text-muted font-medium">книг на рік</span>
+                </div>
             </div>
+            
+            <!-- Stats -->
             <div class="grid grid-cols-3 gap-3 mb-4">
-                <div class="stat-card"><div id="statBooks" class="text-xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Книг</div></div>
-                <div class="stat-card"><div id="statPages" class="text-xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Сторінок</div></div>
-                <div class="stat-card"><div id="statTime" class="text-xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Годин</div></div>
+                <div class="stat-card">
+                    <div id="statBooks" class="text-2xl font-black gradient-text">0</div>
+                    <div class="text-[10px] font-bold text-muted uppercase mt-1.5 tracking-wider">Книг</div>
+                </div>
+                <div class="stat-card">
+                    <div id="statPages" class="text-2xl font-black gradient-text">0</div>
+                    <div class="text-[10px] font-bold text-muted uppercase mt-1.5 tracking-wider">Сторінок</div>
+                </div>
+                <div class="stat-card">
+                    <div id="statTime" class="text-2xl font-black gradient-text">0</div>
+                    <div class="text-[10px] font-bold text-muted uppercase mt-1.5 tracking-wider">Годин</div>
+                </div>
             </div>
-            <div class="card-elevated p-4 mb-4"><p class="text-[10px] font-bold uppercase text-muted mb-2">📊 Книг по місяцях</p><div class="h-36 w-full"><canvas id="statsChart"></canvas></div></div>
+            
+            <!-- Chart -->
+            <div class="card-elevated p-5 mb-4">
+                <p class="text-[10px] font-bold uppercase text-muted mb-3 tracking-wider">📊 Книг по місяцях</p>
+                <div class="chart-container"><canvas id="statsChart"></canvas></div>
+            </div>
+            
+            <!-- Actions -->
             <div class="space-y-2 mb-8">
-                <button onclick="toggleAppTheme()" class="w-full p-4 card flex justify-between items-center"><span class="font-bold text-sm">Тема оформлення</span><span class="text-xl">🌓</span></button>
-                <button onclick="exportLibrary()" class="w-full p-4 card text-left font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</button>
-                <button onclick="importLibrary()" class="w-full p-4 card text-left font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</button>
-                <button onclick="clearAppCache()" class="w-full p-4 card text-left font-bold text-sm text-amber-600">🔄 Очистити кеш</button>
-                <button onclick="logout()" class="w-full p-4 card text-left font-bold text-sm text-red-500">🚪 Вийти</button>
+                <button onclick="toggleAppTheme()" class="w-full p-4 card flex justify-between items-center">
+                    <span class="font-bold text-sm">Тема оформлення</span>
+                    <span class="text-xl" id="themeIcon">🌓</span>
+                </button>
+                <button onclick="exportLibrary()" class="w-full p-4 card text-left">
+                    <span class="font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</span>
+                </button>
+                <button onclick="importLibrary()" class="w-full p-4 card text-left">
+                    <span class="font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</span>
+                </button>
+                <button onclick="clearAppCache()" class="w-full p-4 card text-left">
+                    <span class="font-bold text-sm text-amber-600">🔄 Очистити кеш</span>
+                </button>
+                <button onclick="logout()" class="w-full p-4 card text-left">
+                    <span class="font-bold text-sm text-red-500">🚪 Вийти з акаунту</span>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- BOTTOM NAV -->
+    <!-- ========== BOTTOM NAV ========== -->
     <nav id="mainBottomNav" class="nav-bar hidden">
-        <div class="max-w-lg mx-auto flex items-center justify-around px-2 py-2">
-            <button onclick="switchTab('library')" class="nav-tab active flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all"><span class="text-[20px]">📚</span><span class="text-[10px] font-bold uppercase tracking-wide">Книги</span></button>
-            <button onclick="switchTab('discover')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">⭐</span><span class="text-[10px] font-bold uppercase tracking-wide">Поради</span></button>
-            <button onclick="switchTab('profile')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">👤</span><span class="text-[10px] font-bold uppercase tracking-wide">Профіль</span></button>
+        <div class="max-w-lg mx-auto flex items-center justify-around px-4 py-2.5">
+            <button onclick="switchTab('library')" id="navLibrary" class="nav-tab nav-tab-active flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300">
+                <span class="text-[22px] transition-transform">📚</span>
+                <span class="text-[10px] font-bold tracking-wide">Книги</span>
+            </button>
+            <button onclick="switchTab('discover')" id="navDiscover" class="nav-tab flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300 opacity-50">
+                <span class="text-[22px] transition-transform">⭐</span>
+                <span class="text-[10px] font-bold tracking-wide">Поради</span>
+            </button>
+            <button onclick="switchTab('profile')" id="navProfile" class="nav-tab flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300 opacity-50">
+                <span class="text-[22px] transition-transform">👤</span>
+                <span class="text-[10px] font-bold tracking-wide">Профіль</span>
+            </button>
         </div>
     </nav>
 
-    <div class="backdrop fixed inset-0 z-40 bg-black/40 backdrop-blur-sm hidden" onclick="closeAllSheets()"></div>
+    <!-- Backdrop -->
+    <div class="backdrop fixed inset-0 z-40 hidden" onclick="closeAllSheets()"></div>
 
-    <!-- READER -->
+    <!-- ========== READER ========== -->
     <div id="readerOverlay">
         <div class="reader-controls relative">
-            <button onclick="closeReader()" class="font-bold text-red-500 bg-red-50 px-4 py-2 rounded-xl text-sm active:scale-95">✕</button>
-            <div class="flex flex-col items-center max-w-[50%]"><div id="readerTitle" class="text-xs font-bold truncate text-muted w-full text-center">Книга</div><div id="readerTimer" class="text-[10px] font-mono font-bold text-slate-400 tracking-widest mt-0.5">00:00</div></div>
-            <button onclick="toggleReaderSettings()" class="font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-xl text-sm active:scale-95">⚙️</button>
-            <div id="readerSettingsMenu" class="hidden absolute top-16 right-4 w-52 bg-white shadow-2xl rounded-2xl p-4 border border-slate-100 space-y-4 z-50 fade-in">
-                <div><p class="text-[10px] font-bold uppercase text-muted mb-2">Розмір</p><div class="flex gap-2"><button onclick="changeFontSize(-10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold active:scale-95">A-</button><button onclick="changeFontSize(10)" class="flex-1 bg-slate-100 py-2 rounded-xl font-bold active:scale-95">A+</button></div></div>
-                <div><p class="text-[10px] font-bold uppercase text-muted mb-2">Тема</p><div class="flex gap-3 justify-between"><button onclick="changeReaderTheme('light')" class="size-9 rounded-full bg-[#f8fafc] border-2 border-slate-200 active:scale-90"></button><button onclick="changeReaderTheme('sepia')" class="size-9 rounded-full bg-[#f4ecd8] border-2 border-slate-200 active:scale-90"></button><button onclick="changeReaderTheme('dark')" class="size-9 rounded-full bg-[#0f172a] border-2 border-slate-500 active:scale-90"></button></div></div>
+            <button onclick="closeReader()" class="font-bold text-red-500 bg-red-50 px-4 py-2.5 rounded-xl text-sm active:scale-95 transition-transform" style="background: rgba(239,68,68,0.08);">✕</button>
+            <div class="flex flex-col items-center max-w-[50%]">
+                <div id="readerTitle" class="text-xs font-bold truncate text-muted w-full text-center">Книга</div>
+                <div id="readerTimer" class="text-[10px] font-mono font-bold text-muted tracking-widest mt-0.5">00:00</div>
+            </div>
+            <button onclick="toggleReaderSettings()" class="font-bold px-3.5 py-2.5 rounded-xl text-sm active:scale-95 transition-transform" style="background: var(--card); border: 1px solid var(--card-border);">⚙️</button>
+            <div id="readerSettingsMenu" class="hidden absolute top-16 right-4 w-56 shadow-elevated rounded-2xl p-5 border space-y-5 z-50 scale-in" style="background: var(--card); border-color: var(--card-border);">
+                <div>
+                    <p class="text-[10px] font-bold uppercase text-muted mb-2 tracking-wider">Розмір тексту</p>
+                    <div class="flex gap-2">
+                        <button onclick="changeFontSize(-10)" class="flex-1 py-2.5 rounded-xl font-bold active:scale-95 transition-transform" style="background: var(--card-border);">A−</button>
+                        <button onclick="changeFontSize(10)" class="flex-1 py-2.5 rounded-xl font-bold active:scale-95 transition-transform" style="background: var(--card-border);">A+</button>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-[10px] font-bold uppercase text-muted mb-2 tracking-wider">Тема</p>
+                    <div class="flex gap-3 justify-between">
+                        <button onclick="changeReaderTheme('light')" class="size-10 rounded-full bg-[#fafafa] border-2 border-gray-200 active:scale-90 transition-transform shadow-sm"></button>
+                        <button onclick="changeReaderTheme('sepia')" class="size-10 rounded-full bg-[#f4ecd8] border-2 border-amber-200 active:scale-90 transition-transform shadow-sm"></button>
+                        <button onclick="changeReaderTheme('dark')" class="size-10 rounded-full bg-[#0a0a0f] border-2 border-gray-600 active:scale-90 transition-transform shadow-sm"></button>
+                    </div>
+                </div>
             </div>
         </div>
         <div id="viewer" onclick="document.getElementById('readerSettingsMenu').classList.add('hidden')"></div>
-        <div class="reader-controls border-t"><button onclick="rendition?.prev()" class="nav-btn">←</button><div id="readerProgress" class="text-[10px] font-black text-primary-600 uppercase tracking-widest bg-primary-50 px-3 py-1.5 rounded-lg text-center min-w-[70px]">...</div><button onclick="rendition?.next()" class="nav-btn !bg-primary-600 !text-white">→</button></div>
+        <div class="reader-controls border-t" style="border-color: var(--card-border);">
+            <button onclick="rendition?.prev()" class="nav-btn">← Назад</button>
+            <div id="readerProgress" class="text-[11px] font-black text-primary-600 uppercase tracking-wider px-4 py-2 rounded-xl text-center min-w-[70px]" style="background: rgba(99,102,241,0.08);">...</div>
+                        <button onclick="rendition?.next()" class="nav-btn" style="background: linear-gradient(135deg,#6366f1,#4f46e5); color: white; border: none;">Далі →</button>
+        </div>
     </div>
 
-    <!-- SCANNER -->
-    <div id="scannerSheet" class="hidden fixed inset-0 z-[150] bg-zinc-900 flex flex-col items-center justify-center">
-        <div class="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/70 to-transparent"><h3 class="font-bold text-white">Сканувати ISBN</h3><button onclick="closeScanner()" class="bg-white/20 backdrop-blur text-white size-10 rounded-full flex justify-center items-center font-bold active:scale-95">✕</button></div>
+    <!-- ========== SCANNER ========== -->
+    <div id="scannerSheet" class="fixed inset-0 z-[150] bg-zinc-900 flex-col items-center justify-center" style="display:none;">
+        <div class="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/70 to-transparent">
+            <h3 class="font-bold text-white text-lg">Сканувати ISBN</h3>
+            <button onclick="closeScanner()" class="bg-white/20 backdrop-blur text-white size-11 rounded-full flex justify-center items-center font-bold active:scale-95 transition-transform">✕</button>
+        </div>
         <div id="reader" class="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-zinc-700 aspect-square"></div>
     </div>
 
-    <!-- SEARCH -->
-    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="height:85vh">
-        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
-        <div class="px-5 pb-4 shrink-0"><div class="relative"><span class="absolute left-4 top-3 text-muted">🔍</span><input type="text" id="searchInput" placeholder="Назва, автор або ISBN..." class="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm"></div></div>
-        <div id="searchResults" class="px-4 pb-6 overflow-y-auto flex-1">
-            <button onclick="openScanner()" class="w-full mb-2 p-3 text-center text-sm font-semibold text-white bg-zinc-800 rounded-xl active:scale-95 transition-transform">📷 Сканувати штрих-код</button>
-            <button onclick="openManualForm()" class="w-full mb-3 p-3 text-center text-sm font-semibold text-primary-600 bg-primary-50 rounded-xl active:scale-95 transition-transform">✍️ Додати вручну</button>
-            <div id="searchItems" class="space-y-1"></div>
+    <!-- ========== SEARCH SHEET ========== -->
+    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 rounded-t-[32px] shadow-elevated flex flex-col max-w-lg mx-auto" style="height:88vh">
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab">
+            <div class="w-12 h-1.5 rounded-full" style="background: var(--card-border);"></div>
+        </div>
+        <div class="px-5 pb-4 shrink-0">
+            <div class="relative search-box">
+                <span class="absolute left-4 top-[14px] text-muted">🔍</span>
+                <input type="text" id="searchInput" placeholder="Назва, автор або ISBN..." class="w-full pl-11 pr-4 py-3.5 bg-transparent rounded-2xl outline-none font-medium text-sm">
+            </div>
+        </div>
+        <div id="searchResults" class="px-5 pb-6 overflow-y-auto flex-1 scrollbar-hide">
+            <div class="grid grid-cols-2 gap-2 mb-4">
+                <button onclick="openScanner()" class="p-3.5 text-center text-sm font-semibold text-white bg-zinc-800 rounded-2xl active:scale-95 transition-transform">📷 Сканер</button>
+                <button onclick="openManualForm()" class="p-3.5 text-center text-sm font-semibold text-primary-600 rounded-2xl active:scale-95 transition-transform" style="background: rgba(99,102,241,0.08);">✍️ Вручну</button>
+            </div>
+            <div id="searchItems" class="space-y-1.5 stagger"></div>
         </div>
     </div>
 
-    <!-- DETAILS -->
-    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="max-height:92vh">
-        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
-        <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
+    <!-- ========== DETAILS SHEET ========== -->
+    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 rounded-t-[32px] shadow-elevated flex flex-col max-w-lg mx-auto" style="max-height:92vh">
+        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab">
+            <div class="w-12 h-1.5 rounded-full" style="background: var(--card-border);"></div>
+        </div>
+        <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1 scrollbar-hide"></div>
         <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-3 fade-in">
             <h3 class="text-lg font-bold mb-3">Редагувати</h3>
-            <input type="text" id="editTitle" placeholder="Назва" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
-            <input type="text" id="editAuthor" placeholder="Автор" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
-            <input type="number" id="editPages" placeholder="Сторінок" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
-            <input type="url" id="editImage" placeholder="URL обкладинки" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-xs">
-            <div class="flex gap-2 pt-2"><button onclick="saveBookEdits()" class="flex-1 p-3.5 bg-primary-600 text-white font-bold rounded-xl text-sm active:scale-95">Зберегти</button><button onclick="toggleEditMode(false)" class="flex-1 p-3.5 bg-slate-100 font-bold rounded-xl text-sm active:scale-95">Скасувати</button></div>
+            <input type="text" id="editTitle" placeholder="Назва" class="input-field">
+            <input type="text" id="editAuthor" placeholder="Автор" class="input-field">
+            <input type="number" id="editPages" placeholder="Кількість сторінок" class="input-field">
+            <input type="url" id="editImage" placeholder="URL обкладинки" class="input-field text-xs">
+            <div class="flex gap-3 pt-3">
+                <button onclick="saveBookEdits()" class="flex-1 py-3.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-2xl text-sm active:scale-95 transition-transform shadow-glow">Зберегти</button>
+                <button onclick="toggleEditMode(false)" class="flex-1 py-3.5 font-bold rounded-2xl text-sm active:scale-95 transition-transform" style="background: var(--card-border);">Скасувати</button>
+            </div>
         </div>
-        <div id="statusButtons" class="p-4 bg-white border-t border-slate-100 grid grid-cols-3 gap-2 shrink-0 hidden">
-            <button onclick="addBookWithStatus('planned')" class="flex flex-col items-center p-3 bg-slate-50 rounded-xl active:scale-95 text-primary-600"><span class="text-lg">🕒</span><span class="text-[10px] font-bold mt-0.5">В плани</span></button>
-            <button onclick="addBookWithStatus('reading')" class="flex flex-col items-center p-3 bg-primary-600 text-white rounded-xl active:scale-95"><span class="text-lg">📖</span><span class="text-[10px] font-bold mt-0.5">Читати</span></button>
-            <button onclick="addBookWithStatus('finished')" class="flex flex-col items-center p-3 bg-emerald-50 text-emerald-700 rounded-xl active:scale-95"><span class="text-lg">✅</span><span class="text-[10px] font-bold mt-0.5">Прочитав</span></button>
+        <div id="statusButtons" class="p-5 border-t grid grid-cols-3 gap-3 shrink-0 hidden" style="background: var(--card); border-color: var(--card-border);">
+            <button onclick="addBookWithStatus('planned')" class="flex flex-col items-center p-4 rounded-2xl active:scale-95 transition-transform" style="background: rgba(99,102,241,0.06); color: #6366f1;">
+                <span class="text-2xl mb-1">🕒</span>
+                <span class="text-[11px] font-bold">В плани</span>
+            </button>
+            <button onclick="addBookWithStatus('reading')" class="flex flex-col items-center p-4 bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-2xl active:scale-95 transition-transform shadow-glow">
+                <span class="text-2xl mb-1">📖</span>
+                <span class="text-[11px] font-bold">Читати</span>
+            </button>
+            <button onclick="addBookWithStatus('finished')" class="flex flex-col items-center p-4 rounded-2xl active:scale-95 transition-transform" style="background: rgba(16,185,129,0.06); color: #059669;">
+                <span class="text-2xl mb-1">✅</span>
+                <span class="text-[11px] font-bold">Прочитав</span>
+            </button>
         </div>
     </div>
+
+    <!-- ========== SCRIPTS ========== -->
     <script>
-        function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`)){res();return;}const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
-        async function loadReaderDeps(){await Promise.all([loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js'),loadScript('https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js'),loadScript('https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js')]);}
-        async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
-        async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
+        function loadScript(src) {
+            return new Promise((res, rej) => {
+                if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+                const s = document.createElement('script');
+                s.src = src; s.onload = res; s.onerror = rej;
+                document.head.appendChild(s);
+            });
+        }
+        async function loadReaderDeps() {
+            await Promise.all([
+                loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js'),
+                loadScript('https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js'),
+                loadScript('https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js')
+            ]);
+        }
+        async function loadChartJS() { await loadScript('https://cdn.jsdelivr.net/npm/chart.js'); }
+        async function loadScannerLib() { await loadScript('https://unpkg.com/html5-qrcode'); }
     </script>
     <script src="app.js"></script>
 </body>
