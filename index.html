@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>ЧитайКо</title>
-    <link rel="icon" href="icon-192.png">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0f">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -25,17 +25,7 @@
                 extend: {
                     fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'] },
                     colors: {
-                        primary: {50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81'},
-                        surface: {50:'#fafafa',100:'#f4f4f5',200:'#e4e4e7',300:'#d4d4d8'},
-                        dark: {50:'#18181b',100:'#1c1c22',200:'#27272a',300:'#3f3f46',400:'#52525b',500:'#71717a'}
-                    },
-                    borderRadius: { '4xl': '2rem' },
-                    boxShadow: {
-                        'glow': '0 0 20px rgba(99, 102, 241, 0.15)',
-                        'glow-lg': '0 0 40px rgba(99, 102, 241, 0.2)',
-                        'card': '0 2px 24px rgba(0, 0, 0, 0.04)',
-                        'card-hover': '0 8px 40px rgba(0, 0, 0, 0.08)',
-                        'elevated': '0 12px 48px rgba(0, 0, 0, 0.12)'
+                        primary: {50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81'}
                     }
                 }
             }
@@ -66,7 +56,7 @@
         ::-webkit-scrollbar { width: 0; background: transparent; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        
+
         body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background: var(--bg);
@@ -76,8 +66,17 @@
             padding-top: var(--safe-top);
             padding-bottom: calc(80px + var(--safe-bottom));
         }
-        
-        /* === PREMIUM CARDS === */
+        body.modal-open {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            left: 0;
+            right: 0;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
         .card {
             background: var(--card);
             border: 1px solid var(--card-border);
@@ -86,24 +85,14 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.02);
         }
         .card:active { transform: scale(0.97); }
-        .card:hover { box-shadow: var(--shadow-card-hover, 0 4px 20px rgba(0,0,0,0.06)); }
-        
-        .card-glass {
-            background: var(--glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 24px;
-        }
-        
+
         .card-elevated {
             background: var(--card);
             border: 1px solid var(--card-border);
             border-radius: 24px;
             box-shadow: 0 4px 32px rgba(0,0,0,0.04);
         }
-        
-        /* === GLASS NAV === */
+
         .nav-bar {
             position: fixed;
             bottom: 0;
@@ -116,16 +105,14 @@
             z-index: 30;
             padding-bottom: var(--safe-bottom);
         }
-        
-        /* === ANIMATIONS === */
+
         .fade-in { animation: fadeIn .3s cubic-bezier(.4,0,.2,1) forwards; }
         .fade-up { animation: fadeUp .4s cubic-bezier(.4,0,.2,1) forwards; }
         .scale-in { animation: scaleIn .3s cubic-bezier(.34,1.56,.64,1) forwards; }
-        
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        
+
         .stagger > * { opacity: 0; animation: fadeUp .4s cubic-bezier(.4,0,.2,1) forwards; }
         .stagger > *:nth-child(1) { animation-delay: .05s; }
         .stagger > *:nth-child(2) { animation-delay: .1s; }
@@ -133,10 +120,7 @@
         .stagger > *:nth-child(4) { animation-delay: .2s; }
         .stagger > *:nth-child(5) { animation-delay: .25s; }
         .stagger > *:nth-child(6) { animation-delay: .3s; }
-        .stagger > *:nth-child(7) { animation-delay: .35s; }
-        .stagger > *:nth-child(8) { animation-delay: .4s; }
-        
-        /* === BOTTOM SHEET === */
+
         .bottom-sheet {
             transform: translateY(100%);
             transition: transform .4s cubic-bezier(.32,.72,0,1);
@@ -145,22 +129,20 @@
             border-bottom: none;
         }
         .bottom-sheet.open { transform: translateY(0); }
-        
-        .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .3s ease;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-}
-body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
 
-        
-        /* === PILLS === */
+        .backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .3s ease;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
+
         .pill {
             padding: 8px 18px;
             border-radius: 100px;
@@ -182,12 +164,9 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             border: 1px solid var(--card-border);
         }
         .pill.inactive:active { transform: scale(0.95); }
-        
-        /* === PROGRESS === */
+
         .progress-bar { transition: width .6s cubic-bezier(.4,0,.2,1); }
-        .progress-ring { transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1); }
-        
-        /* === INPUT === */
+
         .input-field {
             width: 100%;
             padding: 14px 16px;
@@ -205,8 +184,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
         }
         .input-field::placeholder { color: var(--text-muted); }
-        
-        /* === SEARCH === */
+
         .search-box {
             background: var(--card);
             border: 1.5px solid var(--card-border);
@@ -217,41 +195,18 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             border-color: #6366f1;
             box-shadow: 0 0 0 4px rgba(99,102,241,0.08);
         }
-        
-        /* === MISC === */
+
         .text-muted { color: var(--text-muted); }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
         .desc-scroll { max-height: 25vh; overflow-y: auto; overscroll-behavior: contain; }
-        
+
         .gradient-text {
             background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        
-        .gradient-border {
-            position: relative;
-            background: var(--card);
-            border-radius: 24px;
-        }
-        .gradient-border::before {
-            content: '';
-            position: absolute;
-            inset: -1px;
-            border-radius: 25px;
-            padding: 1px;
-            background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.1), rgba(236,72,153,0.2));
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-        }
-        
-        /* === STAT CARDS === */
+
         .stat-card {
             background: var(--card);
             border: 1px solid var(--card-border);
@@ -270,8 +225,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             height: 200%;
             background: radial-gradient(circle, rgba(99,102,241,0.04) 0%, transparent 70%);
         }
-        
-        /* === STREAK === */
+
         .streak-cell {
             width: 20px;
             height: 20px;
@@ -284,8 +238,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
         }
         .streak-cell.inactive { background: var(--card-border); }
         .streak-cell.today { box-shadow: 0 0 0 2px #6366f1, 0 0 0 4px rgba(99,102,241,0.2); }
-        
-        /* === READER === */
+
         #readerOverlay {
             display: none;
             position: fixed;
@@ -313,11 +266,10 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             font-weight: 700;
             font-size: 14px;
             color: var(--text);
-            transition: transform .1s, box-shadow .2s;
+            transition: transform .1s;
         }
         .nav-btn:active { transform: scale(0.93); }
-        
-        /* === TOAST === */
+
         .toast {
             position: fixed;
             top: calc(20px + var(--safe-top));
@@ -334,12 +286,10 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             transition: transform .4s cubic-bezier(.32,.72,0,1);
             max-width: 90vw;
             text-align: center;
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            color: var(--text);
         }
         .toast.show { transform: translateX(-50%) translateY(0); }
-        
-        /* === SKELETON === */
+
         .skeleton {
             background: linear-gradient(90deg, var(--card-border) 25%, rgba(99,102,241,0.05) 50%, var(--card-border) 75%);
             background-size: 200% 100%;
@@ -347,8 +297,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             animation: shimmer 1.5s infinite;
         }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        
-        /* === PTR === */
+
         .ptr-indicator {
             position: fixed;
             top: var(--safe-top);
@@ -372,8 +321,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
         .ptr-indicator.visible { transform: translateX(-50%) translateY(16px); }
         .ptr-spinner { width: 18px; height: 18px; border: 2.5px solid var(--card-border); border-top-color: #6366f1; border-radius: 50%; animation: spin .6s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        
-        /* === SWIPE === */
+
         .swipe-card { position: relative; overflow: hidden; }
         .swipe-card .swipe-bg {
             position: absolute; top: 0; bottom: 0; right: 0; width: 80px;
@@ -383,45 +331,35 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             opacity: 0; transition: opacity .2s;
         }
         .swipe-card.swiping .swipe-bg { opacity: 1; }
-        
-        /* === CELEBRATION === */
+
         .celebration { position: fixed; inset: 0; z-index: 999; display: flex; align-items: center; justify-content: center; pointer-events: none; }
         .celebration-text { font-size: 64px; animation: celebPop 1.2s cubic-bezier(.17,.67,.3,1.33) forwards; }
         @keyframes celebPop { 0% { transform: scale(0) rotate(-15deg); opacity: 0; } 40% { transform: scale(1.3) rotate(5deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 0; } }
-        
-        /* === SLIDER === */
+
         .progress-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; background: var(--card-border); outline: none; }
         .progress-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #4f46e5); cursor: pointer; box-shadow: 0 2px 12px rgba(99,102,241,0.4); }
-        
-        /* === WELCOME === */
+
         .welcome-card {
             background: var(--card);
             border: 1px solid var(--card-border);
             border-radius: 28px;
             padding: 32px 24px;
             text-align: center;
-            position: relative;
-            overflow: hidden;
         }
-        .welcome-card::before {
-            content: '';
-            position: absolute;
-            top: -100px;
-            right: -100px;
-            width: 250px;
-            height: 250px;
-            background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
-            border-radius: 50%;
-        }
-        
-        /* === NAV TAB ACTIVE === */
+
         .nav-tab-active {
             background: rgba(99,102,241,0.08);
             border-radius: 16px;
         }
-        .nav-tab-active span:first-child { transform: scale(1.1); }
-        
-        /* === DATE INPUT === */
+        .nav-tab-active span:first-child {
+            animation: navBounce .4s cubic-bezier(.34,1.56,.64,1);
+        }
+        @keyframes navBounce {
+            0% { transform: scale(0.8); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1.05); }
+        }
+
         .date-input {
             border: none;
             background: transparent !important;
@@ -432,11 +370,9 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             cursor: pointer;
             text-align: right;
         }
-        
-        /* === SORTABLE === */
+
         .sortable-ghost { opacity: 0.3; transform: scale(0.95); }
-        
-        /* === ADD BUTTON === */
+
         .fab {
             width: 52px;
             height: 52px;
@@ -452,8 +388,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             transition: transform .15s, box-shadow .25s;
         }
         .fab:active { transform: scale(0.9); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
-        
-        /* === QUICK RESUME === */
+
         .quick-resume {
             background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.04));
             border: 1px solid rgba(99,102,241,0.12);
@@ -462,8 +397,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             transition: transform .15s;
         }
         .quick-resume:active { transform: scale(0.98); }
-        
-        /* === BADGE === */
+
         .badge {
             display: inline-flex;
             align-items: center;
@@ -473,15 +407,24 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             font-size: 11px;
             font-weight: 600;
         }
-        
-        /* Scanner */
+
+        .chart-container { position: relative; height: 140px; width: 100%; }
+
+        body.dark select {
+            background: var(--card) !important;
+            color: var(--text) !important;
+            border-color: var(--card-border) !important;
+        }
+
+        @media (hover: hover) {
+            .card:hover { transform: translateY(-1px); box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+            .pill.inactive:hover { background: rgba(99,102,241,0.06); color: #6366f1; }
+            .fab:hover { transform: scale(1.05); box-shadow: 0 12px 32px rgba(99,102,241,0.4); }
+        }
+
         #scannerSheet { display: none; }
-        #scannerSheet.open { display: flex; }
         #reader { border: none !important; }
         #reader video { object-fit: cover !important; border-radius: 1.5rem !important; }
-        
-        /* Chart */
-        .chart-container { position: relative; height: 140px; width: 100%; }
     </style>
 </head>
 <body class="font-sans antialiased">
@@ -498,35 +441,27 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
     <!-- ========== AUTH SCREEN ========== -->
     <div id="authScreen" class="fixed inset-0 z-[100] flex items-center justify-center p-6 overflow-y-auto fade-in" style="background: var(--bg);">
         <div class="w-full max-w-sm my-auto">
-            <!-- Logo -->
             <div class="text-center mb-10">
-                <div class="w-24 h-24 bg-gradient-to-br from-primary-400 via-primary-500 to-purple-600 rounded-[28px] mx-auto mb-5 flex items-center justify-center shadow-glow-lg rotate-3 hover:rotate-0 transition-transform duration-500">
+                <div class="w-24 h-24 bg-gradient-to-br from-primary-400 via-primary-500 to-purple-600 rounded-[28px] mx-auto mb-5 flex items-center justify-center shadow-lg rotate-3 hover:rotate-0 transition-transform duration-500">
                     <span class="text-5xl -rotate-3">📚</span>
                 </div>
                 <h1 class="text-3xl font-black tracking-tight">ЧитайКо</h1>
                 <p class="text-muted text-sm mt-2 font-medium">Ваша хмарна бібліотека</p>
             </div>
-            
-            <!-- Error -->
             <div id="authError" class="text-center text-sm text-white bg-gradient-to-r from-red-500 to-rose-500 font-semibold p-4 rounded-2xl mb-5 hidden shadow-lg"></div>
-            
-            <!-- Form -->
             <div class="space-y-3 mb-4">
                 <input type="email" id="authEmail" placeholder="Email" class="input-field">
                 <input type="password" id="authPassword" placeholder="Пароль (мін. 6 символів)" class="input-field">
             </div>
-            
             <div class="flex gap-3 mb-6">
-                <button onclick="handleAuth('login',this)" class="flex-1 py-4 text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-2xl font-bold text-sm active:scale-95 transition-transform shadow-glow">Увійти</button>
+                <button onclick="handleAuth('login',this)" class="flex-1 py-4 text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-2xl font-bold text-sm active:scale-95 transition-transform shadow-lg">Увійти</button>
                 <button onclick="handleAuth('signup',this)" class="flex-1 py-4 font-bold text-sm rounded-2xl active:scale-95 transition-transform" style="background: var(--card); border: 1px solid var(--card-border); color: var(--text);">Створити</button>
             </div>
-            
             <div class="relative flex items-center mb-6">
                 <div class="flex-grow h-px" style="background: var(--card-border);"></div>
                 <span class="mx-4 text-muted text-[11px] font-bold uppercase tracking-wider">або</span>
                 <div class="flex-grow h-px" style="background: var(--card-border);"></div>
             </div>
-            
             <button onclick="signInWithGoogle(this)" class="w-full py-4 card flex items-center justify-center gap-3 font-bold text-sm active:scale-95 transition-transform">
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5">
                 <span>Увійти з Google</span>
@@ -548,7 +483,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
                     <div class="flex gap-3 items-center p-3 rounded-xl" style="background: rgba(139,92,246,0.05);"><span class="text-xl">📖</span><span>Завантажте .epub для офлайн читання</span></div>
                     <div class="flex gap-3 items-center p-3 rounded-xl" style="background: rgba(236,72,153,0.05);"><span class="text-xl">🎯</span><span>Встановіть ціль у <b>Профілі</b></span></div>
                 </div>
-                <button onclick="dismissWelcome()" class="w-full py-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-2xl active:scale-95 transition-transform shadow-glow">Почати! 🚀</button>
+                <button onclick="dismissWelcome()" class="w-full py-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-2xl active:scale-95 transition-transform shadow-lg">Почати! 🚀</button>
             </div>
         </div>
 
@@ -561,32 +496,22 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
                 </div>
                 <button onclick="openSheet('searchSheet')" class="fab" aria-label="Додати книгу">+</button>
             </header>
-            
-            <!-- Quick Resume -->
             <div id="quickResume" class="mb-5 hidden"></div>
-            
-            <!-- Search -->
             <div class="relative mb-4 search-box">
                 <span class="absolute left-4 top-[13px] text-muted text-sm pointer-events-none">🔍</span>
                 <input type="search" id="librarySearchInput" placeholder="Пошук у бібліотеці..." class="w-full pl-11 pr-4 py-3 bg-transparent text-sm font-medium outline-none rounded-2xl" oninput="filterLibrary(this.value)">
             </div>
-            
-            <!-- Tabs -->
             <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="libraryTabs">
                 <button onclick="setLibraryTab('reading')" id="tab_reading" class="pill active">📖 Читаю</button>
                 <button onclick="setLibraryTab('planned')" id="tab_planned" class="pill inactive">🕒 В планах</button>
                 <button onclick="setLibraryTab('finished')" id="tab_finished" class="pill inactive">✅ Прочитано</button>
             </div>
-            
-            <!-- View Toggle -->
             <div class="flex justify-end mb-3">
                 <div class="flex gap-1 p-1 rounded-xl" style="background: var(--card); border: 1px solid var(--card-border);">
-                    <button onclick="setViewMode('list')" id="view_list" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">☰</button>
-                    <button onclick="setViewMode('grid')" id="view_grid" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all">⊞</button>
+                    <button onclick="setViewMode('list')" id="view_list" class="px-3 py-1.5 rounded-lg text-xs font-bold">☰</button>
+                    <button onclick="setViewMode('grid')" id="view_grid" class="px-3 py-1.5 rounded-lg text-xs font-bold">⊞</button>
                 </div>
             </div>
-            
-            <!-- Books Container -->
             <div id="myBooksContainer" class="pb-4"></div>
         </div>
 
@@ -614,14 +539,11 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
         <div id="tabProfile" class="tab-content fade-in">
             <header class="mb-8 text-center pt-6">
                 <div class="relative inline-block">
-                    <div class="w-24 h-24 bg-gradient-to-br from-primary-400 via-primary-500 to-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl shadow-glow-lg">📖</div>
-                    <div class="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center text-xs shadow-lg">✓</div>
+                    <div class="w-24 h-24 bg-gradient-to-br from-primary-400 via-primary-500 to-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl shadow-lg">📖</div>
                 </div>
                 <h2 id="profileName" class="text-xl font-black mt-2">Читач</h2>
                 <p id="profileEmail" class="text-muted text-xs font-medium mt-1"></p>
             </header>
-            
-            <!-- Streak -->
             <div class="card-elevated p-5 mb-4">
                 <div class="flex items-center justify-between mb-4">
                     <span class="text-sm font-bold">🔥 Серія читання</span>
@@ -629,23 +551,19 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
                 </div>
                 <div id="streakDots" class="flex gap-[7px] justify-center flex-wrap"></div>
             </div>
-            
-            <!-- Goal -->
             <div class="card-elevated p-5 mb-4">
                 <div class="flex items-center justify-between mb-3">
                     <span class="text-sm font-bold">🎯 Ціль на <span id="goalYear"></span></span>
                     <span id="goalProgress" class="text-sm font-black text-primary-600">0/12</span>
                 </div>
-                <div class="w-full bg-primary-100 h-3 rounded-full overflow-hidden" style="background: rgba(99,102,241,0.1);">
+                <div class="w-full h-3 rounded-full overflow-hidden" style="background: rgba(99,102,241,0.1);">
                     <div id="goalBar" class="bg-gradient-to-r from-primary-400 via-primary-500 to-purple-500 h-full rounded-full transition-all duration-700" style="width:0%"></div>
                 </div>
                 <div class="flex items-center gap-3 mt-4">
-                    <input type="number" id="goalInput" min="1" max="200" value="12" class="w-20 py-2.5 px-3 text-center font-bold text-sm rounded-xl outline-none" style="background: var(--card); border: 1px solid var(--card-border);" onchange="saveGoal(this.value)">
+                    <input type="number" id="goalInput" min="1" max="200" value="12" class="w-20 py-2.5 px-3 text-center font-bold text-sm rounded-xl outline-none" style="background: var(--card); border: 1px solid var(--card-border); color: var(--text);" onchange="saveGoal(this.value)">
                     <span class="text-xs text-muted font-medium">книг на рік</span>
                 </div>
             </div>
-            
-            <!-- Stats -->
             <div class="grid grid-cols-3 gap-3 mb-4">
                 <div class="stat-card">
                     <div id="statBooks" class="text-2xl font-black gradient-text">0</div>
@@ -660,47 +578,35 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
                     <div class="text-[10px] font-bold text-muted uppercase mt-1.5 tracking-wider">Годин</div>
                 </div>
             </div>
-            
-            <!-- Chart -->
             <div class="card-elevated p-5 mb-4">
                 <p class="text-[10px] font-bold uppercase text-muted mb-3 tracking-wider">📊 Книг по місяцях</p>
                 <div class="chart-container"><canvas id="statsChart"></canvas></div>
             </div>
-            
-            <!-- Actions -->
             <div class="space-y-2 mb-8">
                 <button onclick="toggleAppTheme()" class="w-full p-4 card flex justify-between items-center">
                     <span class="font-bold text-sm">Тема оформлення</span>
-                    <span class="text-xl" id="themeIcon">🌓</span>
+                    <span class="text-xl">🌓</span>
                 </button>
-                <button onclick="exportLibrary()" class="w-full p-4 card text-left">
-                    <span class="font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</span>
-                </button>
-                <button onclick="importLibrary()" class="w-full p-4 card text-left">
-                    <span class="font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</span>
-                </button>
-                <button onclick="clearAppCache()" class="w-full p-4 card text-left">
-                    <span class="font-bold text-sm text-amber-600">🔄 Очистити кеш</span>
-                </button>
-                <button onclick="logout()" class="w-full p-4 card text-left">
-                    <span class="font-bold text-sm text-red-500">🚪 Вийти з акаунту</span>
-                </button>
+                <button onclick="exportLibrary()" class="w-full p-4 card text-left"><span class="font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</span></button>
+                <button onclick="importLibrary()" class="w-full p-4 card text-left"><span class="font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</span></button>
+                <button onclick="clearAppCache()" class="w-full p-4 card text-left"><span class="font-bold text-sm text-amber-600">🔄 Очистити кеш</span></button>
+                <button onclick="logout()" class="w-full p-4 card text-left"><span class="font-bold text-sm text-red-500">🚪 Вийти з акаунту</span></button>
             </div>
         </div>
     </div>
 
     <!-- ========== BOTTOM NAV ========== -->
-    <nav id="mainBottomNav" class="nav-bar hidden">
+    <nav id="mainBottomNav" class="nav-bar hidden" aria-label="Навігація">
         <div class="max-w-lg mx-auto flex items-center justify-around px-4 py-2.5">
-            <button onclick="switchTab('library')" id="navLibrary" class="nav-tab nav-tab-active flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300">
+            <button onclick="switchTab('library')" id="navLibrary" aria-label="Бібліотека" class="nav-tab nav-tab-active flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300">
                 <span class="text-[22px] transition-transform">📚</span>
                 <span class="text-[10px] font-bold tracking-wide">Книги</span>
             </button>
-            <button onclick="switchTab('discover')" id="navDiscover" class="nav-tab flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300 opacity-50">
+            <button onclick="switchTab('discover')" id="navDiscover" aria-label="Рекомендації" class="nav-tab flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300 opacity-50">
                 <span class="text-[22px] transition-transform">⭐</span>
                 <span class="text-[10px] font-bold tracking-wide">Поради</span>
             </button>
-            <button onclick="switchTab('profile')" id="navProfile" class="nav-tab flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300 opacity-50">
+            <button onclick="switchTab('profile')" id="navProfile" aria-label="Профіль" class="nav-tab flex flex-col items-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300 opacity-50">
                 <span class="text-[22px] transition-transform">👤</span>
                 <span class="text-[10px] font-bold tracking-wide">Профіль</span>
             </button>
@@ -713,13 +619,13 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
     <!-- ========== READER ========== -->
     <div id="readerOverlay">
         <div class="reader-controls relative">
-            <button onclick="closeReader()" class="font-bold text-red-500 bg-red-50 px-4 py-2.5 rounded-xl text-sm active:scale-95 transition-transform" style="background: rgba(239,68,68,0.08);">✕</button>
+            <button onclick="closeReader()" class="font-bold text-red-500 px-4 py-2.5 rounded-xl text-sm active:scale-95 transition-transform" style="background: rgba(239,68,68,0.08);">✕</button>
             <div class="flex flex-col items-center max-w-[50%]">
                 <div id="readerTitle" class="text-xs font-bold truncate text-muted w-full text-center">Книга</div>
                 <div id="readerTimer" class="text-[10px] font-mono font-bold text-muted tracking-widest mt-0.5">00:00</div>
             </div>
             <button onclick="toggleReaderSettings()" class="font-bold px-3.5 py-2.5 rounded-xl text-sm active:scale-95 transition-transform" style="background: var(--card); border: 1px solid var(--card-border);">⚙️</button>
-            <div id="readerSettingsMenu" class="hidden absolute top-16 right-4 w-56 shadow-elevated rounded-2xl p-5 border space-y-5 z-50 scale-in" style="background: var(--card); border-color: var(--card-border);">
+            <div id="readerSettingsMenu" class="hidden absolute top-16 right-4 w-56 shadow-2xl rounded-2xl p-5 border space-y-5 z-50 scale-in" style="background: var(--card); border-color: var(--card-border);">
                 <div>
                     <p class="text-[10px] font-bold uppercase text-muted mb-2 tracking-wider">Розмір тексту</p>
                     <div class="flex gap-2">
@@ -738,10 +644,10 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             </div>
         </div>
         <div id="viewer" onclick="document.getElementById('readerSettingsMenu').classList.add('hidden')"></div>
-        <div class="reader-controls border-t" style="border-color: var(--card-border);">
-            <button onclick="rendition?.prev()" class="nav-btn">← Назад</button>
+        <div class="reader-controls" style="border-top: 1px solid var(--card-border);">
+            <button onclick="rendition&&rendition.prev()" class="nav-btn">← Назад</button>
             <div id="readerProgress" class="text-[11px] font-black text-primary-600 uppercase tracking-wider px-4 py-2 rounded-xl text-center min-w-[70px]" style="background: rgba(99,102,241,0.08);">...</div>
-                        <button onclick="rendition?.next()" class="nav-btn" style="background: linear-gradient(135deg,#6366f1,#4f46e5); color: white; border: none;">Далі →</button>
+            <button onclick="rendition&&rendition.next()" class="nav-btn" style="background: linear-gradient(135deg,#6366f1,#4f46e5); color: white; border: none;">Далі →</button>
         </div>
     </div>
 
@@ -755,7 +661,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
     </div>
 
     <!-- ========== SEARCH SHEET ========== -->
-    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 rounded-t-[32px] shadow-elevated flex flex-col max-w-lg mx-auto" style="height:88vh">
+    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 rounded-t-[32px] shadow-2xl flex flex-col max-w-lg mx-auto" style="height:88vh">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab">
             <div class="w-12 h-1.5 rounded-full" style="background: var(--card-border);"></div>
         </div>
@@ -770,12 +676,12 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
                 <button onclick="openScanner()" class="p-3.5 text-center text-sm font-semibold text-white bg-zinc-800 rounded-2xl active:scale-95 transition-transform">📷 Сканер</button>
                 <button onclick="openManualForm()" class="p-3.5 text-center text-sm font-semibold text-primary-600 rounded-2xl active:scale-95 transition-transform" style="background: rgba(99,102,241,0.08);">✍️ Вручну</button>
             </div>
-            <div id="searchItems" class="space-y-1.5 stagger"></div>
+            <div id="searchItems" class="space-y-1.5"></div>
         </div>
     </div>
 
     <!-- ========== DETAILS SHEET ========== -->
-    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 rounded-t-[32px] shadow-elevated flex flex-col max-w-lg mx-auto" style="max-height:92vh">
+    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 rounded-t-[32px] shadow-2xl flex flex-col max-w-lg mx-auto" style="max-height:92vh">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab">
             <div class="w-12 h-1.5 rounded-full" style="background: var(--card-border);"></div>
         </div>
@@ -787,7 +693,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
             <input type="number" id="editPages" placeholder="Кількість сторінок" class="input-field">
             <input type="url" id="editImage" placeholder="URL обкладинки" class="input-field text-xs">
             <div class="flex gap-3 pt-3">
-                <button onclick="saveBookEdits()" class="flex-1 py-3.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-2xl text-sm active:scale-95 transition-transform shadow-glow">Зберегти</button>
+                <button onclick="saveBookEdits()" class="flex-1 py-3.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold rounded-2xl text-sm active:scale-95 transition-transform shadow-lg">Зберегти</button>
                 <button onclick="toggleEditMode(false)" class="flex-1 py-3.5 font-bold rounded-2xl text-sm active:scale-95 transition-transform" style="background: var(--card-border);">Скасувати</button>
             </div>
         </div>
@@ -796,7 +702,7 @@ body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
                 <span class="text-2xl mb-1">🕒</span>
                 <span class="text-[11px] font-bold">В плани</span>
             </button>
-            <button onclick="addBookWithStatus('reading')" class="flex flex-col items-center p-4 bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-2xl active:scale-95 transition-transform shadow-glow">
+            <button onclick="addBookWithStatus('reading')" class="flex flex-col items-center p-4 bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-2xl active:scale-95 transition-transform shadow-lg">
                 <span class="text-2xl mb-1">📖</span>
                 <span class="text-[11px] font-bold">Читати</span>
             </button>
