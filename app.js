@@ -42,7 +42,6 @@ let readerDepsLoaded = false;
 let html5QrCode = null;
 let currentTab = 'library';
 let fetchAbortController = null;
-let scrollPos = 0;
 
 // ===== UTILS =====
 function showToast(msg, duration = 2500) {
@@ -428,19 +427,12 @@ function importLibrary() {
             if (!Array.isArray(books)) throw new Error('Невірний формат');
             if (!confirm(`Імпортувати ${books.length} книг?`)) return;
             const ex = new Set(myLibrary.map(b => (b.title || '').toLowerCase().trim()));
+            const toImport = books.filter(book => !ex.has((book.title || '').toLowerCase().trim()));
             let imp = 0;
-
-            // Split into chunks of 450 (Firestore batch limit is 500)
-            const toImport = books.filter(book => {
-                const ti = (book.title || '').toLowerCase().trim();
-                return !ex.has(ti);
-            });
-
             const chunks = [];
             for (let i = 0; i < toImport.length; i += 450) {
                 chunks.push(toImport.slice(i, i + 450));
             }
-
             for (const chunk of chunks) {
                 const batch = db.batch();
                 chunk.forEach(book => {
@@ -598,9 +590,7 @@ function filterLibrary(q) {
 
 // ===== SHEETS =====
 function openSheet(id) {
-    scrollPos = window.scrollY;
     document.body.classList.add('modal-open');
-    document.body.style.top = `-${scrollPos}px`;
     document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
     document.getElementById(id).classList.add('open');
     if (id === 'searchSheet') {
@@ -610,8 +600,6 @@ function openSheet(id) {
 
 function closeAllSheets() {
     document.body.classList.remove('modal-open');
-    document.body.style.top = '';
-    window.scrollTo(0, scrollPos);
     document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
     toggleEditMode(false);
 }
@@ -826,12 +814,11 @@ function showBookDetails(bookData, isNew = false) {
     const authorForSearch = (lb.author || 'Невідомий').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     let h = `
-        <div class="flex gap-4 mb-6 fade-up">
+        <div class="flex gap-4 mb-6fade-up">
             <img loading="lazy" src="${bookImage(lb.image)}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-[100px] h-[150px] object-cover rounded-2xl shadow-lg flex-shrink-0">
             <div class="flex flex-col justify-center min-w-0 flex-1">
                 <h3 class="text-lg font-bold leading-tight mb-2">${escapeHtml(lb.title || 'Без назви')}</h3>
-                <button onclick="window.searchAuthorBooks('${authorForSearch}')" class="w-fit px-3 py-1 rounded-lg text-xs font-semibold mb-2 active:scale-95 transition-transform" style="background: rgba(99,102,241,0.08); color: #6366f1;">
-                    👤 ${safeAuthor}
+                <button onclick="window.searchAuthorBooks('${authorForSearch}')" class="w-fit px-3 py-1 rounded-lg text-xs font-semibold mb-2 active:scale-95 transition-transform" style="background: rgba(99,102,241,0.08); color: #6366f1;">👤 ${safeAuthor}
                 </button>
                 <span class="text-xs text-muted font-medium">📄 ${lb.pagesTotal || 300} сторінок</span>
                 ${lb.genre ? `<span class="badge mt-1.5 text-[10px]" style="background: rgba(99,102,241,0.06); color: #6366f1;">${escapeHtml(lb.genre)}</span>` : ''}
@@ -848,7 +835,7 @@ function showBookDetails(bookData, isNew = false) {
         if (lb.status === 'reading') {
             h += `
                 <div class="mb-5 p-5 card-elevated">
-                    <p class="text-[10px] font-bold uppercase text-muted mb-3 tracking-wider">📊 Прогрес: <span id="sliderVal" class="text-primary-600">${lb.pagesRead || 0}</span> / ${lb.pagesTotal || 300}</p>
+                    <p class="text-[10px] font-bold uppercase text-muted mb-3tracking-wider">📊 Прогрес:<span id="sliderVal" class="text-primary-600">${lb.pagesRead || 0}</span> / ${lb.pagesTotal || 300}</p>
                     <input type="range" min="0" max="${lb.pagesTotal || 300}" value="${lb.pagesRead || 0}" class="progress-slider" oninput="document.getElementById('sliderVal').innerText=this.value" onchange="updateProgress('${lb.id}',this.value)">
                 </div>`;
         }
@@ -867,25 +854,25 @@ function showBookDetails(bookData, isNew = false) {
 
         h += `
             <div class="mb-5 p-5 card-elevated">
-                <p class="text-[10px] font-bold uppercase text-muted mb-3 tracking-wider">🗓 Дати</p>
+                <p class="text-[10px] font-bold uppercase text-muted mb-3 tracking-wider">🗓Дати</p>
                 <div class="space-y-3">
                     <div class="flex justify-between items-center">
                         <span class="text-xs font-medium">Початок</span>
-                        <input type="date" value="${lb.dateStarted || ''}" onchange="saveManualDate('${lb.id}','dateStarted',this)" class="date-input text-xs">
+                        <input type="date" value="${lb.dateStarted || ''}" onchange="saveManualDate('${lb.id}','dateStarted',this)" class="date-input">
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="text-xs font-medium">Кінець</span>
-                        <input type="date" value="${lb.dateFinished || ''}" onchange="saveManualDate('${lb.id}','dateFinished',this)" class="date-input text-xs">
+                        <input type="date" value="${lb.dateFinished || ''}" onchange="saveManualDate('${lb.id}','dateFinished',this)" class="date-input">
                     </div>
                 </div>
             </div>`;
 
-        const hl = lb.highlights || [];
+        consthl = lb.highlights || [];
         if (hl.length > 0) {
             h += `
                 <div class="mb-5 p-5 card-elevated">
                     <p class="text-[10px] font-bold uppercase text-muted mb-3 tracking-wider">✍️ Виділення (${hl.length})</p>
-                    <div class="space-y-2 max-h-40 overflow-y-auto scrollbar-hide">
+                    <div class="space-y-2max-h-40 overflow-y-auto scrollbar-hide">
                         ${hl.map((x, i) => `<div class="text-xs p-3 rounded-xl italic relative" style="background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.1);">
                             "${escapeHtml(x.text.substring(0, 150))}"
                             <button onclick="deleteHighlight('${lb.id}',${i})" class="absolute top-2 right-2 text-red-400 text-xs opacity-60 hover:opacity-100">✕</button>
@@ -911,7 +898,7 @@ function showBookDetails(bookData, isNew = false) {
                     <p class="text-[10px] font-bold uppercase text-muted tracking-wider">📝 Нотатки</p>
                     <button onclick="saveReview('${lb.id}')" class="text-primary-600 px-3 py-1.5 rounded-lg text-[10px] font-bold active:scale-95 transition-transform" style="background: rgba(99,102,241,0.08);">💾 Зберегти</button>
                 </div>
-                <textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[80px] leading-relaxed" placeholder="Ваші враження від книги..." style="color: var(--text);">${escapeHtml(lb.review || '')}</textarea>
+                <textarea id="reviewText_${lb.id}" class="w-full bg-transparent outline-none resize-none min-h-[80px] leading-relaxed" style="color: var(--text);" placeholder="Ваші враження від книги...">${escapeHtml(lb.review || '')}</textarea>
             </div>`;
     }
 
@@ -955,9 +942,7 @@ function deleteHighlight(id, i) {
     const b = myLibrary.find(x => x.id === id);
     if (!b || !b.highlights) return;
     b.highlights.splice(i, 1);
-    updateBookInFirestore(id, { highlights: b.highlights });
-    showBookDetails(b);
-    showToast('✍️ Видалено');
+    updateBookInFirestore(id, { highlights: b.highlights });showBookDetails(b);showToast('✍️ Видалено');
 }
 
 function deleteBookFromDetails(id) {
@@ -983,8 +968,7 @@ function changeStatusFromDetails(id, ns) {
         u.dateFinished = b.dateFinished || new Date().toISOString().slice(0, 10);
         showCelebration();
     } else if (ns === 'reading') {
-        u.dateStarted = b.dateStarted || new Date().toISOString().slice(0, 10);
-    }
+        u.dateStarted = b.dateStarted || new Date().toISOString().slice(0, 10);}
     updateBookInFirestore(id, u);
     closeAllSheets();
     setLibraryTab(ns);
@@ -1018,8 +1002,7 @@ function saveBookEdits() {
         updateBookInFirestore(tempSelectedBook.id, u);
         Object.assign(tempSelectedBook, u);
         toggleEditMode(false);
-        showBookDetails(tempSelectedBook);
-        showToast('✅ Збережено');
+        showBookDetails(tempSelectedBook);showToast('✅ Збережено');
     }
 }
 
@@ -1079,8 +1062,7 @@ function changeStatus(id, ns, ev) {
         showCelebration();
     }
     updateBookInFirestore(id, u);
-    setLibraryTab(ns);
-    showToast(ns === 'finished' ? '🎉 Вітаємо!' : '📖 Статус змінено');
+    setLibraryTab(ns);showToast(ns === 'finished' ? '🎉 Вітаємо!' : '📖 Статус змінено');
 }
 
 function saveManualDate(id, f, el) {
@@ -1263,18 +1245,15 @@ async function openEpubReader(bookId, source) {
             currentBookInstance.getRange(cfi).then(function(range) {
                 if (!range) return;
                 const text = range.toString().trim();
-                if (text.length < 3) return;
+                if (text.length< 3) return;
                 const bk = myLibrary.find(b => b.id === currentReaderBookId);
                 if (bk) {
-                    const hl = bk.highlights || [];
-                    hl.push({ text, cfi, date: Date.now() });
+                    consthl = bk.highlights || [];hl.push({ text, cfi, date: Date.now() });
                     bk.highlights = hl;
                     updateBookInFirestore(currentReaderBookId, { highlights: hl });
-                }
-                if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+                }if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
                 showToast('✍️ Виділено');
-            });
-            contents.window.getSelection().removeAllRanges();
+            });contents.window.getSelection().removeAllRanges();
         });
 
         rendition.on("relocated", loc => {
@@ -1285,8 +1264,7 @@ async function openEpubReader(bookId, source) {
             window.syncProgressTimeout = setTimeout(() => {
                 const u = { lastCfi: loc.start.cfi };
                 if (p > 0) u.pagesRead = Math.round((p / 100) * (bd.pagesTotal || 300));
-                updateBookInFirestore(currentReaderBookId, u);
-            }, 3000);
+                updateBookInFirestore(currentReaderBookId, u);}, 3000);
         });
 
         const safeCfi = (bd.lastCfi && typeof bd.lastCfi === 'string' && bd.lastCfi.startsWith('epubcfi')) ? bd.lastCfi : undefined;
@@ -1299,7 +1277,6 @@ async function openEpubReader(bookId, source) {
 
         initSwipeGestures();
 
-        // Keyboard navigation
         window._readerKeyHandler = function(e) {
             if (!rendition) return;
             if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') rendition.prev();
@@ -1322,8 +1299,7 @@ function closeReader() {
     if (window._readerKeyHandler) {
         document.removeEventListener('keydown', window._readerKeyHandler);
         window._readerKeyHandler = null;
-    }
-    if (currentBookInstance) {
+    }if (currentBookInstance) {
         currentBookInstance.destroy();
         currentBookInstance = null;
         rendition = null;
@@ -1366,8 +1342,7 @@ function renderBookCard(book) {
                     ${isRead && pct > 0 ? `<div class="absolute bottom-0 left-0 right-0 h-1.5 bg-black/20 rounded-b-2xl overflow-hidden"><div class="h-full bg-primary-400 rounded-b-2xl" style="width:${pct}%"></div></div>` : ''}
                 </div>
                 <h3 class="font-semibold text-[11px] mt-2 w-full text-center truncate px-1">${safeTitle}</h3>
-                <p class="text-[9px] text-muted truncate w-full text-center">${safeAuthor}</p>
-            </div>`;
+                <p class="text-[9px] text-muted truncate w-full text-center">${safeAuthor}</p></div>`;
     }
 
     return `
@@ -1378,21 +1353,18 @@ function renderBookCard(book) {
                 <h3 class="font-bold text-sm leading-snug truncate">${safeTitle}</h3>
                 <p class="text-xs text-muted mt-0.5 truncate">${safeAuthor}</p>
                 ${isPlan ? `
-                    <button onclick="changeStatus('${book.id}','reading',event)" class="w-full mt-3 py-2.5 font-bold text-xs rounded-xl active:scale-95 transition-transform" style="background: rgba(99,102,241,0.08); color: #6366f1;">
-                        🚀 Почати читати
+                    <button onclick="changeStatus('${book.id}','reading',event)" class="w-full mt-3 py-2.5 font-bold text-xs rounded-xl active:scale-95 transition-transform" style="background: rgba(99,102,241,0.08); color: #6366f1;">🚀 Почати читати
                     </button>` : `
                     <div class="mt-2.5 flex items-center gap-2">
                         <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background: var(--card-border);">
                             <div class="progress-bar bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full" style="width:${pct}%"></div>
                         </div>
                         <span class="text-[10px] font-bold text-primary-600 min-w-[30px] text-right">${pct}%</span>
-                    </div>
-                    ${isRead ? `
+                    </div>${isRead ? `
                         <div class="flex gap-2 mt-3">
                             <button onclick="readSavedEpubFromCard('${book.id}',event)" class="flex-1 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-transform shadow-sm">▶ Читати</button>
                             <button onclick="changeStatus('${book.id}','finished',event)" class="py-2.5 px-4 rounded-xl text-[11px] font-bold active:scale-95 transition-transform" style="background: rgba(16,185,129,0.08); color: #059669;">✅</button>
-                        </div>
-                        <div class="text-[10px] text-muted mt-1.5 font-medium">⏱ ${formatTime(book.timeSpent)}</div>` : ''}
+                        </div><div class="text-[10px] text-muted mt-1.5 font-medium">⏱ ${formatTime(book.timeSpent)}</div>` : ''}
                 `}
                 ${isFin && book.rating ? `<div class="mt-2 text-amber-400 text-xs">${'★'.repeat(book.rating)}${'☆'.repeat(5 - book.rating)}</div>` : ''}
             </div>
@@ -1417,7 +1389,7 @@ function render() {
         finished = finished.filter(fn);
     }
 
-    document.getElementById('tab_reading').innerHTML = `📖 Читаю <span class="ml-1 text-[10px] opacity-60">${reading.length}</span>`;
+    document.getElementById('tab_reading').innerHTML = `📖 Читаю<span class="ml-1 text-[10px] opacity-60">${reading.length}</span>`;
     document.getElementById('tab_planned').innerHTML = `🕒 В планах <span class="ml-1 text-[10px] opacity-60">${planned.length}</span>`;
     document.getElementById('tab_finished').innerHTML = `✅ Прочитано <span class="ml-1 text-[10px] opacity-60">${finished.length}</span>`;
 
@@ -1442,7 +1414,7 @@ function render() {
         return;
     }
 
-    const wc = viewMode === 'grid' ? 'grid grid-cols-3 gap-4 sortable-list stagger' : 'space-y-3 sortable-list stagger';
+    const wc = viewMode === 'grid' ? 'grid grid-cols-3 gap-4 sortable-list stagger' : 'space-y-3sortable-list stagger';
 
     if (currentLibraryTab === 'finished') {
         finished.sort((a, b) => (b.dateFinished || '1970').localeCompare(a.dateFinished || '1970'));
@@ -1455,8 +1427,7 @@ function render() {
         });
         let html = '';
         Object.keys(gr).sort((a, b) => { if (a === '—') return 1; if (b === '—') return -1; return b - a; }).forEach(y => {
-            html += `<p class="font-black text-sm mt-6 mb-3 tracking-wider" style="color: var(--text-muted);">${y}</p>
-                     <div class="${wc}">${gr[y].map(renderBookCard).join('')}</div>`;
+            html += `<p class="font-black text-sm mt-6 mb-3 tracking-wider" style="color: var(--text-muted);">${y}</p><div class="${wc}">${gr[y].map(renderBookCard).join('')}</div>`;
         });
         c.innerHTML = html;
     } else {
@@ -1491,7 +1462,7 @@ function render() {
 const curatedCategories = {
     'Академія магії': ['"академия магии" фэнтези', '"магическая академия"', 'ромфант академия', 'академия волшебства'],
     'Фентезі': ['"фэнтези" бестселлер', 'эпическое фэнтези', 'Джон Толкин', 'Джордж Мартин', 'Брэндон Сандерсон', 'Робин Хобб', 'Ник Перумов', 'боевое фэнтези'],
-    'Детектив': ['"детектив" бестселлер', 'Агата Кристі', 'Ю Несбё', 'Стиг Ларссон', 'Борис Акунин', 'психологический детектив'],
+    'Детектив': ['"детектив" бестселлер', 'Агата Кристі', 'Ю Несбё', 'СтигЛарссон', 'Борис Акунин', 'психологический детектив'],
     'Трилер': ['"триллер" бестселлер', 'Стивен Кинг', 'Джиллиан Флинн', 'Дэн Браун', 'Франк Тилье', 'психологический триллер'],
     'Романтика': ['"любовный роман" бестселлер', 'Николас Спаркс', 'Джоджо Мойес', 'Колин Гувер', 'современный любовный роман'],
     'Саморозвиток': ['"саморазвитие" бестселлер', 'Роберт Кийосаки', 'Марк Мэнсон', 'Джо Диспенза', 'Джеймс Клир', 'психология успеха'],
@@ -1518,7 +1489,7 @@ async function loadRealRecommendations(cat = 'auto', btnId = 'rec_auto') {
 
     let pool = [];
     if (cat === 'auto') {
-        let authors = myLibrary.map(b => b.author).filter(a => a && a.length > 2 && !a.toLowerCase().includes('невідомий') && !a.toLowerCase().includes('автор'));
+        let authors = myLibrary.map(b => b.author).filter(a => a && a.length > 2&& !a.toLowerCase().includes('невідомий') && !a.toLowerCase().includes('автор'));
         let authorQueries = [];
         if (authors.length > 0) {
             let counts = {};
@@ -1532,10 +1503,8 @@ async function loadRealRecommendations(cat = 'auto', btnId = 'rec_auto') {
         while (ai < authorQueries.length || gi < gen.length) {
             if (ai < authorQueries.length) { pool.push(authorQueries[ai]); ai++; }
             for (let k = 0; k < 3 && gi < gen.length; k++) { pool.push(gen[gi]); gi++; }
-        }
-    } else {
-        pool = [...curatedCategories[cat]];
-        pool.sort(() => 0.5 - Math.random());
+        }} else {
+        pool = [...curatedCategories[cat]];pool.sort(() => 0.5 - Math.random());
     }
     currentRecQueries = pool;
     await fetchMoreRecommendations(true);
@@ -1561,7 +1530,7 @@ async function fetchMoreRecommendations(isFirst = false) {
         try {
             const res = await fetch(url).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] }));
             let items = res.items || [];
-            if (items.length < 30) { currentRecQueryIndex++; recStartIndex = 0; } else { recStartIndex += 40; }
+            if (items.length< 30) { currentRecQueryIndex++; recStartIndex = 0; } else { recStartIndex +=40; }
 
             const badWords = ['учебник', 'словарь', 'журнал', 'комикс', 'манга', 'підручник', 'словник', 'вісник', 'сборник', 'збірник', 'посібник', 'пособие', 'том ', 'випуск', 'выпуск', 'зошит', 'тетрадь', 'хрестоматия', 'дневник'];
             const existingTitles = new Set(myLibrary.map(b => (b.title || '').trim().toLowerCase()));
@@ -1581,7 +1550,7 @@ async function fetchMoreRecommendations(isFirst = false) {
 
             const u = new Map();
             valid.forEach(i => { const b = i.volumeInfo; u.set(b.title.toLowerCase() + (b.authors ? b.authors[0] : ''), i); });
-            let ub = Array.from(u.values());
+            letub = Array.from(u.values());
             ub.forEach(i => {
                 const b = i.volumeInfo;
                 shownRecTitles.add(b.title.toLowerCase() + (b.authors ? b.authors[0] : ''));
@@ -1600,8 +1569,7 @@ async function fetchMoreRecommendations(isFirst = false) {
                 <span class="text-4xl block mb-3">😔</span>
                 <p class="text-muted text-sm font-medium">Не знайшли нових книг</p>
                 <p class="text-muted text-xs mt-1">Потягніть вниз або оберіть іншу категорію</p>
-            </div>`;
-    } else if (finalBooks.length > 0) {
+            </div>`;} else if (finalBooks.length > 0) {
         finalBooks.sort(() => 0.5 - Math.random());
         finalBooks.forEach(i => {
             const b = i.volumeInfo;
@@ -1624,7 +1592,7 @@ async function fetchMoreRecommendations(isFirst = false) {
                     <div class="font-bold text-sm leading-tight truncate">${escapeHtml(bk.title)}</div>
                     <div class="text-xs text-muted mt-0.5 font-medium">${escapeHtml(bk.author)}</div>
                     ${bk.genre ? `<span class="badge mt-1.5 text-[9px]" style="background: rgba(99,102,241,0.06); color: #6366f1;">${escapeHtml(bk.genre)}</span>` : ''}
-                    <div class="text-[11px] text-muted mt-2 line-clamp-2 leading-relaxed">${escapeHtml(bk.description).substring(0, 200)}</div>
+                    <div class="text-[11px] text-muted mt-2line-clamp-2 leading-relaxed">${escapeHtml(bk.description).substring(0, 200)}</div>
                 </div>`;
             div.onclick = () => showBookDetails(bk, true);
             lst.appendChild(div);
