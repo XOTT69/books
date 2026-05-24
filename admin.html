@@ -132,7 +132,7 @@
         document.getElementById('loading').classList.add('hidden');
         if(!user||user.uid!==ADMIN_UID){document.getElementById('accessDenied').classList.remove('hidden');return;}
         document.getElementById('adminPanel').classList.remove('hidden');
-        await loadAllData();
+        await ();
     });
 
     function adminLogout(){auth.signOut();window.location.href='/';}
@@ -143,8 +143,7 @@
         document.querySelectorAll('.sidebar-item').forEach(b=>{b.classList.remove('active');if(b.dataset.section===name)b.classList.add('active');});
     }
 
-    async function loadAllData(){
-        // Load all users
+        async function loadAllData(){
         const usersSnap=await db.collection('users').get();
         allUsers=[];allBooks=[];
         const weekAgo=Date.now()-7*24*60*60*1000;
@@ -153,15 +152,39 @@
         for(const userDoc of usersSnap.docs){
             const uid=userDoc.id;
             const userData=userDoc.data();
-            const booksSnap=await db.collection('users').doc(uid).collection('books').get();
-            const books=booksSnap.docs.map(d=>({id:d.id,...d.data()}));
+            let books=[];
+            try{
+                const booksSnap=await db.collection('users').doc(uid).collection('books').get();
+                books=booksSnap.docs.map(d=>({id:d.id,...d.data()}));
+            }catch(e){console.log('Не вдалося прочитати книги',uid);}
+            
             const finished=books.filter(b=>b.status==='finished').length;
-            const lastActivity=books.reduce((max,b)=>Math.max(max,b.dateAdded||0),0);
+            const lastActivity=userData.lastLogin||books.reduce((max,b)=>Math.max(max,b.dateAdded||0),0);
             if(lastActivity>weekAgo)activeCount++;
 
-            allUsers.push({uid,email:userData.email||uid,readingGoal:userData.readingGoal||12,totalBooks:books.length,finished,lastActivity,books});
+            allUsers.push({
+                uid,
+                email:userData.email||userData.displayName||uid.substring(0,8)+'...',
+                readingGoal:userData.readingGoal||12,
+                totalBooks:books.length,
+                finished,
+                lastActivity,
+                books
+            });
             books.forEach(b=>allBooks.push({...b,ownerUid:uid}));
         }
+
+        document.getElementById('adm_totalUsers').innerText=allUsers.length;
+        document.getElementById('adm_totalBooks').innerText=allBooks.length;
+        document.getElementById('adm_activeWeek').innerText=activeCount;
+        document.getElementById('adm_avgBooks').innerText=allUsers.length?Math.round(allBooks.length/allUsers.length):0;
+
+        renderTopReaders();
+        renderUsersTable();
+        renderPopularBooks();
+        renderCategories();
+        loadNotifHistory();
+    }
 
         // Dashboard
         document.getElementById('adm_totalUsers').innerText=allUsers.length;
