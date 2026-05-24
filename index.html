@@ -147,14 +147,18 @@
         .bottom-sheet.open { transform: translateY(0); }
         
         .backdrop {
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity .3s ease;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-        }
-        body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s ease;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+body.modal-open .backdrop { opacity: 1; pointer-events: auto; }
+
         
         /* === PILLS === */
         .pill {
@@ -704,7 +708,7 @@
     </nav>
 
     <!-- Backdrop -->
-    <div class="backdrop fixed inset-0 z-40 hidden" onclick="closeAllSheets()"></div>
+    <div class="backdrop" onclick="closeAllSheets()"></div>
 
     <!-- ========== READER ========== -->
     <div id="readerOverlay">
