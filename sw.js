@@ -1,10 +1,15 @@
-const CACHE_NAME = 'chitayko-v4';
+const CACHE_NAME = 'chitayko-v3';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
     '/manifest.json',
-    '/app.js',
-    '/icon.png'
+    '/icon.png',
+    'https://cdn.tailwindcss.com',
+    'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
+    'https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js'
 ];
 
 self.addEventListener('install', event => {
@@ -64,10 +69,10 @@ self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {
             const networkFetch = fetch(event.request).then(response => {
-               if (response && response.status === 200 && event.request.url.startsWith('http')) {
-    const responseClone = response.clone();
-    caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
-}
+                if (response && response.status === 200) {
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+                }
                 return response;
             }).catch(() => null);
 
