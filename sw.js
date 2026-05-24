@@ -1,15 +1,10 @@
-const CACHE_NAME = 'chitayko-v3';
+const CACHE_NAME = 'chitayko-v4';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
     '/manifest.json',
-    '/icon.png',
-    'https://cdn.tailwindcss.com',
-    'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
-    'https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js',
-    'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
-    'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js',
-    'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js'
+    '/app.js',
+    '/icon.png'
 ];
 
 self.addEventListener('install', event => {
