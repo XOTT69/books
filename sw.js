@@ -1,77 +1,71 @@
-const CACHE_NAME = 'chitaiko-v8';
-
-// кешуємо тільки свій застосунок (НЕ CDN!)
-const APP_SHELL = [
-  '/',
-  '/index.html',
-  '/app.js',
-  '/manifest.json',
-  '/icon.png'
+const CACHE_NAME = 'chitayko-v7';
+const STATIC_ASSETS = [
+    '/',
+    '/index.html',
+    '/app.js',
+    '/manifest.json',
+    '/icon.png',
+    'https://cdn.tailwindcss.com',
+    'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
+    'https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js',
+    'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js'
 ];
 
-// Install
 self.addEventListener('install', event => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(APP_SHELL);
-    })
-  );
+    self.skipWaiting();
+    event.waitUntil(
+        caches.open(CACHE_NAME).then(cache =>
+            Promise.allSettled(STATIC_ASSETS.map(url => cache.add(url).catch(() => console.warn('SW: failed to cache', url))))
+        )
+    );
 });
 
-// Activate
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.map(key => {
-          if (key !== CACHE_NAME) return caches.delete(key);
-        })
-      )
-    )
-  );
-  self.clients.claim();
+    event.waitUntil(
+        caches.keys().then(names =>
+            Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n)))
+        ).then(() => self.clients.claim())
+    );
 });
 
-// Fetch (SAFE VERSION)
 self.addEventListener('fetch', event => {
-  const req = event.request;
-  const url = new URL(req.url);
+    const url = event.request.url;
+    if (event.request.method !== 'GET') return;
 
-  // ❌ ігноруємо не-http
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+    if (url.includes('firestore.googleapis.com') ||
+        url.includes('googleapis.com/books') ||
+        url.includes('googleapis.com/identitytoolkit') ||
+        url.includes('securetoken.googleapis.com') ||
+        url.includes('itunes.apple.com') ||
+        url.includes('corsproxy.io')) {
+        return;
+    }
 
-  // ❌ НЕ кешуємо CDN / зовнішні сервіси
-  const blocked = [
-    'cdn.tailwindcss.com',
-    'cdn.jsdelivr.net',
-    'cdnjs.cloudflare.com',
-    'www.gstatic.com',
-    'firebase',
-    'googleapis'
-  ];
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then(res => {
+                    const clone = res.clone();
+                    caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+                    return res;
+                })
+                .catch(() => caches.match('/index.html'))
+        );
+        return;
+    }
 
-  if (blocked.some(d => url.hostname.includes(d))) {
-    event.respondWith(fetch(req));
-    return;
-  }
-
-  // 🟢 Network first (краще для PWA)
-  event.respondWith(
-    fetch(req)
-      .then(networkRes => {
-        // кешуємо тільки GET
-        if (req.method === 'GET') {
-          const clone = networkRes.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(req, clone).catch(() => {});
-          });
-        }
-        return networkRes;
-      })
-      .catch(() => {
-        // fallback з кешу
-        return caches.match(req);
-      })
-  );
+    event.respondWith(
+        caches.match(event.request).then(cached => {
+            const netFetch = fetch(event.request).then(res => {
+                if (res && res.status === 200 && res.type !== 'opaqueredirect') {
+                    const clone = res.clone();
+                    caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+                }
+                return res;
+            }).catch(() => cached);
+            return cached || netFetch;
+        })
+    );
 });
