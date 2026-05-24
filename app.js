@@ -23,7 +23,10 @@ document.addEventListener('touchend',()=>{if(!ptrActive)return;ptrActive=false;c
 function checkWelcome(){if(!localStorage.getItem('welcomed')&&myLibrary.length===0)document.getElementById('welcomeScreen').classList.remove('hidden');else document.getElementById('welcomeScreen').classList.add('hidden');}
 function dismissWelcome(){localStorage.setItem('welcomed','1');document.getElementById('welcomeScreen').classList.add('hidden');}
 function showCelebration(){const el=document.getElementById('celebration');el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),1500);if(navigator.vibrate)navigator.vibrate([100,50,100,50,200]);}
-
+    // Handle redirect result
+    auth.getRedirectResult().catch(function(err){
+        if(err.code && err.code !== 'auth/no-auth-event') console.log('Redirect error:', err.message);
+    });
 document.addEventListener('DOMContentLoaded',()=>{
     if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(e=>console.log(e));
     document.querySelectorAll('.bottom-sheet').forEach(sheet=>{
