@@ -90,21 +90,17 @@ auth.onAuthStateChanged(async user=>{const as=document.getElementById('authScree
 try{const ud=await db.collection('users').doc(user.uid).get();if(ud.exists&&ud.data().readingGoal)localStorage.setItem('readingGoal',ud.data().readingGoal);}catch(e){}loadLibrary();}else{currentUser=null;myLibrary=[];as.classList.remove('hidden');as.classList.add('flex');ap.classList.add('hidden');document.getElementById('mainBottomNav').classList.add('hidden');}});
 function showErrorMsg(m){const e=document.getElementById('authError');e.innerText=m;e.classList.remove('hidden');setTimeout(()=>e.classList.add('hidden'),6000);}
 async function handleAuth(type,btn){const ot=btn.innerText;btn.innerText="...";const em=document.getElementById('authEmail').value,pw=document.getElementById('authPassword').value;if(em.length<5||pw.length<6){btn.innerText=ot;return showErrorMsg("Email + пароль (6+)");}try{if(type==='login')await auth.signInWithEmailAndPassword(em,pw);else await auth.createUserWithEmailAndPassword(em,pw);}catch(er){showErrorMsg(er.message);}finally{btn.innerText=ot;}}
-async function signInWithGoogle(btn){
-    var oh=btn.innerHTML;btn.innerText="...";
+function signInWithGoogle(btn){
     var p=new firebase.auth.GoogleAuthProvider();
-    try{
-        await auth.signInWithPopup(p);
-    }catch(er){
-        if(er.code==='auth/popup-blocked'||er.code==='auth/popup-closed-by-user'||er.code==='auth/cancelled-popup-request'){
-            // Fallback на redirect
-            await auth.signInWithRedirect(p);
-        }else{
-            showErrorMsg(er.message);
-            btn.innerHTML=oh;
+    auth.signInWithPopup(p).catch(function(err){
+        if(err.code==='auth/popup-blocked'){
+            showErrorMsg('Дозвольте спливаючі вікна для цього сайту');
+        }else if(err.code!=='auth/popup-closed-by-user'){
+            showErrorMsg(err.message);
         }
-    }
+    });
 }
+
 
 function loadLibrary(){localforage.getItem('library_cache_'+currentUser.uid).then(c=>{if(c&&myLibrary.length===0){myLibrary=c;render();updateGoalWidget();renderQuickResume();checkWelcome();}});db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded','desc').onSnapshot(snap=>{myLibrary=snap.docs.map(d=>({id:d.id,...d.data()}));localforage.setItem('library_cache_'+currentUser.uid,myLibrary);render();updateGoalWidget();renderQuickResume();checkWelcome();});}
 async function updateBookInFirestore(id,u){if(currentUser)await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(u);}
