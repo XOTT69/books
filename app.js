@@ -93,8 +93,13 @@ async function signInWithGoogle(btn){
     try{
         await auth.signInWithPopup(p);
     }catch(er){
-        showErrorMsg(er.message);
-        btn.innerHTML=oh;
+        if(er.code==='auth/popup-blocked'||er.code==='auth/popup-closed-by-user'||er.code==='auth/cancelled-popup-request'){
+            // Fallback на redirect
+            await auth.signInWithRedirect(p);
+        }else{
+            showErrorMsg(er.message);
+            btn.innerHTML=oh;
+        }
     }
 }
 
