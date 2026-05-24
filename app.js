@@ -42,6 +42,7 @@ let readerDepsLoaded = false;
 let html5QrCode = null;
 let currentTab = 'library';
 let fetchAbortController = null;
+let scrollPos = 0;
 
 // ===== UTILS =====
 function showToast(msg, duration = 2500) {
@@ -55,6 +56,10 @@ function showToast(msg, duration = 2500) {
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function bookImage(url) {
+    return (url && url.length > 10 && (url.startsWith('http') || url.startsWith('data:'))) ? url : PLACEHOLDER_IMG;
 }
 
 function showCelebration() {
@@ -75,6 +80,20 @@ function checkWelcome() {
 function dismissWelcome() {
     localStorage.setItem('welcomed', '1');
     document.getElementById('welcomeScreen').classList.add('hidden');
+}
+
+async function safeStoreEpub(key, data) {
+    try {
+        await localforage.setItem(key, data);
+        return true;
+    } catch (e) {
+        if (e.name === 'QuotaExceededError' || e.code === 22) {
+            showToast('⚠️ Сховище переповнене');
+            return false;
+        }
+        console.error('Storage error:', e);
+        return false;
+    }
 }
 
 // ===== PULL TO REFRESH =====
@@ -112,14 +131,12 @@ document.addEventListener('touchend', () => {
     }
 });
 
-// ===== PAGE VISIBILITY (fix timer bug) =====
+// ===== PAGE VISIBILITY =====
 document.addEventListener('visibilitychange', () => {
     if (document.hidden && readingTimer) {
-        // Pause timer when tab hidden
         clearInterval(readingTimer);
         readingTimer = null;
     } else if (!document.hidden && currentReaderBookId && !readingTimer) {
-        // Resume timer
         readingStartTime = Date.now() - (currentSessionSeconds * 1000);
         readingTimer = setInterval(updateTimerDisplay, 1000);
     }
@@ -139,7 +156,6 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.serviceWorker.register('/sw.js').catch(e => console.log('SW:', e));
     }
 
-    // Bottom sheet swipe-to-close
     document.querySelectorAll('.bottom-sheet').forEach(sheet => {
         let startY = 0, currentY = 0, isDragging = false;
         sheet.addEventListener('touchstart', e => {
@@ -169,7 +185,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Infinite scroll for recommendations
     const ro = new IntersectionObserver(entries => {
         if (entries[0].isIntersecting && currentTab === 'discover' && !isFetchingRecs && currentRecQueries.length > 0) {
             fetchMoreRecommendations();
@@ -180,13 +195,19 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ===== THEME =====
-if (localStorage.getItem('appTheme') === 'dark') document.body.classList.add('dark');
+(function() {
+    const isDark = localStorage.getItem('appTheme') === 'dark';
+    if (isDark) document.body.classList.add('dark');
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = isDark ? '#0a0a0f' : '#fafafa';
+})();
 
 function toggleAppTheme() {
     document.body.classList.toggle('dark');
     const isDark = document.body.classList.contains('dark');
     localStorage.setItem('appTheme', isDark ? 'dark' : 'light');
-    document.querySelector('meta[name="theme-color"]').content = isDark ? '#0a0a0f' : '#fafafa';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = isDark ? '#0a0a0f' : '#fafafa';
     showToast(isDark ? '🌙 Темна тема' : '☀️ Світла тема');
 }
 
@@ -194,8 +215,6 @@ function toggleAppTheme() {
 function switchTab(tab) {
     currentTab = tab;
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    
-    // Nav buttons
     document.querySelectorAll('.nav-tab').forEach(b => {
         b.classList.remove('nav-tab-active');
         b.classList.add('opacity-50');
@@ -215,7 +234,6 @@ function switchTab(tab) {
 
     if (tab === 'profile') { calculateStats(); updateStreakWidget(); updateGoalWidget(); }
     if (tab === 'discover' && !currentRecCategory) loadRealRecommendations('auto', 'rec_auto');
-    
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -273,7 +291,7 @@ async function updateStreakWidget() {
             .where(firebase.firestore.FieldPath.documentId(), '>=', days[0])
             .where(firebase.firestore.FieldPath.documentId(), '<=', days[days.length - 1]).get();
         snap.forEach(doc => rd.add(doc.id));
-    } catch (e) { /* offline graceful */ }
+    } catch (e) {}
 
     let streak = 0;
     const ts = today.toISOString().slice(0, 10);
@@ -283,7 +301,7 @@ async function updateStreakWidget() {
         const ds = cd.toISOString().slice(0, 10);
         if (rd.has(ds)) { streak++; cd.setDate(cd.getDate() - 1); } else break;
     }
-    
+
     const label = streak === 1 ? 'день' : streak < 5 ? 'дні' : 'днів';
     document.getElementById('streakCount').innerText = `${streak} ${label}`;
     document.getElementById('streakDots').innerHTML = days.map(d =>
@@ -299,7 +317,7 @@ async function markReadingDay() {
             minutes: Math.round(currentSessionSeconds / 60),
             timestamp: Date.now()
         }, { merge: true });
-    } catch (e) { /* offline */ }
+    } catch (e) {}
 }
 
 // ===== QUICK RESUME =====
@@ -308,14 +326,14 @@ function renderQuickResume() {
     const lastRead = myLibrary
         .filter(b => b.status === 'reading' && b.lastCfi)
         .sort((a, b) => (b.timeSpent || 0) - (a.timeSpent || 0))[0];
-    
+
     if (!lastRead) { qr.classList.add('hidden'); return; }
-    
+
     const pct = Math.round((lastRead.pagesRead / lastRead.pagesTotal) * 100) || 0;
     qr.classList.remove('hidden');
     qr.innerHTML = `
         <div class="quick-resume flex items-center gap-4 cursor-pointer" onclick="readSavedEpub('${lastRead.id}')">
-            <img src="${lastRead.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-12 h-[66px] rounded-xl object-cover shadow-md flex-shrink-0">
+            <img src="${bookImage(lastRead.image)}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-12 h-[66px] rounded-xl object-cover shadow-md flex-shrink-0">
             <div class="flex-1 min-w-0">
                 <p class="text-[10px] font-bold text-primary-600 uppercase tracking-wider mb-0.5">▶ Продовжити читання</p>
                 <p class="font-bold text-sm truncate">${escapeHtml(lastRead.title)}</p>
@@ -326,7 +344,7 @@ function renderQuickResume() {
                     <span class="text-[10px] font-bold text-muted">${pct}%</span>
                 </div>
             </div>
-            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white text-sm shadow-glow flex-shrink-0">▶</div>
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white text-sm shadow-lg flex-shrink-0">▶</div>
         </div>`;
 }
 
@@ -336,7 +354,7 @@ async function calculateStats() {
     const fin = myLibrary.filter(b => b.status === 'finished');
     const tp = fin.reduce((s, b) => s + (parseInt(b.pagesTotal) || 0), 0);
     const tt = myLibrary.reduce((s, b) => s + (b.timeSpent || 0), 0);
-    
+
     document.getElementById('statBooks').innerText = fin.length;
     document.getElementById('statPages').innerText = tp > 999 ? (tp / 1000).toFixed(1) + 'k' : tp;
     document.getElementById('statTime').innerText = Math.round(tt / 3600);
@@ -353,6 +371,7 @@ async function calculateStats() {
     });
     const labels = Object.keys(months).sort().slice(-8);
     const data = labels.map(l => months[l]);
+    const isDark = document.body.classList.contains('dark');
 
     if (window.myChart) window.myChart.destroy();
     window.myChart = new Chart(ctx, {
@@ -371,15 +390,18 @@ async function calculateStats() {
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-    y: { 
-        beginAtZero: true, 
-        ticks: { stepSize: 1, color: document.body.classList.contains('dark') ? '#71717a' : '#a1a1aa' }, 
-        grid: { color: document.body.classList.contains('dark') ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.04)' } 
-    },
-    x: { 
-        grid: { display: false },
-        ticks: { color: document.body.classList.contains('dark') ? '#71717a' : '#a1a1aa' }
-    }
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1, color: isDark ? '#71717a' : '#a1a1aa' },
+                    grid: { color: isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.04)' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: isDark ? '#71717a' : '#a1a1aa' }
+                }
+            }
+        }
+    });
 }
 
 // ===== EXPORT / IMPORT =====
@@ -407,18 +429,30 @@ function importLibrary() {
             if (!confirm(`Імпортувати ${books.length} книг?`)) return;
             const ex = new Set(myLibrary.map(b => (b.title || '').toLowerCase().trim()));
             let imp = 0;
-            const batch = db.batch();
-            books.forEach(book => {
+
+            // Split into chunks of 450 (Firestore batch limit is 500)
+            const toImport = books.filter(book => {
                 const ti = (book.title || '').toLowerCase().trim();
-                if (ex.has(ti)) return;
-                const ref = db.collection('users').doc(currentUser.uid).collection('books').doc();
-                const c = { ...book };
-                delete c.id;
-                if (!c.dateAdded) c.dateAdded = Date.now();
-                batch.set(ref, c);
-                imp++;
+                return !ex.has(ti);
             });
-            await batch.commit();
+
+            const chunks = [];
+            for (let i = 0; i < toImport.length; i += 450) {
+                chunks.push(toImport.slice(i, i + 450));
+            }
+
+            for (const chunk of chunks) {
+                const batch = db.batch();
+                chunk.forEach(book => {
+                    const ref = db.collection('users').doc(currentUser.uid).collection('books').doc();
+                    const c = { ...book };
+                    delete c.id;
+                    if (!c.dateAdded) c.dateAdded = Date.now();
+                    batch.set(ref, c);
+                    imp++;
+                });
+                await batch.commit();
+            }
             showToast(`✅ Імпортовано ${imp} книг!`);
         } catch (err) { showToast('❌ ' + err.message); }
     };
@@ -448,7 +482,7 @@ auth.onAuthStateChanged(async user => {
         try {
             const ud = await db.collection('users').doc(user.uid).get();
             if (ud.exists && ud.data().readingGoal) localStorage.setItem('readingGoal', ud.data().readingGoal);
-        } catch (e) { /* offline */ }
+        } catch (e) {}
         loadLibrary();
     } else {
         currentUser = null;
@@ -511,7 +545,6 @@ function logout() {
 
 // ===== LIBRARY =====
 function loadLibrary() {
-    // Load cache first
     localforage.getItem('library_cache_' + currentUser.uid).then(c => {
         if (c && myLibrary.length === 0) {
             myLibrary = c;
@@ -521,7 +554,6 @@ function loadLibrary() {
             checkWelcome();
         }
     });
-    // Listen for realtime updates
     db.collection('users').doc(currentUser.uid).collection('books').orderBy('dateAdded', 'desc')
         .onSnapshot(snap => {
             myLibrary = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -530,13 +562,25 @@ function loadLibrary() {
             updateGoalWidget();
             renderQuickResume();
             checkWelcome();
-            // Update subtitle
-            const count = myLibrary.length;
-            document.getElementById('librarySubtitle').innerText = count > 0 ? `${count} ${count === 1 ? 'книга' : count < 5 ? 'книги' : 'книг'}` : 'Додайте першу книгу';
+            updateLibrarySubtitle();
         }, err => {
             console.log('Firestore error:', err);
-            // Use cached data
         });
+}
+
+function updateLibrarySubtitle() {
+    const count = myLibrary.length;
+    let label = 'книг';
+    if (count === 1) label = 'книга';
+    else if (count >= 2 && count <= 4) label = 'книги';
+    else if (count >= 5 && count <= 20) label = 'книг';
+    else {
+        const last = count % 10;
+        if (last === 1) label = 'книга';
+        else if (last >= 2 && last <= 4) label = 'книги';
+        else label = 'книг';
+    }
+    document.getElementById('librarySubtitle').innerText = count > 0 ? `${count} ${label}` : 'Додайте першу книгу';
 }
 
 async function updateBookInFirestore(id, u) {
@@ -553,6 +597,25 @@ function filterLibrary(q) {
 }
 
 // ===== SHEETS =====
+function openSheet(id) {
+    scrollPos = window.scrollY;
+    document.body.classList.add('modal-open');
+    document.body.style.top = `-${scrollPos}px`;
+    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
+    document.getElementById(id).classList.add('open');
+    if (id === 'searchSheet') {
+        setTimeout(() => document.getElementById('searchInput').focus(), 400);
+    }
+}
+
+function closeAllSheets() {
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    window.scrollTo(0, scrollPos);
+    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
+    toggleEditMode(false);
+}
+
 function closeDetailsSheet() {
     if (!document.getElementById('statusButtons').classList.contains('hidden')) {
         openSheet('searchSheet');
@@ -613,7 +676,6 @@ searchInput.addEventListener('input', e => {
     searchItems.innerHTML = renderSkeleton();
 
     timeoutId = setTimeout(async () => {
-        // Abort previous
         if (fetchAbortController) fetchAbortController.abort();
         fetchAbortController = new AbortController();
         const signal = fetchAbortController.signal;
@@ -674,7 +736,6 @@ searchInput.addEventListener('input', e => {
             if (signal.aborted) return;
             if (allItems.length === 0) return searchItems.innerHTML = '<div class="p-10 text-muted text-sm text-center"><span class="text-3xl block mb-2">🔍</span>Не знайдено</div>';
 
-            // Deduplicate
             const ui = [];
             const sk = new Set();
             allItems.forEach(it => {
@@ -722,8 +783,7 @@ searchInput.addEventListener('input', e => {
                     publishedDate: b.publishedDate || ''
                 };
                 div.className = "p-3 rounded-2xl cursor-pointer flex items-center gap-3 active:scale-[0.98] transition-transform";
-                div.style.animationDelay = (idx * 0.03) + 's';
-                div.innerHTML = `<img loading="lazy" src="${bk.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-12 h-[66px] object-cover rounded-xl shadow-sm flex-shrink-0"><div class="flex-1 min-w-0"><div class="font-bold text-sm truncate">${escapeHtml(bk.title)}</div><div class="text-xs text-muted truncate mt-0.5">${escapeHtml(bk.author)}</div></div>`;
+                div.innerHTML = `<img loading="lazy" src="${bookImage(bk.image)}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-12 h-[66px] object-cover rounded-xl shadow-sm flex-shrink-0"><div class="flex-1 min-w-0"><div class="font-bold text-sm truncate">${escapeHtml(bk.title)}</div><div class="text-xs text-muted truncate mt-0.5">${escapeHtml(bk.author)}</div></div>`;
                 div.onclick = () => showBookDetails(bk, true);
                 searchItems.appendChild(div);
             });
@@ -754,11 +814,10 @@ function openManualForm() {
     document.getElementById('statusButtons').classList.remove('hidden');
     openSheet('detailsSheet');
 }
-
 // ===== BOOK DETAILS =====
 function showBookDetails(bookData, isNew = false) {
     if (!bookData || !bookData.title) return;
-    
+
     const lb = myLibrary.find(b => (b.googleId && b.googleId === bookData.googleId) || b.id === bookData.id) || bookData;
     tempSelectedBook = isNew ? bookData : null;
     toggleEditMode(false);
@@ -768,7 +827,7 @@ function showBookDetails(bookData, isNew = false) {
 
     let h = `
         <div class="flex gap-4 mb-6 fade-up">
-            <img loading="lazy" src="${lb.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-[100px] h-[150px] object-cover rounded-2xl shadow-lg flex-shrink-0">
+            <img loading="lazy" src="${bookImage(lb.image)}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-[100px] h-[150px] object-cover rounded-2xl shadow-lg flex-shrink-0">
             <div class="flex flex-col justify-center min-w-0 flex-1">
                 <h3 class="text-lg font-bold leading-tight mb-2">${escapeHtml(lb.title || 'Без назви')}</h3>
                 <button onclick="window.searchAuthorBooks('${authorForSearch}')" class="w-fit px-3 py-1 rounded-lg text-xs font-semibold mb-2 active:scale-95 transition-transform" style="background: rgba(99,102,241,0.08); color: #6366f1;">
@@ -786,7 +845,6 @@ function showBookDetails(bookData, isNew = false) {
         </div>`;
 
     if (!isNew) {
-        // Progress slider
         if (lb.status === 'reading') {
             h += `
                 <div class="mb-5 p-5 card-elevated">
@@ -795,12 +853,11 @@ function showBookDetails(bookData, isNew = false) {
                 </div>`;
         }
 
-        // Reader
         h += `
             <div class="mb-5 p-5 card-elevated">
                 <p class="text-[10px] font-bold uppercase text-muted mb-3 tracking-wider">📖 Читалка</p>
                 <div class="flex gap-3">
-                    <button onclick="readSavedEpub('${lb.id}')" class="flex-1 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-bold text-xs active:scale-95 transition-transform shadow-glow">▶ Читати</button>
+                    <button onclick="readSavedEpub('${lb.id}')" class="flex-1 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-bold text-xs active:scale-95 transition-transform shadow-lg">▶ Читати</button>
                     <div class="relative flex-1">
                         <input type="file" id="epubFileModal_${lb.id}" accept=".epub" class="hidden" onchange="handleFileSelectAndSave(event,'${lb.id}')">
                         <button onclick="document.getElementById('epubFileModal_${lb.id}').click()" class="w-full py-3 rounded-xl font-bold text-xs active:scale-95 transition-transform" style="background: var(--card-border);">📥 Завантажити .epub</button>
@@ -808,7 +865,6 @@ function showBookDetails(bookData, isNew = false) {
                 </div>
             </div>`;
 
-        // Dates
         h += `
             <div class="mb-5 p-5 card-elevated">
                 <p class="text-[10px] font-bold uppercase text-muted mb-3 tracking-wider">🗓 Дати</p>
@@ -824,7 +880,6 @@ function showBookDetails(bookData, isNew = false) {
                 </div>
             </div>`;
 
-        // Highlights
         const hl = lb.highlights || [];
         if (hl.length > 0) {
             h += `
@@ -839,7 +894,6 @@ function showBookDetails(bookData, isNew = false) {
                 </div>`;
         }
 
-        // Rating
         let stars = '';
         const cr = lb.rating || 0;
         for (let i = 1; i <= 5; i++) {
@@ -851,18 +905,16 @@ function showBookDetails(bookData, isNew = false) {
                 <div class="flex justify-center gap-2">${stars}</div>
             </div>`;
 
-        // Notes
         h += `
             <div class="mb-5 p-5 card-elevated">
                 <div class="flex justify-between items-center mb-3">
                     <p class="text-[10px] font-bold uppercase text-muted tracking-wider">📝 Нотатки</p>
                     <button onclick="saveReview('${lb.id}')" class="text-primary-600 px-3 py-1.5 rounded-lg text-[10px] font-bold active:scale-95 transition-transform" style="background: rgba(99,102,241,0.08);">💾 Зберегти</button>
                 </div>
-                <textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[80px] leading-relaxed" placeholder="Ваші враження від книги...">${escapeHtml(lb.review || '')}</textarea>
+                <textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[80px] leading-relaxed" placeholder="Ваші враження від книги..." style="color: var(--text);">${escapeHtml(lb.review || '')}</textarea>
             </div>`;
     }
 
-    // Description
     h += `
         <div class="desc-scroll mb-5 p-5 card-elevated">
             <p class="text-[10px] font-bold uppercase text-muted mb-2 tracking-wider">📋 Анотація</p>
@@ -939,12 +991,15 @@ function changeStatusFromDetails(id, ns) {
 }
 
 function toggleEditMode(v) {
+    const dc = document.getElementById('detailsContent');
+    const ec = document.getElementById('editContent');
+    if (!dc || !ec) return;
     if (v) {
-        document.getElementById('detailsContent').classList.add('hidden');
-        document.getElementById('editContent').classList.remove('hidden');
+        dc.classList.add('hidden');
+        ec.classList.remove('hidden');
     } else {
-        document.getElementById('detailsContent').classList.remove('hidden');
-        document.getElementById('editContent').classList.add('hidden');
+        dc.classList.remove('hidden');
+        ec.classList.add('hidden');
     }
 }
 
@@ -977,8 +1032,15 @@ function saveReview(id) {
 
 async function addBookWithStatus(s) {
     if (!currentUser) return;
+    const btns = document.getElementById('statusButtons');
+    if (btns.dataset.loading === 'true') return;
+    btns.dataset.loading = 'true';
+
     if (tempSelectedBook === 'manual') saveBookEdits();
-    if (!tempSelectedBook || tempSelectedBook === 'manual') return;
+    if (!tempSelectedBook || tempSelectedBook === 'manual') {
+        btns.dataset.loading = 'false';
+        return;
+    }
 
     let nd = {
         ...tempSelectedBook,
@@ -995,11 +1057,11 @@ async function addBookWithStatus(s) {
         dateFinished: s === 'finished' ? new Date().toISOString().slice(0, 10) : null,
         sortOrder: 0
     };
-    // Remove id from temp data
     delete nd.id;
 
     await db.collection('users').doc(currentUser.uid).collection('books').add(nd);
     tempSelectedBook = null;
+    btns.dataset.loading = 'false';
     closeAllSheets();
     if (s === 'finished') showCelebration();
     showToast('📚 Додано!');
@@ -1083,7 +1145,7 @@ function stopTimer() {
         const b = myLibrary.find(x => x.id === currentReaderBookId);
         if (b && currentSessionSeconds > 5) {
             const t = (b.timeSpent || 0) + currentSessionSeconds;
-            db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ timeSpent: t });
+            db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({ timeSpent: t }).catch(() => {});
             if (currentSessionSeconds >= 300) markReadingDay();
         }
     }
@@ -1139,10 +1201,12 @@ function handleFileSelectAndSave(ev, bookId) {
     }
     if (bd && bd.lastFileName !== file.name) updateBookInFirestore(bookId, { lastFileName: file.name });
 
+    showToast('📖 Відкриваємо...');
     const r = new FileReader();
     r.onload = async function(e) {
         const ab = e.target.result;
-        try { await localforage.setItem(`epub_${bookId}`, ab); } catch (er) { console.log('Storage error:', er); }
+        const stored = await safeStoreEpub(`epub_${bookId}`, ab);
+        if (!stored) return;
         await openEpubReader(bookId, ab);
         closeAllSheets();
     };
@@ -1194,7 +1258,6 @@ async function openEpubReader(bookId, source) {
         rendition.themes.register("dark", { "body": { "background": "#0a0a0f", "color": "#d4d4d8", "font-family": "Georgia, serif", "line-height": "1.8" } });
         applyReaderSettings();
 
-        // Highlights
         rendition.on("selected", function(cfi, contents) {
             rendition.annotations.highlight(cfi);
             currentBookInstance.getRange(cfi).then(function(range) {
@@ -1214,7 +1277,6 @@ async function openEpubReader(bookId, source) {
             contents.window.getSelection().removeAllRanges();
         });
 
-        // Progress tracking
         rendition.on("relocated", loc => {
             if (!loc || !loc.start) return;
             const p = Math.round((loc.start.percentage || 0) * 100);
@@ -1236,6 +1298,16 @@ async function openEpubReader(bookId, source) {
         }).catch(() => {});
 
         initSwipeGestures();
+
+        // Keyboard navigation
+        window._readerKeyHandler = function(e) {
+            if (!rendition) return;
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') rendition.prev();
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); rendition.next(); }
+            if (e.key === 'Escape') closeReader();
+        };
+        document.addEventListener('keydown', window._readerKeyHandler);
+
     } catch (er) {
         console.error('EPUB error:', er);
         document.getElementById('readerProgress').innerText = "Помилка";
@@ -1247,6 +1319,10 @@ function closeReader() {
     stopTimer();
     document.getElementById('readerOverlay').style.display = 'none';
     document.getElementById('readerSettingsMenu').classList.add('hidden');
+    if (window._readerKeyHandler) {
+        document.removeEventListener('keydown', window._readerKeyHandler);
+        window._readerKeyHandler = null;
+    }
     if (currentBookInstance) {
         currentBookInstance.destroy();
         currentBookInstance = null;
@@ -1259,14 +1335,6 @@ function closeReader() {
 }
 
 // ===== RENDER LIBRARY =====
-function deleteBook(id, ev) {
-    ev.stopPropagation();
-    if (confirm("Видалити цю книгу?")) {
-        db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete();
-        showToast('🗑️ Видалено');
-    }
-}
-
 function formatTime(s) {
     if (!s) return "0хв";
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -1277,6 +1345,7 @@ function setLibraryTab(t) {
     currentLibraryTab = t;
     document.querySelectorAll('#libraryTabs .pill').forEach(b => { b.className = 'pill inactive'; });
     document.getElementById('tab_' + t).className = 'pill active';
+    document.getElementById('tab_' + t).scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     render();
 }
 
@@ -1292,7 +1361,7 @@ function renderBookCard(book) {
         return `
             <div data-id="${book.id}" onclick="showBookDetailsById('${book.id}')" class="flex flex-col items-center cursor-pointer active:scale-[0.96] transition-transform">
                 <div class="relative w-full aspect-[2/3]">
-                    <img loading="lazy" src="${book.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-full h-full rounded-2xl shadow-md object-cover">
+                    <img loading="lazy" src="${bookImage(book.image)}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-full h-full rounded-2xl shadow-md object-cover">
                     ${isFin && book.rating ? `<div class="absolute -bottom-1.5 -right-1.5 bg-white text-amber-400 text-[9px] font-black px-2 py-0.5 rounded-lg shadow-sm border">★${book.rating}</div>` : ''}
                     ${isRead && pct > 0 ? `<div class="absolute bottom-0 left-0 right-0 h-1.5 bg-black/20 rounded-b-2xl overflow-hidden"><div class="h-full bg-primary-400 rounded-b-2xl" style="width:${pct}%"></div></div>` : ''}
                 </div>
@@ -1304,7 +1373,7 @@ function renderBookCard(book) {
     return `
         <div data-id="${book.id}" onclick="showBookDetailsById('${book.id}')" class="card p-4 flex gap-3.5 items-start cursor-pointer swipe-card">
             <div class="swipe-bg">🗑️</div>
-            <img loading="lazy" src="${book.image || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-[52px] h-[75px] rounded-xl shadow-sm object-cover flex-shrink-0">
+            <img loading="lazy" src="${bookImage(book.image)}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-[52px] h-[75px] rounded-xl shadow-sm object-cover flex-shrink-0">
             <div class="flex-1 min-w-0">
                 <h3 class="font-bold text-sm leading-snug truncate">${safeTitle}</h3>
                 <p class="text-xs text-muted mt-0.5 truncate">${safeAuthor}</p>
@@ -1330,7 +1399,6 @@ function renderBookCard(book) {
         </div>`;
 }
 
-// Safe way to open details by ID (avoids inline JSON injection)
 window.showBookDetailsById = function(id) {
     const book = myLibrary.find(b => b.id === id);
     if (book) showBookDetails(book);
@@ -1396,7 +1464,6 @@ function render() {
         c.innerHTML = `<div class="${wc}">${list.map(renderBookCard).join('')}</div>`;
     }
 
-    // Init sortable
     document.querySelectorAll('.sortable-list').forEach(l => {
         new Sortable(l, {
             delay: 300,
@@ -1412,7 +1479,6 @@ function render() {
         });
     });
 
-    // Init swipe delete for list view
     if (viewMode === 'list') {
         document.querySelectorAll('.swipe-card').forEach(el => {
             const id = el.dataset.id;
@@ -1444,7 +1510,11 @@ async function loadRealRecommendations(cat = 'auto', btnId = 'rec_auto') {
     list.innerHTML = renderSkeleton();
 
     document.querySelectorAll('#recTabs .pill').forEach(b => { b.className = 'pill inactive'; });
-    if (document.getElementById(btnId)) document.getElementById(btnId).className = 'pill active';
+    const activeBtn = document.getElementById(btnId);
+    if (activeBtn) {
+        activeBtn.className = 'pill active';
+        activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
 
     let pool = [];
     if (cat === 'auto') {
@@ -1549,7 +1619,7 @@ async function fetchMoreRecommendations(isFirst = false) {
             const div = document.createElement('div');
             div.className = "card p-4 flex gap-3.5 items-start cursor-pointer active:scale-[0.98] transition-transform fade-up";
             div.innerHTML = `
-                <img loading="lazy" src="${bk.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-[52px] h-[75px] rounded-xl shadow-sm object-cover flex-shrink-0">
+                <img loading="lazy" src="${bookImage(bk.image)}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-[52px] h-[75px] rounded-xl shadow-sm object-cover flex-shrink-0">
                 <div class="flex-1 min-w-0">
                     <div class="font-bold text-sm leading-tight truncate">${escapeHtml(bk.title)}</div>
                     <div class="text-xs text-muted mt-0.5 font-medium">${escapeHtml(bk.author)}</div>
@@ -1562,10 +1632,3 @@ async function fetchMoreRecommendations(isFirst = false) {
     }
     isFetchingRecs = false;
 }
-
-// ===== INIT THEME ON LOAD =====
-(function() {
-    const isDark = localStorage.getItem('appTheme') === 'dark';
-    if (isDark) document.body.classList.add('dark');
-    document.querySelector('meta[name="theme-color"]').content = isDark ? '#0a0a0f' : '#fafafa';
-})();
