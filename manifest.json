@@ -1,32 +1,52 @@
 {
-    "name": "ЧитайКо — Хмарний Трекер",
+    "name": "ЧитайКо — Хмарна Бібліотека",
     "short_name": "ЧитайКо",
     "start_url": "/",
     "display": "standalone",
     "orientation": "portrait",
-    "background_color": "#0a0a0f",
+    "background_color": "#09090b",
     "theme_color": "#6366f1",
-    "description": "Ваша особиста хмарна бібліотека та читалка",
-    "categories": ["books", "education"],
+    "description": "Ваша особиста хмарна бібліотека та читалка ePub з AI-рекомендаціями",
+    "categories": ["books", "education", "lifestyle"],
     "lang": "uk",
+    "scope": "/",
     "icons": [
         {
-            "src": "icon.png",
+            "src": "icon-192.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "icon.png",
+            "src": "icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "icon.png",
+            "src": "icon-192-maskable.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "maskable"
+        },
+        {
+            "src": "icon-512-maskable.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "screenshots": [],
+    "shortcuts": [
+        {
+            "name": "Моя бібліотека",
+            "url": "/?tab=library",
+            "description": "Відкрити бібліотеку книг"
+        },
+        {
+            "name": "AI-рекомендації",
+            "url": "/?tab=discover",
+            "description": "Отримати AI-підбірку книг"
         }
     ]
 }
