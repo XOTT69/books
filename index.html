@@ -38,12 +38,6 @@
         .card-elevated{background:#fff;border:1px solid #e4e4e7;border-radius:22px;box-shadow:0 2px 20px rgba(0,0,0,.03)}
         .bg-surface{background:#fafafa}
         .text-muted{color:#71717a}
-        .fade-in{animation:fadeIn .2s ease forwards}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        .bottom-sheet{transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1)}
-        .bottom-sheet.open{transform:translateY(0)}
-        .backdrop{opacity:0;pointer-events:none;transition:opacity .25s}
-        body.modal-open .backdrop{opacity:1;pointer-events:auto}
         .progress-bar{transition:width .5s cubic-bezier(.4,0,.2,1)}
         .pill{padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;white-space:nowrap;transition:all .2s;cursor:pointer}
         .pill.active{background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.25)}
@@ -97,7 +91,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=14">
+    <link rel="stylesheet" href="library.css?v=15">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -147,7 +141,7 @@
         </div>
 
         <!-- TAB: LIBRARY -->
-        <div id="tabLibrary" class="tab-content active fade-in">
+        <div id="tabLibrary" class="tab-content active">
             <header class="library-header">
                 <div><p class="brand-name">ЧитайКо</p><h1>Бібліотека</h1></div>
                 <button onclick="openBookSearch()" class="primary-button"><span aria-hidden="true">＋</span> Додати книгу</button>
@@ -177,7 +171,7 @@
         </div>
 
         <!-- TAB: RECOMMENDATIONS -->
-        <div id="tabDiscover" class="tab-content fade-in">
+        <div id="tabDiscover" class="tab-content">
             <header class="mb-5"><h1 class="text-2xl font-black tracking-tight">Рекомендації</h1><p class="text-muted text-sm mt-0.5">Підібрано для вас</p></header>
             <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="recTabs">
                 <button onclick="loadRealRecommendations('auto','rec_auto')" id="rec_auto" class="pill active">✨ Для вас</button>
@@ -194,7 +188,7 @@
         </div>
 
         <!-- TAB: PROFILE -->
-        <div id="tabProfile" class="tab-content fade-in">
+        <div id="tabProfile" class="tab-content">
             <header class="mb-6 text-center pt-4">
                 <div class="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full mx-auto mb-3 flex items-center justify-center text-3xl shadow-lg shadow-primary-200">📖</div>
                 <h2 id="profileName" class="text-lg font-bold">Читач</h2>
@@ -239,7 +233,7 @@
         </div>
     </nav>
 
-    <div class="backdrop fixed inset-0 z-40 bg-black/40 hidden" aria-hidden="true"></div>
+    <div class="backdrop fixed inset-0 z-40 bg-black/40" aria-hidden="true"></div>
 
     <!-- READER -->
     <div id="readerOverlay">
@@ -320,6 +314,6 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="app.js?v=14"></script>
+    <script defer src="app.js?v=15"></script>
 </body>
 </html>

@@ -218,18 +218,18 @@ function toggleAppTheme(){
 
 // ===== TABS =====
 function switchTab(tab){
-    const changed=currentTab!==tab;
+    if(currentTab===tab)return;
     currentTab=tab;
     document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
 
     const tabs={library:'tabLibrary',discover:'tabDiscover',profile:'tabProfile'};
     const el=document.getElementById(tabs[tab]);
     el.classList.add('active');
-    if(changed){
-        document.getElementById('appScreen').scrollTop=0;
-        window.scrollTo(0,0);
-    }
-    const btns=document.querySelectorAll('.nav-tab');
+    document.getElementById('appScreen').scrollTop=0;
+    window.scrollTo(0,0);
+    const nav=document.getElementById('mainBottomNav');
+    nav.dataset.selectedTab=tab;
+    const btns=nav.querySelectorAll('.nav-tab');
     const idx={library:0,discover:1,profile:2}[tab];
     btns.forEach((button,index)=>{
         const selected=index===idx;
@@ -242,7 +242,26 @@ function switchTab(tab){
 }
 
 // ===== VIEW =====
-function setViewMode(m){viewMode=m;localStorage.setItem('viewMode',m);updateViewButtons();render();}
+const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+let libraryTransition;
+function animateLibraryChange(){
+    if(reducedMotion.matches)return;
+    const books=document.getElementById('myBooksContainer');
+    libraryTransition?.cancel();
+    libraryTransition=books.animate?.(
+        [{opacity:.84,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],
+        {duration:200,easing:'cubic-bezier(.2,.75,.25,1)'}
+    );
+}
+
+function setViewMode(mode){
+    if(viewMode===mode)return;
+    viewMode=mode;
+    localStorage.setItem('viewMode',mode);
+    updateViewButtons();
+    render();
+    animateLibraryChange();
+}
 function updateViewButtons(){
     for(const mode of ['list','grid'])document.getElementById('view_'+mode).setAttribute('aria-pressed',String(viewMode===mode));
 }
@@ -431,14 +450,13 @@ function openSheet(id){
     document.getElementById('mainBottomNav').inert=true;
     sheet.inert=false;
     sheet.classList.add('open');
-    document.querySelector('.backdrop').classList.remove('hidden');
     updateKeyboardLayout();
     sheet.querySelector('[aria-label^="Закрити"]')?.focus({preventScroll:true});
 }
 
 function closeAllSheets(){
     detailsOpenedFromSearch=false;
-    resetBookSearch();
+    cancelBookSearch();
     const sheet=document.querySelector('.bottom-sheet.open');
     if(sheet){
         if(sheet.contains(document.activeElement))document.activeElement.blur();
@@ -448,8 +466,6 @@ function closeAllSheets(){
     document.body.classList.remove('modal-open');
     document.getElementById('appScreen').inert=false;
     document.getElementById('mainBottomNav').inert=false;
-    document.querySelector('.backdrop').classList.add('hidden');
-    toggleEditMode(false);
     updateKeyboardLayout();
     if(sheetTrigger?.isConnected)sheetTrigger.focus({preventScroll:true});
     sheetTrigger=null;
@@ -1125,6 +1141,7 @@ function closeReader(){
 
 // ===== RENDER =====
 function setLibraryTab(tab){
+    const changed=currentLibraryTab!==tab;
     currentLibraryTab=tab;
     for(const button of document.querySelectorAll('#libraryTabs .pill')){
         const selected=button.id==='tab_'+tab;
@@ -1132,6 +1149,7 @@ function setLibraryTab(tab){
         button.setAttribute('aria-pressed',String(selected));
     }
     render();
+    if(changed)animateLibraryChange();
 }
 
 function renderBookCard(book){
@@ -1223,7 +1241,7 @@ function render(){
     container.innerHTML=`<div class="${classes} ${q?'':'sortable-list'}">${list.map(renderBookCard).join('')}</div>`;
     const sortable=container.querySelector('.sortable-list');
     if(sortable&&window.Sortable)new Sortable(sortable,{
-        delay:300,delayOnTouchOnly:true,animation:150,ghostClass:'sortable-ghost',
+        delay:300,delayOnTouchOnly:true,animation:reducedMotion.matches?0:150,ghostClass:'sortable-ghost',
         filter:'input, .book-actions, .secondary-button',preventOnFilter:false,
         onEnd:event=>{[...event.from.children].forEach((element,index)=>{
             if(element.dataset.id)updateBookInFirestore(element.dataset.id,{sortOrder:index});
