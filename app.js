@@ -89,6 +89,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     enableBookLongPress(document.getElementById('myBooksContainer'));
     enableLibraryToolsControls();
     enableBackdropDismiss();
+    enableRecommendationPaging();
     const viewport=window.visualViewport;
     let viewportFrame;
     function scheduleViewportUpdate(){

@@ -99,7 +99,7 @@ function loadLibraryOrganization(user){
     unsubscribeOrganization=db.collection('users').doc(user.uid).onSnapshot(snapshot=>{
         if(currentUser!==user)return;
         const profile=snapshot.data()||{};
-        applyRecommendationPreferences(profile);
+        applyRecommendationPreferences(profile,snapshot);
         if(profile.readingGoal){
             localStorage.setItem('readingGoal',profile.readingGoal);
             updateGoalWidget();

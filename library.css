@@ -556,15 +556,33 @@ body.dark .tool-danger { color: #f7a39b; }
     .import-plan select, .calendar-year select, #recommendationLanguage { font-size: 16px; }
 }
 
+.recommendation-heading { margin-block: .35rem 1rem; }
+.recommendation-heading h1 { font: 500 clamp(2.1rem, 6vw, 3.5rem)/1.05 var(--serif); letter-spacing: -.04em; }
+.recommendation-filters { justify-content: space-between; gap: .45rem; }
+.recommendation-filters select { min-width: 0; }
 .recommendation-tabs {
     display: flex;
-    flex-wrap: wrap;
     gap: .4rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    padding-block: .35rem .65rem;
+    margin-block: .3rem .55rem;
 }
-.recommendation-filters { justify-content: space-between; }
-#recommendationsList { display: flex; flex-direction: column; }
-#recommendationsList > .recommendation-no-cover { order: 1; }
-#recommendationsList > .recommendation-status { order: 2; }
+.recommendation-tabs .pill {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    min-height: 44px;
+    padding-inline: .85rem;
+    border: 1px solid var(--line);
+}
+.recommendation-tabs .pill.active { border-color: var(--accent); }
+.recommendation-tabs .pill span { font-size: 1.02rem; line-height: 1; }
+#recommendationsList { display: grid; gap: .65rem; }
+#recommendationMore:empty { padding-block: 0; }
+#recommendationMore { color: var(--muted); }
 .recommendation-settings { display: grid; gap: .8rem; }
 .recommendation-settings > div {
     display: grid;
@@ -581,5 +599,6 @@ body.dark .tool-danger { color: #f7a39b; }
     background: var(--soft);
     color: var(--ink);
 }
+.recommendation-settings label:has(:checked) { color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--accent); }
 .recommendation-settings input, .duplicate-choice input { accent-color: var(--accent); }
 .duplicate-plan li { white-space: normal; }

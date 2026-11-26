@@ -606,9 +606,11 @@ const recommendationLanguageCodes={uk:'ukr',ru:'rus'};
 const recommendationLanguageLabels={uk:'Українська',ru:'Російська'};
 let recommendationFeed;
 let dismissedRecommendations=new Set();
-let pendingRecommendationDismissals=new Set();
+let localRecommendationDismissals=new Set();
 let recommendationPreferences={language:'',genres:Object.keys(recommendationGenres)};
-let savingRecommendationPreferences=0;
+let recommendationPreferenceOverride;
+let recommendationPager;
+const recommendationIcons={auto:"✦",romantasy:"♡",portal:"↪",fantasy:"⚔",romance:"♥",detective:"⌕",thriller:"◈",magic:"☾",self:"↗",scifi:"✧"};
 
 function recommendationKey(title,author){
     return JSON.stringify([normalizeReadingSearch(title),normalizeReadingSearch(author)]);
@@ -627,13 +629,20 @@ function resetReadingTools(){
     pendingDuplicates=null;
     recommendationFeed?.controller.abort();
     recommendationFeed=null;
-    dismissedRecommendations=new Set();
-    pendingRecommendationDismissals=new Set();
-    savingRecommendationPreferences=0;
-    let cached;
-    try{if(currentUser)cached=JSON.parse(localStorage.getItem('recommendations_'+currentUser.uid));}catch{}
-    recommendationPreferences=cleanRecommendationPreferences(cached);
+    recommendationPager?.disconnect();
+    let cached,legacyPreferences;
+    try{
+        if(currentUser){
+            cached=JSON.parse(localStorage.getItem('recommendationState_'+currentUser.uid));
+            legacyPreferences=JSON.parse(localStorage.getItem('recommendations_'+currentUser.uid));
+        }
+    }catch{}
+    recommendationPreferenceOverride=cached?.override?cleanRecommendationPreferences(cached.preferences):null;
+    recommendationPreferences=cleanRecommendationPreferences(cached?.preferences||legacyPreferences);
+    localRecommendationDismissals=new Set(labelNames(cached?.dismissed));
+    dismissedRecommendations=new Set(localRecommendationDismissals);
     document.getElementById('recommendationsList').replaceChildren();
+    document.getElementById('recommendationMore').replaceChildren();
     renderRecommendationControls();
 }
 
@@ -641,26 +650,40 @@ function renderRecommendationControls(category='auto'){
     document.getElementById('recommendationLanguage').value=recommendationPreferences.language;
     const tabs=document.getElementById('recTabs');
     const buttons=[['auto','Для вас'],...recommendationPreferences.genres.map(genre=>[genre,genre])];
-    const key=JSON.stringify([category,buttons]);
-    if(tabs.dataset.key===key)return;
-    tabs.dataset.key=key;
-    tabs.replaceChildren(...buttons.map(([value,label])=>{
-        const button=document.createElement('button');
-        button.type='button';
-        button.id=value==='auto'?'rec_auto':'rec_'+recommendationGenres[value].id;
-        button.className=value===category?'pill active':'pill inactive';
-        button.textContent=label;
-        button.setAttribute('aria-pressed',String(value===category));
-        button.addEventListener('click',()=>loadRealRecommendations(value));
-        return button;
-    }));
+    const key=JSON.stringify(buttons);
+    if(tabs.dataset.key!==key){
+        const scrollLeft=tabs.scrollLeft;
+        tabs.dataset.key=key;
+        tabs.replaceChildren(...buttons.map(([value,label])=>{
+            const id=value==='auto'?'auto':recommendationGenres[value].id;
+            const button=document.createElement('button');
+            button.type='button';
+            button.id='rec_'+id;
+            button.dataset.genre=value;
+            button.className='pill';
+            const icon=document.createElement('span');
+            icon.setAttribute('aria-hidden','true');
+            icon.textContent=recommendationIcons[id];
+            button.append(icon,document.createTextNode(label));
+            button.addEventListener('click',()=>loadRealRecommendations(value));
+            return button;
+        }));
+        tabs.scrollLeft=scrollLeft;
+    }
+    for(const button of tabs.children){
+        const active=button.dataset.genre===category;
+        button.classList.toggle('active',active);
+        button.classList.toggle('inactive',!active);
+        button.setAttribute('aria-pressed',String(active));
+    }
 }
 
 function renderRecommendationSettings(){
     document.getElementById('libraryToolsContent').innerHTML=`<form class="recommendation-settings" data-form="recommendation-settings">
         <p class="text-muted">Виберіть жанри для стрічки «Для вас» і вкладок у порадах.</p>
         <div>${Object.keys(recommendationGenres).map(genre=>
-            `<label><input type="checkbox" name="genre" value="${genre}" ${recommendationPreferences.genres.includes(genre)?'checked':''}> ${genre}</label>`).join('')}</div>
+            `<label><input type="checkbox" name="genre" value="${genre}" ${recommendationPreferences.genres.includes(genre)?'checked':''}>
+                <span aria-hidden="true">${recommendationIcons[recommendationGenres[genre].id]}</span> ${genre}</label>`).join('')}</div>
         <p class="text-muted" role="status"></p><button type="submit" class="primary-button">Зберегти жанри</button>
     </form>`;
 }
@@ -672,15 +695,39 @@ function setRecommendationPreferences(preferences){
     else renderRecommendationControls(category);
 }
 
+function storeRecommendationState(user){
+    try{
+        localStorage.setItem('recommendationState_'+user.uid,JSON.stringify({
+            preferences:recommendationPreferences,override:Boolean(recommendationPreferenceOverride),
+            dismissed:[...localRecommendationDismissals]
+        }));
+        return true;
+    }catch{return false;}
+}
+
+async function syncRecommendationState(user,fields,savedLocally){
+    try{
+        await db.collection('users').doc(user.uid).set(fields,{merge:true});
+        return true;
+    }catch(error){
+        if(!savedLocally&&currentUser===user)showWriteError(error);
+        return false;
+    }
+}
+
 function persistRecommendationPreferences(preferences){
     const user=currentUser;
-    setRecommendationPreferences(preferences);
-    if(!user)return Promise.resolve();
-    try{localStorage.setItem('recommendations_'+user.uid,JSON.stringify(recommendationPreferences));}catch{}
-    savingRecommendationPreferences++;
-    return db.collection('users').doc(user.uid).set({recommendationPreferences},{merge:true}).catch(error=>{
-        if(currentUser===user)showWriteError(error);
-    }).finally(()=>{if(currentUser===user)savingRecommendationPreferences--;});
+    const override=cleanRecommendationPreferences(preferences);
+    recommendationPreferenceOverride=override;
+    setRecommendationPreferences(override);
+    if(!user)return;
+    const savedLocally=storeRecommendationState(user);
+    return syncRecommendationState(user,{recommendationPreferences:override},savedLocally).then(saved=>{
+        if(saved&&currentUser===user&&recommendationPreferenceOverride===override){
+            recommendationPreferenceOverride=null;
+            storeRecommendationState(user);
+        }
+    });
 }
 
 function saveRecommendationGenres(form){
@@ -690,16 +737,21 @@ function saveRecommendationGenres(form){
     closeLibraryTools();
 }
 
-function applyRecommendationPreferences(profile){
-    dismissedRecommendations=new Set(labelNames(profile.dismissedRecommendations));
-    for(const name of dismissedRecommendations)pendingRecommendationDismissals.delete(name);
+function applyRecommendationPreferences(profile,snapshot){
+    const cloudDismissals=labelNames(profile.dismissedRecommendations);
+    dismissedRecommendations=new Set([...localRecommendationDismissals,...cloudDismissals]);
     document.querySelectorAll('.recommendation-card').forEach(card=>{
         if(dismissedRecommendations.has(card.dataset.recommendation))card.remove();
     });
-    if(profile.recommendationPreferences&&!savingRecommendationPreferences){
-        setRecommendationPreferences(profile.recommendationPreferences);
-        try{if(currentUser)localStorage.setItem('recommendations_'+currentUser.uid,JSON.stringify(recommendationPreferences));}catch{}
+    if(profile.recommendationPreferences){
+        const cloud=cleanRecommendationPreferences(profile.recommendationPreferences);
+        if(recommendationPreferenceOverride&&dataEquals(recommendationPreferenceOverride,cloud)&&
+            !snapshot?.metadata?.hasPendingWrites&&!snapshot?.metadata?.fromCache){
+            recommendationPreferenceOverride=null;
+        }
+        if(!recommendationPreferenceOverride)setRecommendationPreferences(cloud);
     }
+    if(currentUser)storeRecommendationState(currentUser);
 }
 
 function changeRecommendationLanguage(){
@@ -745,7 +797,7 @@ function loadRealRecommendations(category='auto'){
     recommendationFeed?.controller.abort();
     recommendationFeed={
         key,category,language,queries:recommendationQueries(category,language),queryIndex:0,
-        seen:new Set(),controller:new AbortController(),loading:false
+        failedQueries:[],emptyBatches:0,seen:new Set(),controller:new AbortController(),loading:false
     };
     document.getElementById('recommendationsList').replaceChildren();
     return fetchMoreRecommendations();
@@ -755,12 +807,13 @@ function recommendationTitleIsBook(title){
     return !/^(Мир фантастики|Навигатор игрового мира)(?:[\s№]|$)/iu.test(title);
 }
 
-async function queryRecommendationCatalog({source,language,query,title},signal){
+async function queryRecommendationCatalog({source,language,query,title,page=1},signal){
     const matchTitle=value=>!title||bookIdentity(value).includes(bookIdentity(title));
     if(source==='google'){
-        const params=new URLSearchParams({key:googleBooksKey,q:query,printType:'books',langRestrict:language,maxResults:'24'});
+        const params=new URLSearchParams({key:googleBooksKey,q:query,printType:'books',langRestrict:language,maxResults:'24',startIndex:String((page-1)*24)});
         const response=await catalogResponse(`https://www.googleapis.com/books/v1/volumes?${params}`,signal);
-        return (response.items||[]).flatMap(({id,volumeInfo:data})=>{
+        const items=Array.isArray(response.items)?response.items:[];
+        const books=items.flatMap(({id,volumeInfo:data})=>{
             if(!data?.title||data.language!==language||!data.authors?.length||!matchTitle(data.title)||
                 (data.pageCount>0&&data.pageCount<48)||data.printType==='MAGAZINE'||!recommendationTitleIsBook(data.title))return [];
             return [{
@@ -771,13 +824,15 @@ async function queryRecommendationCatalog({source,language,query,title},signal){
                 source:'Google Books'
             }];
         });
+        return {books,hasMore:!title&&items.length===24&&response.totalItems>page*24};
     }
 
     const code=recommendationLanguageCodes[language];
-    const params=new URLSearchParams({q:query+' language:'+code,lang:language,limit:'16',
+    const params=new URLSearchParams({q:query+' language:'+code,lang:language,limit:'16',page:String(page),
         fields:'author_name,first_publish_year,number_of_pages_median,editions,editions.key,editions.title,editions.language,editions.cover_i,editions.isbn'});
     const response=await catalogResponse(`https://openlibrary.org/search.json?${params}`,signal);
-    return (response.docs||[]).flatMap(work=>{
+    const docs=Array.isArray(response.docs)?response.docs:[];
+    const books=docs.flatMap(work=>{
         const edition=work.editions?.docs?.find(book=>book.language?.includes(code)&&book.key&&book.title&&matchTitle(book.title)&&recommendationTitleIsBook(book.title));
         if(!edition)return [];
         return [{
@@ -787,6 +842,7 @@ async function queryRecommendationCatalog({source,language,query,title},signal){
             identifiers:labelNames(edition.isbn),publishedDate:String(work.first_publish_year||''),source:'Open Library'
         }];
     });
+    return {books,hasMore:!title&&docs.length===16&&response.numFound>page*16};
 }
 
 function makeRecommendationCard(book,key){
@@ -815,42 +871,50 @@ function makeRecommendationCard(book,key){
     return card;
 }
 
-async function dismissRecommendation(key,card){
-    if(!currentUser||pendingRecommendationDismissals.has(key))return;
+function dismissRecommendation(key,card){
     const user=currentUser;
-    const feed=recommendationFeed;
-    const container=card.parentElement;
-    const next=card.nextSibling;
-    pendingRecommendationDismissals.add(key);
+    if(!user||dismissedRecommendations.has(key))return;
+    dismissedRecommendations.add(key);
+    localRecommendationDismissals.add(key);
+    const next=card.nextElementSibling?.querySelector('button')||card.previousElementSibling?.querySelector('button');
+    const restoreFocus=card.contains(document.activeElement);
     card.remove();
-    if(container.querySelectorAll('.recommendation-card').length<4){
-        fetchMoreRecommendations();
-        if(!feed.loading&&!container.querySelector('.recommendation-card, #recommendationMore')){
-            const empty=document.createElement('p');
-            empty.id='recommendationMore';
-            empty.className='recommendation-status text-muted';
-            empty.textContent='Усі знайдені книги вже переглянуто.';
-            container.append(empty);
+    if(restoreFocus)next?.focus({preventScroll:true});
+    const savedLocally=storeRecommendationState(user);
+    if(document.getElementById('recommendationsList').childElementCount<4)fetchMoreRecommendations();
+    return syncRecommendationState(user,{dismissedRecommendations:firebase.firestore.FieldValue.arrayUnion(key)},savedLocally);
+}
+
+function enableRecommendationPaging(){
+    if(!('IntersectionObserver' in window))return;
+    recommendationPager=new IntersectionObserver(entries=>{
+        if(entries.some(entry=>entry.isIntersecting)&&currentTab==='discover'){
+            fetchMoreRecommendations();
         }
+    },{rootMargin:'320px 0px'});
+}
+
+function renderRecommendationPager(feed,added){
+    const footer=document.getElementById('recommendationMore');
+    const hasCards=document.getElementById('recommendationsList').childElementCount>0;
+    const hasMore=feed.queryIndex<feed.queries.length;
+    footer.replaceChildren();
+    if(hasMore||feed.failedQueries.length){
+        const next=document.createElement('button');
+        next.type='button';
+        next.className='secondary-button';
+        next.textContent=hasMore?'Шукати ще':'Повторити пошук';
+        next.addEventListener('click',()=>{
+            if(!hasMore)feed.queries.push(...feed.failedQueries.splice(0));
+            fetchMoreRecommendations();
+        });
+        footer.append(next);
     }
-    try{
-        await db.collection('users').doc(user.uid).set({
-            dismissedRecommendations:firebase.firestore.FieldValue.arrayUnion(key)
-        },{merge:true});
-        if(currentUser===user){
-            pendingRecommendationDismissals.delete(key);
-            dismissedRecommendations.add(key);
-        }
-    }catch(error){
-        if(currentUser===user){
-            pendingRecommendationDismissals.delete(key);
-            if(recommendationFeed===feed){
-                if(!container.querySelector('.recommendation-card'))document.getElementById('recommendationMore')?.remove();
-                container.insertBefore(card,next?.parentElement===container?next:null);
-            }
-            showWriteError(error);
-        }
+    if(!hasCards){
+        footer.prepend(feed.failedQueries.length?'Деякі каталоги не відповіли.':'За цими фільтрами книги поки не знайдено.');
     }
+    feed.emptyBatches=added?0:feed.emptyBatches+1;
+    if(hasMore&&feed.emptyBatches<2&&(added||!feed.failedQueries.length))recommendationPager?.observe(footer);
 }
 
 async function fetchMoreRecommendations(){
@@ -858,60 +922,41 @@ async function fetchMoreRecommendations(){
     if(!feed||feed.loading||feed.queryIndex>=feed.queries.length)return;
     feed.loading=true;
     const list=document.getElementById('recommendationsList');
-    document.getElementById('recommendationMore')?.remove();
-    const status=document.createElement('p');
-    status.className='recommendation-status text-muted';
+    const status=document.getElementById('recommendationMore');
+    recommendationPager?.unobserve(status);
     status.textContent='Шукаємо книги…';
-    list.append(status);
-    const candidates=[];
-    let failed=false;
+    const candidates=new Map();
     const existingTitles=new Set(myLibrary.map(book=>bookIdentity(book.title)));
+    const languages=feed.language?[feed.language]:Object.keys(recommendationLanguageCodes);
     try{
         for(let attempt=0;attempt<3&&feed.queryIndex<feed.queries.length;attempt++){
             const batch=feed.queries.slice(feed.queryIndex,feed.queryIndex+4);
             feed.queryIndex+=batch.length;
             const results=await Promise.allSettled(batch.map(query=>queryRecommendationCatalog(query,feed.controller.signal)));
             if(feed!==recommendationFeed)return;
-            for(const result of results){
-                if(result.status==='rejected'){failed=true;continue;}
-                candidates.push(...result.value.filter(book=>!existingTitles.has(bookIdentity(book.title))));
-            }
-            const languages=feed.language?[feed.language]:Object.keys(recommendationLanguageCodes);
-            const available=candidates.filter(book=>{
-                const key=recommendationKey(book.title,book.author);
-                return !feed.seen.has(key)&&!dismissedRecommendations.has(key)&&!pendingRecommendationDismissals.has(key);
+            results.forEach((result,index)=>{
+                const query=batch[index];
+                if(result.status==='rejected'){feed.failedQueries.push(query);return;}
+                if(result.value.hasMore&&(query.page||1)<4)feed.queries.push({...query,page:(query.page||1)+1});
+                for(const book of result.value.books){
+                    const key=recommendationKey(book.title,book.author);
+                    if(existingTitles.has(bookIdentity(book.title))||feed.seen.has(key)||dismissedRecommendations.has(key))continue;
+                    const previous=candidates.get(key);
+                    if(!previous||!previous.image&&book.image)candidates.set(key,book);
+                }
             });
+            const available=[...candidates.values()];
             if(languages.every(language=>available.filter(book=>book.language===language).length>=4))break;
         }
-        const withCoverFirst=candidates.sort((a,b)=>Number(Boolean(b.image))-Number(Boolean(a.image)));
-        for(const book of withCoverFirst){
-            const key=recommendationKey(book.title,book.author);
-            if(feed.seen.has(key)||dismissedRecommendations.has(key)||pendingRecommendationDismissals.has(key))continue;
+        const sorted=[...candidates].filter(([key])=>!dismissedRecommendations.has(key))
+            .sort(([,a],[,b])=>Number(Boolean(b.image))-Number(Boolean(a.image)));
+        const cards=sorted.map(([key,book])=>{
             feed.seen.add(key);
-            const card=makeRecommendationCard(book,key);
-            const firstWithoutCover=list.querySelector('.recommendation-no-cover');
-            list.insertBefore(card,book.image?firstWithoutCover:null);
-        }
-        const footer=document.createElement('div');
-        footer.id='recommendationMore';
-        footer.className='recommendation-status text-muted';
-        if(!list.querySelector('.recommendation-card')){
-            footer.textContent=failed?'Деякі каталоги не відповіли.':'За цими фільтрами книги поки не знайдено.';
-        }
-        if(feed.queryIndex<feed.queries.length||failed){
-            const next=document.createElement('button');
-            next.type='button';
-            next.className='secondary-button';
-            next.textContent='Шукати ще';
-            next.addEventListener('click',()=>{
-                if(feed.queryIndex>=feed.queries.length)feed.queryIndex=0;
-                fetchMoreRecommendations();
-            });
-            footer.append(next);
-        }
-        if(footer.hasChildNodes())list.append(footer);
+            return makeRecommendationCard(book,key);
+        });
+        list.append(...cards);
+        renderRecommendationPager(feed,cards.length);
     }finally{
-        status.remove();
         feed.loading=false;
     }
 }
