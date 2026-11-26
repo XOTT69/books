@@ -76,6 +76,7 @@ function libraryMatch(candidate){
 document.addEventListener('DOMContentLoaded',()=>{
     if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn);
     document.querySelectorAll('.bottom-sheet').forEach(enableSheetDrag);
+    enableDetailsSwipe(document.getElementById('detailsSheet'));
     enableBackdropDismiss();
     const viewport=window.visualViewport;
     let viewportFrame;
@@ -174,6 +175,13 @@ function enableBackdropDismiss(){
     backdrop.addEventListener('lostpointercapture',()=>{tap=null;});
 }
 
+const sheetDismissDistance=80;
+
+function resetSheetDrag(sheet){
+    sheet.classList.remove('sheet-dragging');
+    sheet.style.removeProperty('transform');
+}
+
 function enableSheetDrag(sheet){
     const handle=sheet.querySelector('.drag-handle');
     let pointer,start,offset;
@@ -193,12 +201,59 @@ function enableSheetDrag(sheet){
     function end(event){
         if(event.pointerId!==pointer)return;
         pointer=null;
-        sheet.classList.remove('sheet-dragging');
-        sheet.style.removeProperty('transform');
-        if(event.type!=='pointerup'||offset<80)return;
-        dismissCurrentSheet();
+        resetSheetDrag(sheet);
+        if(event.type==='pointerup'&&offset>=sheetDismissDistance&&sheet.classList.contains('open'))dismissCurrentSheet();
     }
     for(const type of ['pointerup','pointercancel','lostpointercapture'])handle.addEventListener(type,end);
+}
+
+function enableDetailsSwipe(sheet){
+    let gesture;
+    function finish(event){
+        if(!gesture)return;
+        const {dragging,offset}=gesture;
+        gesture=null;
+        if(!dragging)return;
+        resetSheetDrag(sheet);
+        if(event.type==='touchend'&&event.cancelable)event.preventDefault();
+        if(event.type==='touchend'&&offset>=sheetDismissDistance&&sheet.classList.contains('open'))dismissCurrentSheet();
+    }
+
+    sheet.addEventListener('touchstart',event=>{
+        if(gesture)finish(event);
+        if(!sheet.classList.contains('open')||event.touches.length!==1)return;
+        const target=event.target;
+        if(target.closest('.drag-handle, button, a, input, select, textarea, summary, [contenteditable]'))return;
+        if(document.body.classList.contains('keyboard-open')||window.getSelection()?.isCollapsed===false)return;
+        for(let element=target;element&&element!==sheet;element=element.parentElement){
+            if(element.scrollTop>1)return;
+        }
+        const touch=event.touches[0];
+        gesture={x:touch.clientX,y:touch.clientY,dragging:false,offset:0};
+    },{passive:true});
+
+    sheet.addEventListener('touchmove',event=>{
+        if(!gesture)return;
+        if(event.touches.length!==1||!event.cancelable||!sheet.classList.contains('open')){
+            finish(event);
+            return;
+        }
+        const touch=event.touches[0];
+        const x=touch.clientX-gesture.x;
+        const y=touch.clientY-gesture.y;
+        if(!gesture.dragging){
+            if(Math.max(Math.abs(x),Math.abs(y))<5)return;
+            if(y<=Math.abs(x)){gesture=null;return;}
+            gesture.dragging=true;
+            sheet.classList.add('sheet-dragging');
+        }
+        event.preventDefault();
+        gesture.offset=Math.max(0,y);
+        sheet.style.transform=`translateY(${gesture.offset}px)`;
+    },{passive:false});
+
+    sheet.addEventListener('touchend',finish,{passive:false});
+    sheet.addEventListener('touchcancel',finish);
 }
 
 // ===== THEME =====
@@ -441,10 +496,7 @@ function openSheet(id){
     const focus=document.activeElement;
     if(!current)sheetTrigger=focus?.matches('button,a')?focus:null;
     if(current?.contains(focus)||focus?.matches('input,textarea'))focus.blur();
-    if(current){
-        current.classList.remove('open');
-        current.inert=true;
-    }
+    if(current)hideSheet(current);
     document.body.classList.add('modal-open');
     document.getElementById('appScreen').inert=true;
     document.getElementById('mainBottomNav').inert=true;
@@ -454,14 +506,19 @@ function openSheet(id){
     sheet.querySelector('[aria-label^="Закрити"]')?.focus({preventScroll:true});
 }
 
+function hideSheet(sheet){
+    resetSheetDrag(sheet);
+    sheet.classList.remove('open');
+    sheet.inert=true;
+}
+
 function closeAllSheets(){
     detailsOpenedFromSearch=false;
     cancelBookSearch();
     const sheet=document.querySelector('.bottom-sheet.open');
     if(sheet){
         if(sheet.contains(document.activeElement))document.activeElement.blur();
-        sheet.classList.remove('open');
-        sheet.inert=true;
+        hideSheet(sheet);
     }
     document.body.classList.remove('modal-open');
     document.getElementById('appScreen').inert=false;
