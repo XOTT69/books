@@ -2,12 +2,12 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>ЧитайКо</title>
     <link rel="icon" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#6366f1">
+    <meta name="theme-color" content="#f5f1e9">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,7 +16,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <script>tailwind.config={theme:{extend:{colors:{primary:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca'}}}}};</script>
+    <script>tailwind.config={theme:{extend:{colors:{primary:{50:'#eaf1ec',100:'#dbe8df',200:'#c2d7c9',300:'#9db8ab',400:'#6f9383',500:'#416357',600:'#315145',700:'#244236'}}}}};</script>
     <style>
         *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
         ::-webkit-scrollbar{width:0;background:transparent}
@@ -101,6 +101,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
+    <link rel="stylesheet" href="library.css">
 </head>
 <body class="bg-surface font-sans pb-24 text-slate-900 antialiased">
 
@@ -132,7 +133,7 @@
     </div>
 
     <!-- APP -->
-    <div id="appScreen" class="max-w-lg mx-auto px-4 pt-6 hidden">
+    <div id="appScreen" class="app-shell hidden">
 
         <!-- Welcome (first time) -->
         <div id="welcomeScreen" class="hidden fade-in mb-6">
@@ -151,25 +152,30 @@
 
         <!-- TAB: LIBRARY -->
         <div id="tabLibrary" class="tab-content active fade-in">
-            <header class="flex justify-between items-center mb-4">
-                <h1 class="text-2xl font-black tracking-tight">Бібліотека</h1>
-                <button onclick="openSheet('searchSheet')" class="size-11 flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-full shadow-lg shadow-primary-200 active:scale-90 transition-transform text-lg font-bold">+</button>
+            <header class="library-header">
+                <div><p class="brand-name">ЧитайКо</p><h1>Бібліотека</h1></div>
+                <button onclick="openSheet('searchSheet')" class="primary-button"><span aria-hidden="true">＋</span> Додати книгу</button>
             </header>
-            <div id="quickResume" class="mb-4 hidden"></div>
-            <div class="relative mb-4">
-                <span class="absolute left-3.5 top-[10px] text-muted text-sm pointer-events-none">🔍</span>
-                <input type="search" id="librarySearchInput" placeholder="Пошук у бібліотеці..." class="w-full pl-10 pr-4 py-2.5 search-box text-sm font-medium outline-none focus:ring-2 ring-primary-300 transition-shadow" oninput="filterLibrary(this.value)">
-            </div>
-            <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="libraryTabs">
-                <button onclick="setLibraryTab('reading')" id="tab_reading" class="pill active">📖 Читаю</button>
-                <button onclick="setLibraryTab('planned')" id="tab_planned" class="pill inactive">🕒 В планах</button>
-                <button onclick="setLibraryTab('finished')" id="tab_finished" class="pill inactive">✅ Прочитано</button>
-            </div>
-            <div class="flex justify-end mb-3">
-                <div class="flex gap-1 bg-slate-100 p-0.5 rounded-lg">
-                    <button onclick="setViewMode('list')" id="view_list" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-white shadow-sm text-slate-800">☰</button>
-                    <button onclick="setViewMode('grid')" id="view_grid" class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase text-slate-400">⊞</button>
+            <div id="quickResume" class="hidden"></div>
+            <div class="library-tools">
+                <input type="search" id="librarySearchInput" aria-label="Пошук у бібліотеці" placeholder="Пошук у бібліотеці…" class="search-box" oninput="filterLibrary(this.value)">
+                <div class="view-switch" aria-label="Вигляд бібліотеки">
+                    <button onclick="setViewMode('list')" id="view_list" aria-label="Список" aria-pressed="true">☰</button>
+                    <button onclick="setViewMode('grid')" id="view_grid" aria-label="Обкладинки" aria-pressed="false">⊞</button>
                 </div>
+            </div>
+            <div class="library-tabs scrollbar-hide" id="libraryTabs">
+                <button onclick="setLibraryTab('reading')" id="tab_reading" class="pill active" aria-pressed="true">Читаю</button>
+                <button onclick="setLibraryTab('planned')" id="tab_planned" class="pill inactive" aria-pressed="false">Заплановано</button>
+                <button onclick="setLibraryTab('finished')" id="tab_finished" class="pill inactive" aria-pressed="false">Прочитано</button>
+            </div>
+            <div id="finishedFilters" class="library-filters" hidden>
+                <select id="finishedYear" aria-label="Рік читання" onchange="setFinishedFilters()"><option value="">Усі роки</option></select>
+                <select id="finishedRating" aria-label="Оцінка" onchange="setFinishedFilters()">
+                    <option value="">Усі оцінки</option><option value="5">5 зірок</option><option value="4">4 зірки</option>
+                    <option value="3">3 зірки</option><option value="2">2 зірки</option><option value="1">1 зірка</option>
+                </select>
+                <label><input type="checkbox" id="finishedReread" onchange="setFinishedFilters()"> Перечитував</label>
             </div>
             <div id="myBooksContainer" class="pb-4"></div>
         </div>
@@ -207,6 +213,11 @@
                 <div class="w-full bg-primary-100 h-2.5 rounded-full overflow-hidden"><div id="goalBar" class="bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full transition-all duration-500" style="width:0%"></div></div>
                 <div class="flex items-center gap-2 mt-3"><input type="number" id="goalInput" min="1" max="200" value="12" class="w-16 p-2 bg-surface rounded-lg text-center font-bold text-sm border border-slate-100 outline-none" onchange="saveGoal(this.value)"><span class="text-xs text-muted">книг на рік</span></div>
             </div>
+            <section class="card-elevated year-stats">
+                <h3 id="yearStatsTitle">Підсумки року</h3>
+                <dl><div><dt>Унікальні книги</dt><dd id="yearUniqueBooks">0</dd></div>
+                <div><dt>Перечитування</dt><dd id="yearRereads">0</dd></div></dl>
+            </section>
             <div class="grid grid-cols-3 gap-3 mb-4">
                 <div class="stat-card"><div id="statBooks" class="text-xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Книг</div></div>
                 <div class="stat-card"><div id="statPages" class="text-xl font-black text-primary-600">0</div><div class="text-[10px] font-bold text-muted uppercase mt-1">Сторінок</div></div>
@@ -226,9 +237,9 @@
     <!-- BOTTOM NAV -->
     <nav id="mainBottomNav" class="nav-bar hidden">
         <div class="max-w-lg mx-auto flex items-center justify-around px-2 py-2">
-            <button onclick="switchTab('library')" class="nav-tab active flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all"><span class="text-[20px]">📚</span><span class="text-[10px] font-bold uppercase tracking-wide">Книги</span></button>
-            <button onclick="switchTab('discover')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">⭐</span><span class="text-[10px] font-bold uppercase tracking-wide">Поради</span></button>
-            <button onclick="switchTab('profile')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="text-[20px]">👤</span><span class="text-[10px] font-bold uppercase tracking-wide">Профіль</span></button>
+            <button onclick="switchTab('library')" class="nav-tab active flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all"><span class="nav-icon" aria-hidden="true">▤</span><span class="text-[10px] font-bold uppercase tracking-wide">Книги</span></button>
+            <button onclick="switchTab('discover')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="nav-icon" aria-hidden="true">✧</span><span class="text-[10px] font-bold uppercase tracking-wide">Поради</span></button>
+            <button onclick="switchTab('profile')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="nav-icon" aria-hidden="true">◉</span><span class="text-[10px] font-bold uppercase tracking-wide">Профіль</span></button>
         </div>
     </nav>
 
@@ -258,17 +269,19 @@
     <!-- SEARCH -->
     <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="height:85vh">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
-        <div class="px-5 pb-4 shrink-0"><div class="relative"><span class="absolute left-4 top-3 text-muted">🔍</span><input type="text" id="searchInput" placeholder="Назва, автор або ISBN..." class="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-2xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm"></div></div>
+        <div class="sheet-header"><h2>Додати книгу</h2><button type="button" class="secondary-button" onclick="closeAllSheets()" aria-label="Закрити пошук">✕</button></div>
+        <div class="px-5 pb-4 shrink-0"><input type="search" id="searchInput" aria-label="Назва, автор або ISBN" placeholder="Назва, автор або ISBN…" class="search-box"></div>
         <div id="searchResults" class="px-4 pb-6 overflow-y-auto flex-1">
             <button onclick="openScanner()" class="w-full mb-2 p-3 text-center text-sm font-semibold text-white bg-zinc-800 rounded-xl active:scale-95 transition-transform">📷 Сканувати штрих-код</button>
             <button onclick="openManualForm()" class="w-full mb-3 p-3 text-center text-sm font-semibold text-primary-600 bg-primary-50 rounded-xl active:scale-95 transition-transform">✍️ Додати вручну</button>
-            <div id="searchItems" class="space-y-1"></div>
+            <div id="searchItems" aria-live="polite" class="search-items"></div>
         </div>
     </div>
 
     <!-- DETAILS -->
     <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="max-height:92vh">
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
+        <div class="detail-close"><button type="button" class="secondary-button" onclick="closeDetailsSheet()" aria-label="Закрити картку">✕</button></div>
         <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
         <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-3 fade-in">
             <h3 class="text-lg font-bold mb-3">Редагувати</h3>
@@ -290,6 +303,6 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script src="app.js"></script>
+    <script src="app.js?v=8"></script>
 </body>
 </html>

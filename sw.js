@@ -1,8 +1,10 @@
-const CACHE_NAME = 'chitayko-v7';
+const CACHE_NAME = 'chitayko-v8';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
-    '/app.js',
+    '/app.js?v=8',
+    '/library.css',
+    '/icon-192.png',
     '/manifest.json',
     '/icon.png',
     'https://cdn.tailwindcss.com',
@@ -25,7 +27,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(names =>
-            Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n)))
+            Promise.all(names.filter(n => n.startsWith('chitayko-') && n !== CACHE_NAME).map(n => caches.delete(n)))
         ).then(() => self.clients.claim())
     );
 });
@@ -39,6 +41,7 @@ self.addEventListener('fetch', event => {
         url.includes('googleapis.com/identitytoolkit') ||
         url.includes('securetoken.googleapis.com') ||
         url.includes('itunes.apple.com') ||
+        url.startsWith('https://openlibrary.org/search.json') ||
         url.includes('corsproxy.io')) {
         return;
     }
