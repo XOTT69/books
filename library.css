@@ -580,6 +580,7 @@ body.dark .tool-danger { color: #f7a39b; }
 }
 .recommendation-tabs .pill.active { border-color: var(--accent); }
 .recommendation-tabs .pill span { font-size: 1.02rem; line-height: 1; }
+.portal-genre-summary { margin: 0 0 .75rem; color: var(--muted); font-size: .85rem; }
 #recommendationsList { display: grid; gap: .65rem; }
 #recommendationMore:empty { padding-block: 0; }
 #recommendationMore { color: var(--muted); }
