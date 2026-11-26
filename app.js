@@ -120,10 +120,16 @@ function updateKeyboardLayout(){
     const keyboard=Boolean(unzoomed&&(textField||keyboardWasOpen)&&layoutHeight-viewport.height>115);
     document.body.classList.toggle('keyboard-open',keyboard);
     const style=document.documentElement.style;
-    if(unzoomed)style.setProperty('--visible-viewport-height',viewport.height+'px');
-    else style.removeProperty('--visible-viewport-height');
+    const bottomGap=unzoomed?Math.max(0,layoutHeight-viewport.height-viewport.offsetTop):0;
+    if(unzoomed){
+        style.setProperty('--visible-viewport-height',viewport.height+'px');
+        style.setProperty('--viewport-bottom-gap',bottomGap+'px');
+    }else{
+        style.removeProperty('--visible-viewport-height');
+        style.removeProperty('--viewport-bottom-gap');
+    }
     if(keyboard){
-        style.setProperty('--keyboard-inset',Math.max(0,layoutHeight-viewport.height-viewport.offsetTop)+'px');
+        style.setProperty('--keyboard-inset',bottomGap+'px');
         style.setProperty('--sheet-height',viewport.height+'px');
     }else{
         style.removeProperty('--keyboard-inset');
@@ -196,8 +202,19 @@ function enableSheetDrag(sheet){
 }
 
 // ===== THEME =====
-if(localStorage.getItem('appTheme')==='dark')document.body.classList.add('dark');
-function toggleAppTheme(){document.body.classList.toggle('dark');localStorage.setItem('appTheme',document.body.classList.contains('dark')?'dark':'light');}
+function applyAppTheme(dark){
+    document.body.classList.toggle('dark',dark);
+    const windowColor=getComputedStyle(document.body).getPropertyValue('--paper').trim();
+    document.documentElement.style.setProperty('--window-color',windowColor);
+    document.querySelector('meta[name="theme-color"]').content=windowColor;
+}
+applyAppTheme(localStorage.getItem('appTheme')==='dark');
+
+function toggleAppTheme(){
+    const dark=!document.body.classList.contains('dark');
+    applyAppTheme(dark);
+    localStorage.setItem('appTheme',dark?'dark':'light');
+}
 
 // ===== TABS =====
 function switchTab(tab){

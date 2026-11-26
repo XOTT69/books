@@ -2,14 +2,13 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ЧитайКо</title>
     <link rel="icon" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#f5f1e9">
+    <link rel="manifest" href="manifest.json?v=14">
+    <meta name="theme-color" content="#fffcf6">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <link rel="stylesheet" href="utilities.css">
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -98,7 +97,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=13">
+    <link rel="stylesheet" href="library.css?v=14">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -321,6 +320,6 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="app.js?v=13"></script>
+    <script defer src="app.js?v=14"></script>
 </body>
 </html>
