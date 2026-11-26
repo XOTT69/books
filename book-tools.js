@@ -239,9 +239,9 @@ function enableBookLongPress(container){
             openedButton=null;
             return;
         }
-        const id=button.closest('[data-id]').dataset.id;
+        const {id,finished}=button.closest('[data-id]').dataset;
         if(button.matches('.book-actions-trigger'))openBookActions(id);
-        else showLibraryBook(id);
+        else showLibraryBook(id,finished);
     });
 }
 
