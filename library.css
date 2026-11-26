@@ -356,12 +356,18 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
     from { opacity: .84; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
 }
+@keyframes tab-enter {
+    from { opacity: .84; transform: translate(var(--tab-enter-x, 0px), 4px); }
+    to { opacity: 1; transform: translate(0, 0); }
+}
+.tab-content.active { animation: tab-enter var(--motion-content) var(--ease-out); }
+
 @keyframes overlay-enter {
     from { opacity: 0; }
     to { opacity: 1; }
 }
 
-.fade-in, .tab-content.active, .search-result, .reading-history details[open] > :not(summary) {
+.fade-in, .search-result, .reading-history details[open] > :not(summary) {
     animation: content-enter var(--motion-content) var(--ease-out);
 }
 #scannerSheet:not(.hidden), #readerOverlay {
