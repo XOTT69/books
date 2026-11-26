@@ -4,8 +4,8 @@
     "start_url": "./",
     "display": "standalone",
     "orientation": "portrait",
-    "background_color": "#fffcf6",
-    "theme_color": "#fffcf6",
+    "background_color": "#fffbfc",
+    "theme_color": "#fffbfc",
     "description": "Ваша особиста хмарна бібліотека та читалка",
     "categories": [
         "books",

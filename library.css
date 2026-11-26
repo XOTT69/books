@@ -1,16 +1,17 @@
 :root {
-    --page: #f5f1e9;
-    --paper: #fffcf6;
+    --page: #faf5f7;
+    --paper: #fffbfc;
     --window-color: var(--paper);
-    --ink: #272923;
-    --muted: #636558;
-    --line: #ded8cc;
-    --soft: #eee8dc;
-    --accent: #315145;
-    --accent-text: #315145;
-    --on-accent: #fffdf5;
-    --gold: #795521;
-    --shadow: 0 12px 32px #4339210c;
+    --ink: #342c30;
+    --muted: #73636c;
+    --line: #e6d9df;
+    --soft: #f4e8ed;
+    --accent: #85546b;
+    --accent-text: #85546b;
+    --highlight: #9b5f79;
+    --button-fill: #edcfdb;
+    --button-ink: #59374a;
+    --shadow: 0 12px 32px #69374e0b;
     --serif: Georgia, 'Times New Roman', serif;
     --motion-fast: 150ms;
     --motion-content: 200ms;
@@ -22,16 +23,17 @@ html { background: var(--window-color); }
 body, body.bg-surface { background: var(--page); color: var(--ink); }
 body.dark {
     color-scheme: dark;
-    --page: #20221f;
-    --paper: #282c27;
-    --ink: #f6f1e7;
-    --muted: #c4c5b7;
-    --line: #42483e;
-    --soft: #353b33;
-    --accent: #b1cbbd;
-    --accent-text: #b1cbbd;
-    --on-accent: #172b23;
-    --gold: #e2bb80;
+    --page: #231e22;
+    --paper: #30282e;
+    --ink: #f7eff3;
+    --muted: #cebdc6;
+    --line: #53434d;
+    --soft: #43333d;
+    --accent: #e4b8ca;
+    --accent-text: #e4b8ca;
+    --highlight: #e6adc7;
+    --button-fill: #dcb4c6;
+    --button-ink: #352430;
     --shadow: 0 12px 32px #0002;
     background: var(--page);
     color: var(--ink);
@@ -45,11 +47,13 @@ body .card, body .card-elevated, body .stat-card, body.dark .card, body.dark .ca
     box-shadow: var(--shadow);
 }
 body.dark .bg-surface { background: var(--page); }
-body.dark :is(#appScreen, .bottom-sheet, #readerSettingsMenu) :is(.bg-slate-50, .bg-slate-100, .bg-primary-50, .bg-primary-100, .bg-red-50, .bg-amber-50, .bg-emerald-50) {
+body.dark :is(#appScreen, .bottom-sheet, #readerSettingsMenu) :is(.bg-slate-50, .bg-slate-100, .bg-primary-50, .bg-primary-100, .bg-red-50, .bg-emerald-50) {
     background: var(--soft);
 }
 body.dark :is(#appScreen, .bottom-sheet) :is(.text-primary-600, .text-primary-700, .text-emerald-700) { color: var(--accent-text); }
-body.dark :is(#appScreen, .bottom-sheet) :is(.text-amber-600, .text-amber-400) { color: var(--gold); }
+.rating-filled { color: var(--highlight); }
+.rating-empty { color: var(--line); }
+.quote-excerpt { background: var(--soft); border-color: var(--line); }
 
 .app-shell {
     width: min(100%, 74rem);
@@ -72,7 +76,7 @@ body.dark :is(#appScreen, .bottom-sheet) :is(.text-amber-600, .text-amber-400) {
     line-height: 1.2;
     text-align: center;
 }
-.primary-button { color: var(--on-accent); background: var(--accent); }
+.primary-button { color: var(--button-ink); background: var(--button-fill); }
 .secondary-button { color: var(--ink); background: var(--soft); border: 1px solid var(--line); }
 .primary-button:hover, .secondary-button:hover { filter: brightness(.93); }
 .library-header .primary-button { min-height: 2.75rem; white-space: nowrap; }
@@ -118,7 +122,7 @@ body.dark :is(#appScreen, .bottom-sheet) :is(.text-amber-600, .text-amber-400) {
 .book-card-grid .book-card-info strong { font-size: 1rem; }
 .book-card > .secondary-button { margin-top: .7rem; }
 .book-progress, .book-meta { margin-top: .75rem; color: var(--muted); font-size: .75rem; display: flex; flex-wrap: wrap; gap: .4rem .7rem; align-items: center; }
-.book-rating { color: var(--gold); font-weight: 700; }
+.book-rating { color: var(--highlight); font-weight: 700; }
 .book-progress progress { min-width: 2.3rem; height: .4rem; flex: 1; accent-color: var(--accent-text); }
 .book-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .7rem; }
 .book-actions button { min-height: 2rem; font-size: .75rem; }
@@ -421,7 +425,7 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
 .book-labels { display: flex; flex-wrap: wrap; gap: .4rem; margin: .55rem 0; }
 .book-label { max-width: 100%; padding: .3rem .55rem; border-radius: .55rem; background: var(--soft); color: var(--accent-text); font-size: .75rem; overflow-wrap: anywhere; }
 .tag-remove { min-height: 44px; }
-.favorite-label { color: var(--gold); }
+.favorite-label { color: var(--highlight); }
 
 #libraryToolsSheet .sheet-scroll { padding: 0 1rem 1.1rem; }
 #libraryToolsTitle { margin-bottom: .7rem; font: 600 1.55rem/1.15 var(--serif); overflow-wrap: anywhere; }
