@@ -934,7 +934,7 @@ function showBookDetails(bookData,isNew=false,completionDate){
         h+=`<div class="mb-5 p-4 card-elevated"><div class="flex justify-between items-center mb-2"><p class="text-[10px] font-bold uppercase text-muted">Нотатки</p><button onclick="saveReview('${lb.id}',this)" class="text-primary-600 bg-primary-50 px-3 py-1 rounded-lg text-[10px] font-bold active:scale-95">Зберегти</button></div><textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[60px]" placeholder="Враження...">${escapeHtml(lb.review||'')}</textarea></div>`;
     }
     h+=`<div class="desc-scroll mb-4"><p class="text-[10px] font-bold uppercase text-muted mb-1">Анотація</p><p class="text-sm text-muted leading-relaxed">${escapeHtml(lb.description||'Немає.')}</p></div>`;
-    if(!isNew)h+=`<button onclick="moveBookToTrash(document.getElementById('detailsContent').dataset.book)" class="w-full py-3 text-red-500 bg-red-50 rounded-xl font-bold text-sm active:scale-95 mb-4">До кошика</button>`;
+    if(!isNew&&(!showDate||showDate===dateValue(lb.dateFinished)||readingHistoryForCard(lb).recordCount<=1))h+=`<button onclick="moveBookToTrash(document.getElementById('detailsContent').dataset.book)" class="w-full py-3 text-red-500 bg-red-50 rounded-xl font-bold text-sm active:scale-95 mb-4">До кошика</button>`;
     const sameRecord=details.dataset.book===lb.id;
     details.dataset.book=lb.id||'';
     details.dataset.completion=showDate;
@@ -1359,6 +1359,7 @@ function renderBookCard(book,completion){
         <progress max="100" value="${progressPercent(book)}" aria-label="Прогрес читання"></progress>
         <span>Сторінка ${currentPages(book)} з ${pages}</span>
     </div>`:'';
+    const recordActions=!completion?.sessionLabel||completedDate===dateValue(book.dateFinished);
     const completionMarkup=currentLibraryTab==='finished'?`<div class="book-meta">
         ${completedDate?`<span>${formatReadingDate(completedDate)}</span>`:''}
         ${completion?.sessionLabel?`<span>${completion.sessionLabel}</span>`:count?`<span>Перечитувань: ${count}</span>`:''}
@@ -1372,7 +1373,7 @@ function renderBookCard(book,completion){
             <button class="secondary-button" onclick="changeStatus('${id}','finished',event)">Завершити</button>
         </div>`:'';
     return `<article data-id="${id}"${completedDate?` data-finished="${completedDate}"`: ''} class="book-card card ${viewMode==='grid'?'book-card-grid':''}">
-        <div class="book-card-tools">${canReorderBooks()?'<span class="book-reorder-handle" title="Перетягнути, щоб змінити порядок" aria-hidden="true">⠿</span>':''}<button type="button" class="book-actions-trigger" aria-label="Дії: ${title}" aria-haspopup="dialog">⋯</button></div>
+        <div class="book-card-tools">${canReorderBooks()?'<span class="book-reorder-handle" title="Перетягнути, щоб змінити порядок" aria-hidden="true">⠿</span>':''}${recordActions?`<button type="button" class="book-actions-trigger" aria-label="Дії: ${title}" aria-haspopup="dialog">⋯</button>`:''}</div>
         <button type="button" class="book-card-main" aria-label="Відкрити: ${title}${completion?.sessionLabel?', '+formatReadingDate(completedDate):''}">
             <img loading="lazy" decoding="async" ${libraryCoverAttributes(book)} alt="">
             <span class="book-card-info"><strong>${title}</strong><span class="text-muted">${author}</span></span>
