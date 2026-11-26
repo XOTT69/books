@@ -7,24 +7,33 @@
     "background_color": "#fffcf6",
     "theme_color": "#fffcf6",
     "description": "Ваша особиста хмарна бібліотека та читалка",
-    "categories": ["books", "education"],
+    "categories": [
+        "books",
+        "education"
+    ],
     "lang": "uk",
     "icons": [
         {
-            "src": "icon.png",
+            "src": "icon-192.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "icon.png",
+            "src": "icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "icon.png",
+            "src": "icon-192-maskable.png",
             "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icon-512-maskable.png",
+            "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
         }

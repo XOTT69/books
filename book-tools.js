@@ -125,13 +125,21 @@ function exportBookRecord(book){
     return copy;
 }
 
+function backupBookRecord(book){
+    const overrides=deviceShelfMembership[book.id];
+    if(!overrides)return book;
+    const record={...book,shelfIds:[...bookShelfIds(book)]};
+    if(book.shelves)record.shelves=labelNames(book.shelves).filter(name=>overrides[legacyShelfId(name)]!==false);
+    return record;
+}
+
 function loadLibraryOrganization(user){
     unsubscribeOrganization=db.collection('users').doc(user.uid).onSnapshot(snapshot=>{
         if(currentUser!==user)return;
         const profile=snapshot.data()||{};
         applyRecommendationPreferences(profile,snapshot);
         if(profile.readingGoal){
-            localStorage.setItem('readingGoal',profile.readingGoal);
+            localStorage.setItem('readingGoal_'+user.uid,profile.readingGoal);
             updateGoalWidget();
         }
         const shelves=labelNames(profile.shelfNames);

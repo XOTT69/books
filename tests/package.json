@@ -1,0 +1,6 @@
+{
+  "name": "chytayko-webkit",
+  "private": true,
+  "scripts": {"test": "node backup-iphone.cjs"},
+  "dependencies": {"playwright": "1.65.1"}
+}

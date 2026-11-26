@@ -370,7 +370,45 @@ function createImportPlan(records,user){
     return {user,rows,skipped,combined,finished:new Set(),result:{added:0,updated:0,changed:0}};
 }
 
-function importLibrary(){
+function validBackupBook(raw){
+    if(!raw||typeof raw.title!=='string'||!raw.title.trim())return false;
+    const textFields=['author','image','description','review','genre','googleId','status','mergedInto'];
+    if(textFields.some(field=>raw[field]!=null&&typeof raw[field]!=='string'))return false;
+    for(const field of ['highlights','rereads','tags','shelves','shelfIds','identifiers']){
+        if(raw[field]!=null&&!Array.isArray(raw[field]))return false;
+    }
+    if(raw.highlights?.some(entry=>typeof entry?.text!=='string'))return false;
+    if(raw.activeReread&&(!/^[\w-]+$/.test(raw.activeReread.id)||!dateValue(raw.activeReread.started)))return false;
+    return ['dateStarted','dateFinished'].every(key=>!raw[key]||dateValue(raw[key]));
+}
+
+function createRestorePlan(file,user){
+    const legacy=Array.isArray(file);
+    if(!legacy&&(file?.format!=='chytayko-library'||file.version!==1||!Array.isArray(file.records)||!Array.isArray(file.shelves)))throw new Error('Unsupported backup');
+    const records=legacy?file:file.records;
+    const shelves=legacy?[]:uniqueLabels(labelNames(file.shelves));
+    const parent=db.collection('users').doc(user.uid).collection('books');
+    const existing=new Map(allBookRecords.map(book=>[book.id,book]));
+    const ids=new Set();
+    const catalog=legacy?{}:(file.catalog||{});
+    if(Array.isArray(catalog)||typeof catalog!=='object')throw new Error('Invalid shelf catalog');
+    for(const [key,entry] of Object.entries(catalog)){
+        if(!key||key.startsWith('__')||['constructor','prototype'].includes(key)||(!entry?.deleted&&typeof entry?.name!=='string'))throw new Error('Invalid shelf');
+    }
+    const rows=records.map(raw=>{
+        const id=raw?.id;
+        if(typeof id!=='string'||!/^[\w-]{1,200}$/.test(id)||/^__.*__$/.test(id)||ids.has(id)||!validBackupBook(raw))throw new Error('Invalid backup record');
+        ids.add(id);
+        const {id:recordId,...data}=raw;
+        const current=existing.get(recordId);
+        const differs=current&&!dataEquals(legacy?exportBookRecord(current):backupBookRecord(current),raw);
+        return {ref:parent.doc(recordId),data,existing:current,conflicts:[],differs};
+    });
+    const count=groupReadingRecords(records.filter(book=>!isBookTrashed(book))).reduce((sum,group)=>sum+readingStartsByCompletion(group).length,0);
+    return {exact:true,user,rows,shelves,catalog,count,finished:new Set(),result:{added:0,updated:0,changed:0}};
+}
+
+function importLibrary(exact=false){
     if(!currentUser)return;
     const user=currentUser;
     const input=document.createElement('input');
@@ -381,9 +419,9 @@ function importLibrary(){
         if(!file)return;
         try{
             const records=JSON.parse(await file.text());
-            if(!Array.isArray(records))throw new Error('Invalid backup');
+            if(!exact&&!Array.isArray(records)&&records?.format!=='chytayko-library')throw new Error('Invalid backup');
             if(currentUser!==user)return;
-            pendingImport=createImportPlan(records,user);
+            pendingImport=exact?createRestorePlan(records,user):createImportPlan(Array.isArray(records)?records:records.records,user);
             renderImportPlan();
             openLibraryTools('import');
         }catch(error){
@@ -427,6 +465,7 @@ function renderImportPlan(){
     const conflictCount=existing.filter(row=>row.conflicts.length).length;
     const holder=document.getElementById('libraryToolsContent');
     holder.innerHTML=`<form class="import-plan" data-form="import-plan">
+        ${pendingImport.exact?`<p>Відновлення копії · ${rows.length} записів · ${pendingImport.count} завершених читань. Буде додано лише відсутні записи. Наявні записи з відмінностями: ${rows.filter(row=>row.differs).length}.</p>`:''}
         <div class="import-summary"><span>Нові книги <strong>${newBooks.length}</strong></span>
             <span>У бібліотеці або кошику <strong>${existing.length}</strong></span>
             ${newArchives?`<span>Записи для кошика <strong>${newArchives}</strong></span>`:''}
@@ -444,9 +483,9 @@ function renderImportPlan(){
                 </select></label><details class="import-values"><summary>Порівняти: ${group.label.toLowerCase()}</summary>
                     <div><strong>У бібліотеці</strong><p>${escapeHtml(importConflictContent(group.id,group.before))}</p></div>
                     <div><strong>${group.combine?'Після об’єднання':'З файлу'}</strong><p>${escapeHtml(importConflictContent(group.id,group.after))}</p></div>
-                </details>`).join(''):'<p class="text-muted">Запис уже є.</p>'}</fieldset>`:'').join('')}</details>`:''}
+                </details>`).join(''):row.differs?'<p>Версія у бібліотеці відрізняється й буде збережена.</p>':'<p class="text-muted">Запис уже є.</p>'}</fieldset>`:'').join('')}</details>`:''}
         <p class="text-muted" role="status"></p>
-        <button type="submit" class="primary-button" ${!newBooks.length&&!newArchives&&!conflictCount?'disabled':''}>Імпортувати</button>
+        <button type="submit" class="primary-button" ${!newBooks.length&&!newArchives&&!conflictCount&&!pendingImport.shelves?.length&&!Object.keys(pendingImport.catalog||{}).length?'disabled':''}>${pendingImport.exact?'Відновити відсутнє':'Імпортувати'}</button>
     </form>`;
 }
 
@@ -483,7 +522,7 @@ async function commitLibraryImport(form){
         const groups=(row.conflicts||[]).filter(group=>choices.get(`conflict-${index}-${group.id}`)==='file');
         return row.existing&&!groups.length?[]:[{row,groups}];
     });
-    if(!selected.length){form.querySelector('[role=status]').textContent='Обрані дані вже є в бібліотеці.';return;}
+    if(!selected.length&&!plan.shelves?.length&&!Object.keys(plan.catalog||{}).length){form.querySelector('[role=status]').textContent='Обрані дані вже є в бібліотеці.';return;}
     const status=form.querySelector('[role=status]');
     const button=form.querySelector('[type=submit]');
     plan.running=true;
@@ -498,7 +537,7 @@ async function commitLibraryImport(form){
                 chunk.forEach(({row,groups},index)=>{
                     const snapshot=snapshots[index];
                     if(!row.existing){
-                        if(snapshot.exists||(!row.archive&&libraryMatch(row.data,allBookRecords.filter(book=>!book.mergedInto)))){changed++;return;}
+                        if(snapshot.exists||(!plan.exact&&!row.archive&&libraryMatch(row.data,allBookRecords.filter(book=>!book.mergedInto)))){changed++;return;}
                         transaction.set(row.ref,row.data);
                         added++;
                         return;
@@ -522,8 +561,33 @@ async function commitLibraryImport(form){
             processed+=chunk.length;
             status.textContent=`Опрацьовано ${processed} з ${selected.length}.`;
         }
+        if(plan.user!==currentUser)return;
+        if(plan.shelves?.length||Object.keys(plan.catalog||{}).length){
+            const ref=db.collection('users').doc(plan.user.uid);
+            await db.runTransaction(async transaction=>{
+                const profile=(await transaction.get(ref)).data()||{};
+                const knownNames=new Set(labelNames(profile.shelfNames).map(labelKey));
+                const missing=plan.shelves.filter(name=>!knownNames.has(labelKey(name)));
+                const additions=Object.fromEntries(Object.entries(plan.catalog).filter(([id])=>
+                    !Object.hasOwn(profile.shelfCatalog||{},id)&&!Object.hasOwn(deviceShelfCatalog,id)));
+                const fields={};
+                if(Object.keys(additions).length)fields.shelfCatalog=additions;
+                if(missing.length)fields.shelfNames=firebase.firestore.FieldValue.arrayUnion(...missing);
+                if(Object.keys(fields).length)transaction.set(ref,fields,{merge:true});
+            }).catch(error=>{
+                if(error.code!=='permission-denied'||currentUser!==plan.user)throw error;
+                const byId={...Object.fromEntries(plan.shelves.map(name=>[legacyShelfId(name),{name}])),...plan.catalog};
+                const missing=Object.entries(byId).filter(([id])=>!Object.hasOwn(shelfCatalog,id)&&!Object.hasOwn(deviceShelfCatalog,id));
+                const previous=deviceShelfCatalog;
+                deviceShelfCatalog={...previous,...Object.fromEntries(missing)};
+                if(!saveDeviceShelves(plan.user)){deviceShelfCatalog=previous;throw error;}
+                refreshShelfViews();
+                plan.localShelves=true;
+            });
+        }
         const {added,updated,changed}=plan.result;
         status.textContent=`Додано ${added}, оновлено ${updated}.${changed?` Пропущено змінені після перегляду записи або поля: ${changed}.`:''}`;
+        if(plan.localShelves)status.textContent+=' Полиці збережено на цьому пристрої.';
         plan.done=true;
     }catch(error){
         console.warn(error);
@@ -943,7 +1007,7 @@ async function queryRecommendationCatalog({source,language,query,title,portal,pa
             if(portal&&(!matchesPortalSynopsis(description,language)||
                 /^(Foreign Language Study|Literary Criticism|Education)(?:\s|\/|$)/i.test(data.categories?.[0]||'')))return [];
             return [{
-                language,googleId:id||'',title:data.title,author:data.authors[0],pagesTotal:data.pageCount||300,
+                language,googleId:id||'',title:data.title,author:data.authors[0],pagesTotal:data.pageCount||null,
                 image:(data.imageLinks?.thumbnail||data.imageLinks?.smallThumbnail||'').replace(/^http:\/\//i,'https://'),
                 description,genre:portal?'Попаданці':data.categories?.[0]||'',
                 publishedDate:data.publishedDate||'',identifiers:(data.industryIdentifiers||[]).map(entry=>entry.identifier).filter(Boolean),
@@ -963,7 +1027,7 @@ async function queryRecommendationCatalog({source,language,query,title,portal,pa
         if(!edition)return [];
         return [{
             language,googleId:'openlibrary_'+edition.key.split('/').pop(),title:edition.title,author:work.author_name?.[0]||'Невідомий',
-            pagesTotal:work.number_of_pages_median||300,description:'',genre:'',
+            pagesTotal:work.number_of_pages_median||null,description:'',genre:'',
             image:edition.cover_i?`https://covers.openlibrary.org/b/id/${edition.cover_i}-M.jpg?default=false`:'',
             identifiers:labelNames(edition.isbn),publishedDate:String(work.first_publish_year||''),source:'Open Library'
         }];
@@ -971,7 +1035,7 @@ async function queryRecommendationCatalog({source,language,query,title,portal,pa
     return {books,hasMore:!title&&docs.length===16&&response.numFound>page*16};
 }
 
-function makeRecommendationCard(book,key){
+function makeRecommendationCard(book,key,category){
     const card=document.createElement('article');
     card.className='card recommendation-card fade-in';
     card.dataset.recommendation=key;
@@ -983,7 +1047,7 @@ function makeRecommendationCard(book,key){
     open.setAttribute('aria-label','Відкрити: '+book.title);
     open.innerHTML=`<img loading="lazy" decoding="async" src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
         <span class="min-w-0"><strong class="block">${escapeHtml(book.title)}</strong>
-            <span class="text-muted block text-xs">${escapeHtml(book.author)} · ${recommendationLanguageLabels[book.language]}</span>
+            <span class="text-muted block text-xs">${escapeHtml(book.author)} · ${recommendationLanguageLabels[book.language]}${category&&category!=='auto'?' · За жанром '+escapeHtml(category):''}</span>
             <span class="text-muted line-clamp-2 text-xs">${escapeHtml(book.description)}</span></span>`;
     open.querySelector('img').addEventListener('error',()=>card.classList.add('recommendation-no-cover'),{once:true});
     open.addEventListener('click',()=>showBookDetails(book,true));
@@ -1052,7 +1116,8 @@ async function fetchMoreRecommendations(){
     recommendationPager?.unobserve(status);
     status.textContent='Шукаємо книги…';
     const candidates=new Map();
-    const existingTitles=new Set(myLibrary.map(book=>bookIdentity(book.title)));
+    const existingWorks=new Set(myLibrary.map(bookWorkKey).filter(Boolean));
+    const existingIsbns=new Set(myLibrary.flatMap(bookIsbns));
     const languages=feed.language?[feed.language]:Object.keys(recommendationLanguageCodes);
     try{
         for(let attempt=0;attempt<3&&feed.queryIndex<feed.queries.length;attempt++){
@@ -1066,7 +1131,7 @@ async function fetchMoreRecommendations(){
                 if(result.value.hasMore&&(query.page||1)<4)feed.queries.push({...query,page:(query.page||1)+1});
                 for(const book of result.value.books){
                     const key=recommendationKey(book.title,book.author);
-                    if(existingTitles.has(bookIdentity(book.title))||feed.seen.has(key)||dismissedRecommendations.has(key))continue;
+                    if(existingWorks.has(bookWorkKey(book))||bookIsbns(book).some(id=>existingIsbns.has(id))||feed.seen.has(key)||dismissedRecommendations.has(key))continue;
                     const previous=candidates.get(key);
                     if(!previous||!previous.image&&book.image)candidates.set(key,book);
                 }
@@ -1078,7 +1143,7 @@ async function fetchMoreRecommendations(){
             .sort(([,a],[,b])=>Number(Boolean(b.image))-Number(Boolean(a.image)));
         const cards=sorted.map(([key,book])=>{
             feed.seen.add(key);
-            return makeRecommendationCard(book,key);
+            return makeRecommendationCard(book,key,feed.category);
         });
         list.append(...cards);
         renderRecommendationPager(feed,cards.length);
