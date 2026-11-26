@@ -60,12 +60,12 @@ function bookCover(value){
     }catch{}
     return PLACEHOLDER_IMG;
 }
-function libraryMatch(candidate){
-    const exact=myLibrary.find(book=>book.id===candidate.id||(book.googleId&&book.googleId===candidate.googleId));
+function libraryMatch(candidate,books=myLibrary){
+    const exact=books.find(book=>book.id===candidate.id||(book.googleId&&book.googleId===candidate.googleId));
     if(exact)return exact;
     const isbn=(Array.isArray(candidate.identifiers)?candidate.identifiers:[]).map(canonicalIsbn).filter(Boolean);
     const normalized=value=>String(value||'').normalize('NFKC').toLocaleLowerCase('uk').replace(/[^\p{L}\p{N}]/gu,'');
-    return myLibrary.find(book=>{
+    return books.find(book=>{
         const own=(Array.isArray(book.identifiers)?book.identifiers:[]).map(canonicalIsbn).filter(Boolean);
         if(own.length&&isbn.length)return own.some(value=>isbn.includes(value));
         return normalized(book.title)===normalized(candidate.title)&&normalized(book.author)&&normalized(book.author)===normalized(candidate.author);
@@ -78,6 +78,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.querySelectorAll('.bottom-sheet').forEach(enableSheetDrag);
     enableDetailsSwipe(document.getElementById('detailsSheet'));
     enableTabSwipe(document.getElementById('appScreen'));
+    enableBookLongPress(document.getElementById('myBooksContainer'));
+    enableLibraryToolsControls();
     enableBackdropDismiss();
     const viewport=window.visualViewport;
     let viewportFrame;
@@ -334,7 +336,7 @@ function switchTab(tab,direction=0){
 
 function enableTabSwipe(screen){
     let gesture;
-    const excluded='input, textarea, select, [contenteditable], #libraryTabs, #recTabs, canvas';
+    const excluded='input, textarea, select, [contenteditable], #libraryTabs, #recTabs, canvas, .book-reorder-handle';
     screen.addEventListener('touchstart',event=>{
         gesture=null;
         if(event.touches.length!==1||document.body.classList.contains('modal-open'))return;
@@ -346,7 +348,7 @@ function enableTabSwipe(screen){
 
     screen.addEventListener('touchmove',event=>{
         if(!gesture)return;
-        if(event.touches.length!==1||!event.cancelable||currentTab!==gesture.tab||
+        if(event.touches.length!==1||!event.cancelable||currentTab!==gesture.tab||document.body.classList.contains('modal-open')||
             gesture.target.closest('.sortable-chosen, .sortable-drag')){
             gesture=null;
             return;
@@ -483,8 +485,8 @@ async function calculateStats(){
 }
 
 // ===== EXPORT/IMPORT =====
-function exportLibrary(){if(myLibrary.length===0)return alert('Порожньо!');const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(myLibrary,null,2));const a=document.createElement('a');a.href=d;a.download=`chitayko_${new Date().toISOString().slice(0,10)}.json`;a.click();}
-function importLibrary(){const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const t=await f.text(),books=JSON.parse(t);if(!Array.isArray(books))throw new Error('Bad');if(!confirm(`Імпортувати ${books.length} книг?`))return;const ex=new Set(myLibrary.map(b=>(b.title||'').toLowerCase().trim()));let imp=0;const batch=db.batch();books.forEach(book=>{const ti=(book.title||'').toLowerCase().trim();if(ex.has(ti))return;const ref=db.collection('users').doc(currentUser.uid).collection('books').doc();const c={...book};delete c.id;if(!c.dateAdded)c.dateAdded=Date.now();batch.set(ref,c);imp++;});await batch.commit();alert(`✅ ${imp} книг!`);}catch(err){alert('Помилка: '+err.message);}};inp.click();}
+function exportLibrary(){if(!allBookRecords.length)return alert('Порожньо!');const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(allBookRecords,null,2));const a=document.createElement('a');a.href=d;a.download=`chitayko_${new Date().toISOString().slice(0,10)}.json`;a.click();}
+function importLibrary(){const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const t=await f.text(),books=JSON.parse(t);if(!Array.isArray(books))throw new Error('Bad');if(!confirm(`Імпортувати ${books.length} книг?`))return;const ex=new Set(allBookRecords.map(b=>(b.title||'').toLowerCase().trim()));let imp=0;const batch=db.batch();books.forEach(book=>{const ti=(book.title||'').toLowerCase().trim();if(ex.has(ti))return;const ref=db.collection('users').doc(currentUser.uid).collection('books').doc();const c={...book};delete c.id;if(!c.dateAdded)c.dateAdded=Date.now();batch.set(ref,c);imp++;});await batch.commit();alert(`✅ ${imp} книг!`);}catch(err){alert('Помилка: '+err.message);}};inp.click();}
 async function clearAppCache(){
     try{
         if('serviceWorker' in navigator){
@@ -501,12 +503,13 @@ async function clearAppCache(){
 }
 
 // ===== AUTH =====
-auth.onAuthStateChanged(async user=>{
+auth.onAuthStateChanged(user=>{
     const as=document.getElementById('authScreen'),ap=document.getElementById('appScreen');
     unsubscribeLibrary?.();
     unsubscribeLibrary=null;
     currentUser=user;
     document.body.classList.toggle('app-open',Boolean(user));
+    resetBookTools();
     myLibrary=[];
     localEpubIds=new Set();
     if(user){
@@ -516,14 +519,7 @@ auth.onAuthStateChanged(async user=>{
         document.getElementById('profileEmail').innerText=user.email||'';
         updateViewButtons();
         loadLibrary();
-        try{
-            const profile=await db.collection('users').doc(user.uid).get();
-            const goal=profile.exists&&profile.data().readingGoal;
-            if(currentUser===user&&goal){
-                localStorage.setItem('readingGoal',goal);
-                updateGoalWidget();
-            }
-        }catch(error){console.warn(error);}
+        loadLibraryOrganization(user);
     }else{as.classList.remove('hidden');as.classList.add('flex');ap.classList.add('hidden');document.getElementById('mainBottomNav').classList.add('hidden');}
 });
 function showErrorMsg(m){const e=document.getElementById('authError');e.innerText=m;e.classList.remove('hidden');setTimeout(()=>e.classList.add('hidden'),6000);}
@@ -539,7 +535,7 @@ function loadLibrary(){
     refreshLocalEpubs();
     localforage.getItem(key).then(cached=>{
         if(currentUser!==user||receivedSnapshot||!cached||myLibrary.length)return;
-        myLibrary=cached;
+        replaceBookRecords(cached);
         render();
         updateGoalWidget();
         renderQuickResume();
@@ -547,8 +543,8 @@ function loadLibrary(){
     unsubscribeLibrary=db.collection('users').doc(user.uid).collection('books').orderBy('dateAdded','desc').onSnapshot(snapshot=>{
         if(currentUser!==user||(!snapshot.docs.length&&snapshot.metadata?.fromCache))return;
         receivedSnapshot=true;
-        myLibrary=snapshot.docs.map(doc=>({...doc.data(),id:doc.id}));
-        localforage.setItem(key,myLibrary).catch(console.warn);
+        replaceBookRecords(snapshot.docs.map(doc=>({...doc.data(),id:doc.id})));
+        localforage.setItem(key,allBookRecords).catch(console.warn);
         render();
         updateGoalWidget();
         renderQuickResume();
@@ -594,6 +590,7 @@ function hideSheet(sheet){
 
 function closeAllSheets(){
     detailsOpenedFromSearch=false;
+    libraryToolsView=null;
     cancelBookSearch();
     const sheet=document.querySelector('.bottom-sheet.open');
     if(sheet){
@@ -614,6 +611,7 @@ function closeDetailsSheet(){
 
 function dismissCurrentSheet(){
     if(document.getElementById('detailsSheet').classList.contains('open'))closeDetailsSheet();
+    else if(document.getElementById('libraryToolsSheet').classList.contains('open'))closeLibraryTools();
     else closeAllSheets();
 }
 
@@ -790,6 +788,7 @@ function renderSearchResults(books,failed){
         const saved=previous.get(key);
         if(saved){results.push(saved);continue;}
         const existing=libraryMatch(book);
+        const trashed=libraryMatch(book,trashedBooks);
         const result=document.createElement('button');
         result.type='button';
         result.dataset.book=key;
@@ -798,9 +797,10 @@ function renderSearchResults(books,failed){
             <span class="min-w-0"><strong class="block truncate">${escapeHtml(book.title)}</strong>
             <span class="block truncate text-muted">${escapeHtml(book.author)}</span>
             <small class="text-muted">${book.source}</small></span>
-            ${existing?'<span class="in-library">У бібліотеці</span>':''}`;
+            ${existing?'<span class="in-library">У бібліотеці</span>':trashed?'<span class="in-library">У кошику</span>':''}`;
         result.onclick=()=>{
             const match=libraryMatch(book);
+            if(!match&&libraryMatch(book,trashedBooks)){openLibraryTrash();return;}
             showBookDetails(match||book,!match);
         };
         results.push(result);
@@ -891,6 +891,7 @@ function showBookDetails(bookData,isNew=false){
     const sa=escapeHtml(lb.author||'Невідомий');
     let h=`<div class="detail-cover flex gap-4 mb-5 fade-in"><img loading="lazy" decoding="async" src="${bookCover(lb.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${escapeHtml(lb.title||'Без назви')}</h3><button onclick="openBookSearch(this.textContent.trim())" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal||300} стор.</span>${!isNew&&!lb.activeReread?`<select aria-label="Статус книги" onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
     if(!isNew){
+        h+=renderBookLabels(lb);
         h+=renderReadingHistory(lb);
         // Progress slider
         if(lb.status==='reading'){
@@ -904,7 +905,7 @@ function showBookDetails(bookData,isNew=false){
         h+=`<div class="mb-5 p-4 card-elevated"><div class="flex justify-between items-center mb-2"><p class="text-[10px] font-bold uppercase text-muted">Нотатки</p><button onclick="saveReview('${lb.id}',this)" class="text-primary-600 bg-primary-50 px-3 py-1 rounded-lg text-[10px] font-bold active:scale-95">Зберегти</button></div><textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[60px]" placeholder="Враження...">${escapeHtml(lb.review||'')}</textarea></div>`;
     }
     h+=`<div class="desc-scroll mb-4"><p class="text-[10px] font-bold uppercase text-muted mb-1">Анотація</p><p class="text-sm text-muted leading-relaxed">${escapeHtml(lb.description||'Немає.')}</p></div>`;
-    if(!isNew)h+=`<button onclick="deleteBookFromDetails('${lb.id}')" class="w-full py-3 text-red-500 bg-red-50 rounded-xl font-bold text-sm active:scale-95 mb-4">🗑️ Видалити</button>`;
+    if(!isNew)h+=`<button onclick="moveBookToTrash(document.getElementById('detailsContent').dataset.book)" class="w-full py-3 text-red-500 bg-red-50 rounded-xl font-bold text-sm active:scale-95 mb-4">До кошика</button>`;
     const details=document.getElementById('detailsContent');
     const updateOpenCard=document.getElementById('detailsSheet').classList.contains('open');
     details.dataset.book=lb.id||'';
@@ -973,7 +974,7 @@ function changeBook(id,update){
     return db.runTransaction(async transaction=>{
         const snapshot=await transaction.get(ref);
         if(!snapshot.exists)throw new Error('Book not found');
-        const changes=update(snapshot.data());
+        const changes=isBookTrashed(snapshot.data())?undefined:update(snapshot.data());
         if(changes)transaction.update(ref,changes);
         return changes;
     });
@@ -1034,7 +1035,6 @@ async function deleteHighlight(id,index){
         }
     }catch(error){showWriteError(error);}
 }
-function deleteBookFromDetails(id){if(confirm("Видалити?")){db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete();closeAllSheets();}}
 function setRating(id,rating){
     const book=libraryBook(id);
     if(!book)return;
@@ -1052,6 +1052,7 @@ async function changeStatusFromDetails(id,status){
     const sessionId=crypto.randomUUID();
     try{
         const book=libraryBook(id);
+        if(!book)return;
         let changes;
         if(navigator.onLine===false&&book&&!isCompleted(book)&&!book.dateFinished){
             changes=statusChanges(book,status,date,sessionId);
@@ -1095,6 +1096,7 @@ async function addBookWithStatus(status){
     else{
         const existing=libraryMatch(tempSelectedBook);
         if(existing){showBookDetails(existing);return;}
+        if(libraryMatch(tempSelectedBook,trashedBooks)){openLibraryTrash();return;}
     }
 
     const selected=tempSelectedBook;
@@ -1315,11 +1317,12 @@ function renderBookCard(book){
             <button class="secondary-button" onclick="changeStatus('${id}','finished',event)">Завершити</button>
         </div>`:'';
     return `<article data-id="${id}" class="book-card card ${viewMode==='grid'?'book-card-grid':''}">
-        <button type="button" class="book-card-main" onclick="showLibraryBook('${id}')" aria-label="Відкрити: ${title}">
+        <div class="book-card-tools">${canReorderBooks()?'<span class="book-reorder-handle" title="Перетягнути, щоб змінити порядок" aria-hidden="true">⠿</span>':''}<button type="button" class="book-actions-trigger" aria-label="Дії: ${title}" aria-haspopup="dialog">⋯</button></div>
+        <button type="button" class="book-card-main" aria-label="Відкрити: ${title}">
             <img loading="lazy" decoding="async" src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
             <span class="book-card-info"><strong>${title}</strong><span class="text-muted">${author}</span></span>
         </button>
-        ${progress}${completion}${actions}
+        ${renderBookLabels(book)}${progress}${completion}${actions}
     </article>`;
 }
 
@@ -1334,7 +1337,9 @@ function setFinishedFilters(){
 
 function render(){
     const q=libraryFilterQuery;
-    const matching=myLibrary.filter(book=>!q||book.title?.toLowerCase().includes(q)||book.author?.toLowerCase().includes(q));
+    updateOrganizationFilters();
+    const matching=myLibrary.filter(book=>matchesOrganizationFilters(book)&&
+        (!q||book.title?.toLowerCase().includes(q)||book.author?.toLowerCase().includes(q)));
     const reading=matching.filter(book=>book.status==='reading');
     const planned=matching.filter(book=>book.status==='planned');
     const finished=matching.filter(isCompleted);
@@ -1350,7 +1355,7 @@ function render(){
     if(!years.includes(finishedFilters.year))finishedFilters.year='';
     yearSelect.innerHTML='<option value="">Усі роки</option>'+years.map(year=>`<option>${year}</option>`).join('');
     yearSelect.value=finishedFilters.year;
-    const filtered=!filters.hidden&&(finishedFilters.year||finishedFilters.rating||finishedFilters.reread);
+    const filtered=hasOrganizationFilters()||(!filters.hidden&&(finishedFilters.year||finishedFilters.rating||finishedFilters.reread));
     const list=currentLibraryTab==='reading'?reading:currentLibraryTab==='planned'?planned:finished.filter(book=>
         (!finishedFilters.year||completionDates(book).some(date=>date.startsWith(finishedFilters.year)))&&
         (!finishedFilters.rating||Number(book.rating)===Number(finishedFilters.rating))&&
@@ -1375,11 +1380,11 @@ function render(){
         return;
     }
     list.sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-    container.innerHTML=`<div class="${classes} ${q?'':'sortable-list'}">${list.map(renderBookCard).join('')}</div>`;
+    container.innerHTML=`<div class="${classes} ${canReorderBooks()?'sortable-list':''}">${list.map(renderBookCard).join('')}</div>`;
     const sortable=container.querySelector('.sortable-list');
     if(sortable&&window.Sortable)new Sortable(sortable,{
         delay:300,delayOnTouchOnly:true,animation:reducedMotion.matches?0:150,ghostClass:'sortable-ghost',
-        filter:'input, .book-actions, .secondary-button',preventOnFilter:false,
+        handle:'.book-reorder-handle',
         onEnd:event=>{[...event.from.children].forEach((element,index)=>{
             if(element.dataset.id)updateBookInFirestore(element.dataset.id,{sortOrder:index});
         });}
@@ -1424,7 +1429,7 @@ async function fetchMoreRecommendations(isFirst=false){
             let items=res.items||[];
             if(items.length<30){currentRecQueryIndex++;recStartIndex=0;}else{recStartIndex+=40;}
             const badWords=['учебник','словарь','журнал','комикс','манга','підручник','словник','вісник','сборник','збірник','посібник','пособие','том ','випуск','выпуск','зошит','тетрадь','хрестоматия','дневник'];
-            const existingTitles=new Set(myLibrary.map(b=>(b.title||'').trim().toLowerCase()));
+            const existingTitles=new Set(allBookRecords.map(b=>(b.title||'').trim().toLowerCase()));
             let valid=items.filter(item=>{
                 const b=item.volumeInfo;
                 if(!b.title||!b.description||b.description.length<20)return false;
