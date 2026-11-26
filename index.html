@@ -54,11 +54,6 @@
         .sortable-ghost{opacity:.3;transform:scale(.96)}
         .date-input{border:none;background:transparent;color:#3f3f46;outline:none;font-size:13px;font-weight:500;cursor:pointer;text-align:right}
         body.dark .date-input{color:#e4e4e7!important;background:transparent!important}
-        .streak-cell{width:18px;height:18px;border-radius:5px;transition:all .2s}
-        .streak-cell.active{background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 2px 6px rgba(99,102,241,.3)}
-        .streak-cell.inactive{background:#f4f4f5}
-        body.dark .streak-cell.inactive{background:#27272a}
-        .streak-cell.today{ring:2px;ring-color:#6366f1;ring-offset:2px}
         .stat-card{background:linear-gradient(135deg,#fafaff,#f0f0ff);border:1px solid #e8e8f4;border-radius:16px;padding:14px;text-align:center}
         .search-box{background:#fff;border:1px solid #f4f4f5;border-radius:14px}
         .tab-content{display:none}
@@ -87,7 +82,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=20">
+    <link rel="stylesheet" href="library.css?v=21">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -181,24 +176,15 @@
         <!-- TAB: RECOMMENDATIONS -->
         <div id="tabDiscover" class="tab-content">
             <header class="mb-5"><h1 class="text-2xl font-black tracking-tight">Рекомендації</h1><p class="text-muted text-sm mt-0.5">Підібрано для вас</p></header>
-            <div class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide" id="recTabs">
-                <button onclick="loadRealRecommendations('auto','rec_auto')" id="rec_auto" class="pill active">✨ Для вас</button>
-                <button onclick="loadRealRecommendations('Академія магії','rec_magic')" id="rec_magic" class="pill inactive">🔮 Магія</button>
-                <button onclick="loadRealRecommendations('Фентезі','rec_fantasy')" id="rec_fantasy" class="pill inactive">⚔️ Фентезі</button>
-                <button onclick="loadRealRecommendations('Детектив','rec_detective')" id="rec_detective" class="pill inactive">🔍 Детектив</button>
-                <button onclick="loadRealRecommendations('Трилер','rec_thriller')" id="rec_thriller" class="pill inactive">😱 Трилер</button>
-                <button onclick="loadRealRecommendations('Романтика','rec_romance')" id="rec_romance" class="pill inactive">💕 Романтика</button>
-                <button onclick="loadRealRecommendations('Саморозвиток','rec_self')" id="rec_self" class="pill inactive">🧠 Саморозвиток</button>
-                <button onclick="loadRealRecommendations('Фантастика','rec_scifi')" id="rec_scifi" class="pill inactive">🚀 Фантастика</button>
-            </div>
             <div class="library-filters recommendation-filters">
                 <label>Мова <select id="recommendationLanguage" onchange="changeRecommendationLanguage()" aria-label="Мова рекомендацій">
-                    <option value="">Усі мови</option><option value="uk">Українська</option>
-                    <option value="en">Англійська</option><option value="pl">Польська</option><option value="ru">Російська</option>
+                    <option value="">Українська й російська</option><option value="uk">Українська</option>
+                    <option value="ru">Російська</option>
                 </select></label>
+                <button type="button" class="secondary-button" onclick="openLibraryTools('recommendation-settings')">Мої жанри</button>
             </div>
+            <div class="recommendation-tabs" id="recTabs" aria-label="Жанри рекомендацій"></div>
             <div id="recommendationsList" class="space-y-3 mt-3"></div>
-            <div id="recScrollTarget" class="h-10 w-full pb-20"></div>
         </div>
 
         <!-- TAB: PROFILE -->
@@ -208,10 +194,6 @@
                 <h2 id="profileName" class="text-lg font-bold">Читач</h2>
                 <p id="profileEmail" class="text-muted text-xs"></p>
             </header>
-            <div class="card-elevated p-5 mb-4">
-                <div class="flex items-center justify-between mb-3"><span class="text-sm font-bold">🔥 Серія читання</span><span id="streakCount" class="text-sm font-black text-primary-600">0 днів</span></div>
-                <div id="streakDots" class="flex gap-[6px] justify-center flex-wrap"></div>
-            </div>
             <div class="card-elevated p-5 mb-4">
                 <div class="flex items-center justify-between mb-3"><span class="text-sm font-bold">🎯 Ціль на <span id="goalYear"></span></span><span id="goalProgress" class="text-sm font-black text-primary-600">0/12</span></div>
                 <div class="w-full bg-primary-100 h-2.5 rounded-full overflow-hidden"><div id="goalBar" class="bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full transition-all duration-500" style="width:0%"></div></div>
@@ -235,6 +217,7 @@
                 <button onclick="toggleAppTheme()" class="w-full p-4 card flex justify-between items-center"><span class="font-bold text-sm">Тема оформлення</span><span class="text-xl">🌓</span></button>
                 <button type="button" onclick="openLibraryTrash()" class="w-full p-4 card text-left font-bold text-sm">Кошик <span id="trashCount" class="text-muted"></span></button>
                 <button onclick="exportLibrary()" class="w-full p-4 card text-left font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</button>
+                <button type="button" onclick="openLibraryTools('duplicates')" class="w-full p-4 card text-left font-bold text-sm">Об’єднати дублікати</button>
                 <button onclick="importLibrary()" class="w-full p-4 card text-left font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</button>
                 <button onclick="clearAppCache()" class="w-full p-4 card text-left font-bold text-sm text-amber-600">🔄 Очистити кеш</button>
                 <button onclick="logout()" class="w-full p-4 card text-left font-bold text-sm text-red-500">🚪 Вийти</button>
@@ -342,8 +325,8 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="book-tools.js?v=20"></script>
-    <script defer src="reading-tools.js?v=20"></script>
-    <script defer src="app.js?v=20"></script>
+    <script defer src="book-tools.js?v=21"></script>
+    <script defer src="reading-tools.js?v=21"></script>
+    <script defer src="app.js?v=21"></script>
 </body>
 </html>

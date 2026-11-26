@@ -2,6 +2,7 @@
 const monthFormatter=new Intl.DateTimeFormat('uk-UA',{month:'long',timeZone:'UTC'});
 let calendarMonth;
 let pendingImport;
+let pendingDuplicates;
 
 function normalizeReadingSearch(value){
     return typeof value==='string'?value.normalize('NFKC').toLocaleLowerCase('uk').replace(/['’ʼ]/g,'’').replace(/\s+/g,' ').trim():'';
@@ -82,6 +83,14 @@ function refreshReadingTools(){
     if(libraryToolsView.mode==='calendar'){
         document.getElementById('libraryToolsTitle').textContent='Календар читання';
         renderReadingCalendar();
+        return true;
+    }
+    if(libraryToolsView.mode==='recommendation-settings'){
+        document.getElementById('libraryToolsTitle').textContent='Мої жанри';
+        return true;
+    }
+    if(libraryToolsView.mode==='duplicates'){
+        document.getElementById('libraryToolsTitle').textContent='Об’єднати дублікати';
         return true;
     }
     if(libraryToolsView.mode==='import'){
@@ -217,23 +226,122 @@ function sanitizeImportedBook(raw){
     return book;
 }
 
+// Match by identifiers or by title and author, including separate editions of a work.
+function groupBookRecords(records){
+    const groups=[];
+    for(const record of records){
+        const matching=groups.filter(group=>libraryMatch(record,group));
+        if(!matching.length){groups.push([record]);continue;}
+        matching[0].push(record);
+        for(const other of matching.slice(1)){
+            matching[0].push(...other);
+            groups.splice(groups.indexOf(other),1);
+        }
+    }
+    return groups;
+}
+
+function combinedReadingHistory(books){
+    const completed=new Map();
+    for(const book of books){
+        const entries=[{started:book.dateStarted,finished:book.dateFinished},...rereads(book)];
+        for(const entry of entries){
+            const finished=dateValue(entry.finished);
+            if(!finished)continue;
+            const started=dateValue(entry.started);
+            if(!completed.has(finished))completed.set(finished,new Set());
+            if(started&&started<=finished)completed.get(finished).add(started);
+        }
+    }
+    const sessions=[...completed.keys()].sort().flatMap(finished=>{
+        const starts=[...completed.get(finished)].sort();
+        return (starts.length?starts:[null]).map(started=>({started,finished}));
+    });
+    const first=sessions.shift();
+    return {
+        dateStarted:first?first.started:books.map(book=>dateValue(book.dateStarted)).find(Boolean)||null,
+        dateFinished:first?.finished||null,
+        rereads:sessions
+    };
+}
+
+function combinedBookData(primary,others){
+    const books=[primary,...others];
+    const merged={...primary,...combinedReadingHistory(books)};
+    for(const field of ['image','description','googleId','source','genre','publishedDate','author','rating','pagesTotal','rereadReminderMonth']){
+        if(!merged[field]){
+            const value=others.find(book=>book[field])?.[field];
+            if(value!==undefined)merged[field]=value;
+        }
+    }
+    for(const field of ['tags','shelves','shelfIds','identifiers']){
+        const values=[...new Set(books.flatMap(book=>labelNames(book[field])))];
+        if(values.length)merged[field]=values;
+    }
+    const notes=[...new Set(books.map(book=>book.review).filter(note=>typeof note==='string'&&note.trim()))];
+    const noteBoundary='\n\n';
+    const distinctNotes=notes.filter(note=>!notes.some(other=>other!==note&&
+        (noteBoundary+other+noteBoundary).includes(noteBoundary+note+noteBoundary)));
+    if(distinctNotes.length)merged.review=distinctNotes.join(noteBoundary);
+    const quotes=books.flatMap(book=>Array.isArray(book.highlights)?book.highlights:[]);
+    if(quotes.length)merged.highlights=quotes.filter((quote,index)=>quotes.findIndex(other=>dataEquals(quote,other))===index);
+    if(books.some(book=>book.favorite===true))merged.favorite=true;
+    if(books.some(book=>book.timeSpent))merged.timeSpent=Math.max(...books.map(book=>Number(book.timeSpent)||0));
+    const active=books.find(book=>book.activeReread);
+    if(active){
+        merged.activeReread=active.activeReread;
+        merged.rereadProgress=Object.assign({},...books.slice().reverse().map(book=>book.rereadProgress));
+        merged.status='reading';
+    }else if(books.some(isCompleted))merged.status='finished';
+    else if(books.some(book=>book.status==='reading'))merged.status='reading';
+    if(!localEpubIds.has(primary.id)&&!primary.lastCfi&&books.some(book=>book.pagesRead)){
+        merged.pagesRead=Math.max(...books.map(book=>Number(book.pagesRead)||0));
+    }
+    return merged;
+}
+
 function createImportPlan(records,user){
     const rows=[];
-    const seenCandidates=[];
     const parent=db.collection('users').doc(user.uid).collection('books');
-    let skipped=0;
+    const archiveIds=new Set(records.filter(raw=>raw&&typeof raw.title==='string'&&raw.title.trim()).map(raw=>raw.id));
+    const candidates=[],archives=[];
+    let skipped=0,combined=0;
     for(const raw of records){
         const data=sanitizeImportedBook(raw);
         if(!data){skipped++;continue;}
-        const candidate={...data,...(typeof raw.id==='string'&&raw.id?{id:raw.id}:{})};
-        const existing=libraryMatch(candidate,allBookRecords);
-        if(libraryMatch(candidate,seenCandidates)||(existing&&rows.some(row=>row.existing?.id===existing.id))){
-            skipped++;
-            continue;
+        const id=typeof raw.id==='string'&&/^[\w-]{1,200}$/.test(raw.id)&&!/^__.*__$/.test(raw.id)?raw.id:undefined;
+        if(id&&isBookTrashed(data)&&archiveIds.has(raw.mergedInto)){
+            archives.push({...data,id,mergedInto:raw.mergedInto});
+        }else candidates.push({...data,...(id?{id}:{})});
+    }
+    const existingRecords=allBookRecords.filter(book=>!isBookTrashed(book)||!book.mergedInto);
+    const importedIds=new Map();
+    for(const group of groupBookRecords(candidates)){
+        combined+=group.length-1;
+        const [first,...others]=group.slice().sort((a,b)=>Number(isBookTrashed(a))-Number(isBookTrashed(b)));
+        const {id,...data}=others.length?combinedBookData(first,others):first;
+        const existing=group.map(book=>libraryMatch(book,existingRecords)).filter(Boolean)
+            .sort((a,b)=>Number(isBookTrashed(a))-Number(isBookTrashed(b)))[0];
+        const ref=parent.doc(existing?.id||id);
+        for(const item of group){if(item.id)importedIds.set(item.id,ref.id);}
+        if(!existing){rows.push({data,ref});continue;}
+        let groups=importGroups;
+        const history=combinedReadingHistory([existing,...group]);
+        const hasNewDates=completionDates(history).some(date=>!completionDates(existing).includes(date))||
+            (others.length>0&&completionDates(history).length>completionDates(existing).length);
+        if(hasNewDates){
+            Object.assign(data,history);
+            if(history.dateFinished&&existing.status==='planned')data.status='finished';
+            groups=[{id:'history',label:'Усі дати читання',fields:['dateStarted','dateFinished','rereads','status'],combine:true},
+                ...groups.filter(group=>group.id!=='dates'&&group.id!=='rereads')];
         }
-        seenCandidates.push(candidate);
-        if(!existing){rows.push({data,ref:parent.doc()});continue;}
-        const conflicts=importGroups.flatMap(group=>{
+        if(others.length){
+            const merged=combinedBookData(existing,group);
+            for(const key of ['review','highlights']){
+                if(Object.hasOwn(merged,key))data[key]=merged[key];
+            }
+        }
+        const conflicts=groups.flatMap(group=>{
             const changes=Object.fromEntries(group.fields.filter(key=>Object.hasOwn(data,key)&&!dataEquals(existing[key],data[key]))
                 .map(key=>[key,data[key]]));
             if(!Object.keys(changes).length)return [];
@@ -242,9 +350,17 @@ function createImportPlan(records,user){
             if(group.id==='dates'&&after.dateStarted&&after.dateFinished&&after.dateStarted>after.dateFinished)return [];
             return [{...group,before,after,changes}];
         });
-        rows.push({existing,data,conflicts,ref:parent.doc(existing.id)});
+        rows.push({existing,data,conflicts,ref});
     }
-    return {user,rows,skipped,finished:new Set(),result:{added:0,updated:0,changed:0}};
+    const addedArchives=new Set();
+    for(const {id,mergedInto,...data} of archives){
+        if(allBookRecords.some(book=>book.id===id)||addedArchives.has(id))continue;
+        const parentId=importedIds.get(mergedInto);
+        if(!parentId){skipped++;continue;}
+        addedArchives.add(id);
+        rows.push({data:{...data,mergedInto:parentId},ref:parent.doc(id),archive:true});
+    }
+    return {user,rows,skipped,combined,finished:new Set(),result:{added:0,updated:0,changed:0}};
 }
 
 function importLibrary(){
@@ -272,6 +388,9 @@ function importLibrary(){
 }
 
 function importSummary(group,data){
+    if(group==='history'){
+        return [importSummary('dates',data),...rereads(data).map(entry=>[formatReadingDate(entry.started),formatReadingDate(entry.finished)].filter(Boolean).join(' — '))].join(' · ');
+    }
     if(group==='dates')return [formatReadingDate(data.dateStarted),formatReadingDate(data.dateFinished)].filter(Boolean).join(' — ')||'Без дат';
     if(group==='notes'){
         const review=typeof data.review==='string'?data.review:'';
@@ -294,15 +413,18 @@ function importConflictContent(group,data){
 }
 
 function renderImportPlan(){
-    const {rows,skipped}=pendingImport;
+    const {rows,skipped,combined}=pendingImport;
     const existing=rows.filter(row=>row.existing);
-    const newBooks=rows.filter(row=>!row.existing);
+    const newBooks=rows.filter(row=>!row.existing&&!row.archive);
+    const newArchives=rows.filter(row=>row.archive).length;
     const conflictCount=existing.filter(row=>row.conflicts.length).length;
     const holder=document.getElementById('libraryToolsContent');
     holder.innerHTML=`<form class="import-plan" data-form="import-plan">
         <div class="import-summary"><span>Нові книги <strong>${newBooks.length}</strong></span>
             <span>У бібліотеці або кошику <strong>${existing.length}</strong></span>
-            ${skipped?`<span>Повтори або пошкоджені записи <strong>${skipped}</strong></span>`:''}</div>
+            ${newArchives?`<span>Записи для кошика <strong>${newArchives}</strong></span>`:''}
+            ${combined?`<span>Об’єднані повтори <strong>${combined}</strong></span>`:''}
+            ${skipped?`<span>Пропущені записи <strong>${skipped}</strong></span>`:''}</div>
         ${newBooks.length?`<details><summary>Нові книги</summary><ul>${newBooks.map(row=>
             `<li>${escapeHtml(row.data.title)}${row.data.author?' · '+escapeHtml(row.data.author):''}</li>`).join('')}</ul></details>`:''}
         ${existing.length?`<details ${conflictCount?'open':''}><summary>Збіги з бібліотекою</summary>${rows.map((row,index)=>
@@ -311,13 +433,13 @@ function renderImportPlan(){
                 ${row.conflicts.length?row.conflicts.map(group=>
                 `<label>${group.label}<select name="conflict-${index}-${group.id}">
                     <option value="keep">Залишити — ${escapeHtml(importSummary(group.id,group.before))}</option>
-                    <option value="file">З файлу — ${escapeHtml(importSummary(group.id,group.after))}</option>
+                    <option value="file" ${group.combine?'selected':''}>${group.combine?'Доповнити історію':'З файлу'} — ${escapeHtml(importSummary(group.id,group.after))}</option>
                 </select></label><details class="import-values"><summary>Порівняти: ${group.label.toLowerCase()}</summary>
                     <div><strong>У бібліотеці</strong><p>${escapeHtml(importConflictContent(group.id,group.before))}</p></div>
-                    <div><strong>З файлу</strong><p>${escapeHtml(importConflictContent(group.id,group.after))}</p></div>
+                    <div><strong>${group.combine?'Після об’єднання':'З файлу'}</strong><p>${escapeHtml(importConflictContent(group.id,group.after))}</p></div>
                 </details>`).join(''):'<p class="text-muted">Запис уже є.</p>'}</fieldset>`:'').join('')}</details>`:''}
         <p class="text-muted" role="status"></p>
-        <button type="submit" class="primary-button" ${!newBooks.length&&!conflictCount?'disabled':''}>Імпортувати</button>
+        <button type="submit" class="primary-button" ${!newBooks.length&&!newArchives&&!conflictCount?'disabled':''}>Імпортувати</button>
     </form>`;
 }
 
@@ -369,7 +491,7 @@ async function commitLibraryImport(form){
                 chunk.forEach(({row,groups},index)=>{
                     const snapshot=snapshots[index];
                     if(!row.existing){
-                        if(snapshot.exists||libraryMatch(row.data,allBookRecords)){changed++;return;}
+                        if(snapshot.exists||(!row.archive&&libraryMatch(row.data,allBookRecords.filter(book=>!book.mergedInto)))){changed++;return;}
                         transaction.set(row.ref,row.data);
                         added++;
                         return;
@@ -408,34 +530,164 @@ async function commitLibraryImport(form){
     }
 }
 
+// ===== DUPLICATE BOOKS =====
+function previewDuplicateBooks(){
+    const groups=groupBookRecords(myLibrary).filter(group=>group.length>1).map(group=>group.slice().sort((a,b)=>
+        Number(localEpubIds.has(b.id))-Number(localEpubIds.has(a.id))||
+        Number(Boolean(b.activeReread))-Number(Boolean(a.activeReread))||
+        Number(Boolean(b.lastCfi))-Number(Boolean(a.lastCfi))||a.id.localeCompare(b.id)));
+    pendingDuplicates={user:currentUser,groups};
+    document.getElementById('libraryToolsContent').innerHTML=groups.length?
+        `<form class="import-plan duplicate-plan" data-form="duplicates">
+            <p class="text-muted">Перевірте збіги. Дати, нотатки й цитати об’єднаються в одній картці. Початкові дублікати можна відновити з кошика.</p>
+            ${groups.map(([primary,...others],index)=>{
+                const merged=combinedReadingHistory([primary,...others]);
+                return `<fieldset><legend>${escapeHtml(primary.title)}</legend>
+                    <label class="duplicate-choice"><input type="checkbox" name="duplicate" value="${index}" checked> Об’єднати ${others.length+1} записи</label>
+                    <details><summary>Переглянути записи й дати</summary><ul>${[primary,...others].map(book=>
+                        `<li>${escapeHtml(book.title)} · ${escapeHtml(book.author||'Автор невідомий')} · ${escapeHtml(importSummary('history',book))}</li>`).join('')}</ul>
+                        <p><strong>Об’єднана історія</strong> ${escapeHtml(importSummary('history',merged))}</p>
+                    </details></fieldset>`;
+            }).join('')}
+            <p class="text-muted" role="status"></p><button type="submit" class="primary-button">Об’єднати вибрані</button>
+        </form>`:'<p class="text-muted">У бібліотеці немає записів зі збігом за ідентифікаторами або за назвою й автором.</p>';
+}
+
+async function mergeDuplicateBooks(form){
+    const plan=pendingDuplicates;
+    if(!plan||plan.running||currentUser!==plan.user)return;
+    const groups=new FormData(form).getAll('duplicate').map(value=>plan.groups[Number(value)]).filter(Boolean);
+    const status=form.querySelector('[role=status]');
+    if(!groups.length){status.textContent='Виберіть записи для об’єднання.';return;}
+    const parent=db.collection('users').doc(plan.user.uid).collection('books');
+    const button=form.querySelector('[type=submit]');
+    plan.running=true;
+    button.disabled=true;
+    let merged=0,changed=0,failed=0;
+    for(const group of groups){
+        if(currentUser!==plan.user)break;
+        const refs=group.map(book=>parent.doc(book.id));
+        try{
+            const success=await db.runTransaction(async transaction=>{
+                const snapshots=await Promise.all(refs.map(ref=>transaction.get(ref)));
+                if(snapshots.some((snapshot,index)=>!snapshot.exists||!dataEquals({...snapshot.data(),id:group[index].id},group[index])))return false;
+                const [primary,...others]=group;
+                const data=combinedBookData(primary,others);
+                const changes=Object.fromEntries(Object.entries(data).filter(([key,value])=>key!=='id'&&!dataEquals(primary[key],value)));
+                if(Object.keys(changes).length)transaction.update(refs[0],changes);
+                const deletedAt=Date.now();
+                for(const ref of refs.slice(1))transaction.update(ref,{deletedAt,mergedInto:primary.id});
+                return true;
+            });
+            if(success)merged++;
+            else changed++;
+        }catch(error){
+            console.warn(error);
+            failed++;
+        }
+    }
+    plan.running=false;
+    status.textContent=`Об’єднано наборів записів: ${merged}.${changed?' Змінені записи пропущено. Відкрийте перегляд ще раз.':''}${failed?' Частину наборів не вдалося зберегти. Відкрийте перегляд і повторіть.':''}`;
+}
+
 // ===== PERSONAL RECOMMENDATIONS =====
 const recommendationGenres={
-    'Академія магії':{subject:'Fantasy',query:'"magic academy"'},
-    'Фентезі':{subject:'Fantasy',query:'fantasy fiction'},
-    'Детектив':{subject:'Mystery & Detective',query:'mystery detective novel'},
-    'Трилер':{subject:'Thrillers',query:'psychological thriller'},
-    'Романтика':{subject:'Romance',query:'romance novel'},
-    'Саморозвиток':{subject:'Self-Help',query:'personal growth'},
-    'Фантастика':{subject:'Science Fiction',query:'science fiction'}
+    'Роментезі':{id:'romantasy',subject:'Romance fantasy',uk:['романтичне фентезі','Четверте крило','Двір шипів і троянд','Жорстокий принц'],ru:['романтическое фэнтези','Четвертое крыло','Двор шипов и роз']},
+    'Попаданці':{id:'portal',subject:'Portal fantasy',uk:['попаданці','Кораліна','Лев Біла Відьма та шафа','Аліса в Країні Див'],ru:['попаданцы','Лев Колдунья и платяной шкаф','Алиса в Стране чудес']},
+    'Фентезі':{id:'fantasy',subject:'Fantasy',uk:['фентезі пригоди','Гобіт'],ru:['фэнтези приключения','Ведьмак']},
+    'Романтика':{id:'romance',subject:'Romance',uk:['любовний роман','Гіпотеза кохання'],ru:['любовный роман','Гипотеза любви']},
+    'Детектив':{id:'detective',subject:'Mystery and detective fiction',uk:['детектив роман','Убивство у Східному експресі'],ru:['детектив роман','Убийство в Восточном экспрессе']},
+    'Трилер':{id:'thriller',subject:'Thrillers',uk:['психологічний трилер','Мовчазна пацієнтка'],ru:['психологический триллер','Безмолвный пациент']},
+    'Академія магії':{id:'magic',subject:'Schools of magic',uk:['академія магії фентезі','Смертельна освіта'],ru:['магическая академия','Смертельное образование']},
+    'Саморозвиток':{id:'self',subject:'Self-help',uk:['саморозвиток','Атомні звички'],ru:['саморазвитие','Атомные привычки']},
+    'Фантастика':{id:'scifi',subject:'Science fiction',uk:['наукова фантастика','Марсіянин'],ru:['научная фантастика','Марсианин']}
 };
-const recommendationLanguageCodes=['uk','en','pl','ru'];
+const recommendationLanguageCodes={uk:'ukr',ru:'rus'};
+const recommendationLanguageLabels={uk:'Українська',ru:'Російська'};
 let recommendationFeed;
 let dismissedRecommendations=new Set();
 let pendingRecommendationDismissals=new Set();
+let recommendationPreferences={language:'',genres:Object.keys(recommendationGenres)};
+let savingRecommendationPreferences=0;
 
 function recommendationKey(title,author){
     return JSON.stringify([normalizeReadingSearch(title),normalizeReadingSearch(author)]);
 }
 
+function cleanRecommendationPreferences(raw){
+    const selected=Array.isArray(raw?.genres)?raw.genres:[];
+    const genres=Object.keys(recommendationGenres).filter(genre=>selected.includes(genre));
+    return {language:Object.hasOwn(recommendationLanguageCodes,raw?.language)?raw.language:'',
+        genres:genres.length?genres:Object.keys(recommendationGenres)};
+}
+
 function resetReadingTools(){
     calendarMonth=null;
     pendingImport=null;
+    pendingDuplicates=null;
     recommendationFeed?.controller.abort();
     recommendationFeed=null;
     dismissedRecommendations=new Set();
     pendingRecommendationDismissals=new Set();
-    document.getElementById('recommendationLanguage').value='';
+    savingRecommendationPreferences=0;
+    let cached;
+    try{if(currentUser)cached=JSON.parse(localStorage.getItem('recommendations_'+currentUser.uid));}catch{}
+    recommendationPreferences=cleanRecommendationPreferences(cached);
     document.getElementById('recommendationsList').replaceChildren();
+    renderRecommendationControls();
+}
+
+function renderRecommendationControls(category='auto'){
+    document.getElementById('recommendationLanguage').value=recommendationPreferences.language;
+    const tabs=document.getElementById('recTabs');
+    const buttons=[['auto','Для вас'],...recommendationPreferences.genres.map(genre=>[genre,genre])];
+    const key=JSON.stringify([category,buttons]);
+    if(tabs.dataset.key===key)return;
+    tabs.dataset.key=key;
+    tabs.replaceChildren(...buttons.map(([value,label])=>{
+        const button=document.createElement('button');
+        button.type='button';
+        button.id=value==='auto'?'rec_auto':'rec_'+recommendationGenres[value].id;
+        button.className=value===category?'pill active':'pill inactive';
+        button.textContent=label;
+        button.setAttribute('aria-pressed',String(value===category));
+        button.addEventListener('click',()=>loadRealRecommendations(value));
+        return button;
+    }));
+}
+
+function renderRecommendationSettings(){
+    document.getElementById('libraryToolsContent').innerHTML=`<form class="recommendation-settings" data-form="recommendation-settings">
+        <p class="text-muted">Виберіть жанри для стрічки «Для вас» і вкладок у порадах.</p>
+        <div>${Object.keys(recommendationGenres).map(genre=>
+            `<label><input type="checkbox" name="genre" value="${genre}" ${recommendationPreferences.genres.includes(genre)?'checked':''}> ${genre}</label>`).join('')}</div>
+        <p class="text-muted" role="status"></p><button type="submit" class="primary-button">Зберегти жанри</button>
+    </form>`;
+}
+
+function setRecommendationPreferences(preferences){
+    recommendationPreferences=cleanRecommendationPreferences(preferences);
+    const category=recommendationFeed?.category||'auto';
+    if(currentTab==='discover')loadRealRecommendations(category);
+    else renderRecommendationControls(category);
+}
+
+function persistRecommendationPreferences(preferences){
+    const user=currentUser;
+    setRecommendationPreferences(preferences);
+    if(!user)return Promise.resolve();
+    try{localStorage.setItem('recommendations_'+user.uid,JSON.stringify(recommendationPreferences));}catch{}
+    savingRecommendationPreferences++;
+    return db.collection('users').doc(user.uid).set({recommendationPreferences},{merge:true}).catch(error=>{
+        if(currentUser===user)showWriteError(error);
+    }).finally(()=>{if(currentUser===user)savingRecommendationPreferences--;});
+}
+
+function saveRecommendationGenres(form){
+    const genres=new FormData(form).getAll('genre');
+    if(!genres.length){form.querySelector('[role=status]').textContent='Оберіть хоча б один жанр.';return;}
+    persistRecommendationPreferences({...recommendationPreferences,genres});
+    closeLibraryTools();
 }
 
 function applyRecommendationPreferences(profile){
@@ -444,59 +696,114 @@ function applyRecommendationPreferences(profile){
     document.querySelectorAll('.recommendation-card').forEach(card=>{
         if(dismissedRecommendations.has(card.dataset.recommendation))card.remove();
     });
-}
-
-function recommendationQueries(category){
-    const genres=category==='auto'?Object.values(recommendationGenres):[recommendationGenres[category]];
-    const authors=category==='auto'?[...new Set(myLibrary.map(book=>book.author)
-        .filter(author=>typeof author==='string'&&author.length>2&&author!=='Невідомий'))]
-        .slice(0,4).map(author=>`inauthor:"${author.replace(/"/g,'')}"`):[];
-    if(category==='Академія магії')return [genres[0].query+' subject:"Fantasy"'];
-    return [...authors,...genres.flatMap(genre=>[`subject:"${genre.subject}"`,`${genre.query} subject:"${genre.subject}"`])];
+    if(profile.recommendationPreferences&&!savingRecommendationPreferences){
+        setRecommendationPreferences(profile.recommendationPreferences);
+        try{if(currentUser)localStorage.setItem('recommendations_'+currentUser.uid,JSON.stringify(recommendationPreferences));}catch{}
+    }
 }
 
 function changeRecommendationLanguage(){
-    loadRealRecommendations(recommendationFeed?.category||'auto',recommendationFeed?.button||'rec_auto');
+    persistRecommendationPreferences({...recommendationPreferences,language:document.getElementById('recommendationLanguage').value});
 }
 
-function loadRealRecommendations(category='auto',button='rec_auto'){
-    if(category!=='auto'&&!Object.hasOwn(recommendationGenres,category))return;
-    const selected=document.getElementById('recommendationLanguage').value;
-    const language=recommendationLanguageCodes.includes(selected)?selected:'';
-    if(recommendationFeed?.category===category&&recommendationFeed.language===language)return;
+function recommendationQueries(category,language){
+    const genres=category==='auto'?recommendationPreferences.genres:[category];
+    const languages=language?[language]:Object.keys(recommendationLanguageCodes);
+    const perGenre=genres.map((name,genreIndex)=>{
+        const genre=recommendationGenres[name];
+        const codes=genreIndex%2?languages.slice().reverse():languages;
+        const terms=codes.map(code=>{
+            const [keyword,...titles]=genre[code];
+            const searches=[{query:keyword,subject:genre.subject},...titles.map(title=>({query:title,title}))];
+            if(name==='Попаданці'&&code==='uk')searches.push(searches.shift());
+            return searches;
+        });
+        const queries=[];
+        const maxTerms=Math.max(...terms.map(searches=>searches.length));
+        for(let index=0;index<maxTerms;index++){
+            codes.forEach((language,codeIndex)=>{
+                const search=terms[codeIndex][index];
+                if(!search)return;
+                const google={source:'google',language,query:search.query,title:search.title};
+                const open={source:'openlibrary',language,title:search.title,
+                    query:search.title?'title:"'+search.title+'"':'subject:"'+search.subject+'"'};
+                queries.push(...(genreIndex%3===2?[open,google]:[google,open]));
+            });
+        }
+        return queries;
+    });
+    const maxQueries=Math.max(...perGenre.map(queries=>queries.length));
+    return Array.from({length:maxQueries},(_,index)=>perGenre.map(queries=>queries[index]).filter(Boolean)).flat();
+}
+
+function loadRealRecommendations(category='auto'){
+    if(category!=='auto'&&!recommendationPreferences.genres.includes(category))category='auto';
+    const {language,genres}=recommendationPreferences;
+    const key=JSON.stringify([category,language,category==='auto'?genres:[]]);
+    renderRecommendationControls(category);
+    if(recommendationFeed?.key===key)return;
     recommendationFeed?.controller.abort();
     recommendationFeed={
-        category,button,language,queries:recommendationQueries(category),queryIndex:0,startIndex:0,
+        key,category,language,queries:recommendationQueries(category,language),queryIndex:0,
         seen:new Set(),controller:new AbortController(),loading:false
     };
-    document.querySelectorAll('#recTabs .pill').forEach(pill=>{
-        const active=pill.id===button;
-        pill.className=active?'pill active':'pill inactive';
-        pill.setAttribute('aria-pressed',String(active));
-    });
     document.getElementById('recommendationsList').replaceChildren();
     return fetchMoreRecommendations();
 }
 
-function makeRecommendationCard(item,key){
-    const data=item.volumeInfo;
-    const book={
-        googleId:item.id||'',title:data.title,author:data.authors?.[0]||'Невідомий',
-        pagesTotal:data.pageCount||300,image:(data.imageLinks?.thumbnail||'').replace(/^http:\/\//i,'https://'),
-        description:data.description.replace(/<[^>]*>/g,''),genre:data.categories?.[0]||'',
-        publishedDate:data.publishedDate||'',identifiers:(data.industryIdentifiers||[]).map(entry=>entry.identifier).filter(Boolean)
-    };
+function recommendationTitleIsBook(title){
+    return !/^(Мир фантастики|Навигатор игрового мира)(?:[\s№]|$)/iu.test(title);
+}
+
+async function queryRecommendationCatalog({source,language,query,title},signal){
+    const matchTitle=value=>!title||bookIdentity(value).includes(bookIdentity(title));
+    if(source==='google'){
+        const params=new URLSearchParams({key:googleBooksKey,q:query,printType:'books',langRestrict:language,maxResults:'24'});
+        const response=await catalogResponse(`https://www.googleapis.com/books/v1/volumes?${params}`,signal);
+        return (response.items||[]).flatMap(({id,volumeInfo:data})=>{
+            if(!data?.title||data.language!==language||!data.authors?.length||!matchTitle(data.title)||
+                (data.pageCount>0&&data.pageCount<48)||data.printType==='MAGAZINE'||!recommendationTitleIsBook(data.title))return [];
+            return [{
+                language,googleId:id||'',title:data.title,author:data.authors[0],pagesTotal:data.pageCount||300,
+                image:(data.imageLinks?.thumbnail||data.imageLinks?.smallThumbnail||'').replace(/^http:\/\//i,'https://'),
+                description:(data.description||'').replace(/<[^>]*>/g,''),genre:data.categories?.[0]||'',
+                publishedDate:data.publishedDate||'',identifiers:(data.industryIdentifiers||[]).map(entry=>entry.identifier).filter(Boolean),
+                source:'Google Books'
+            }];
+        });
+    }
+
+    const code=recommendationLanguageCodes[language];
+    const params=new URLSearchParams({q:query+' language:'+code,lang:language,limit:'16',
+        fields:'author_name,first_publish_year,number_of_pages_median,editions,editions.key,editions.title,editions.language,editions.cover_i,editions.isbn'});
+    const response=await catalogResponse(`https://openlibrary.org/search.json?${params}`,signal);
+    return (response.docs||[]).flatMap(work=>{
+        const edition=work.editions?.docs?.find(book=>book.language?.includes(code)&&book.key&&book.title&&matchTitle(book.title)&&recommendationTitleIsBook(book.title));
+        if(!edition)return [];
+        return [{
+            language,googleId:'openlibrary_'+edition.key.split('/').pop(),title:edition.title,author:work.author_name?.[0]||'Невідомий',
+            pagesTotal:work.number_of_pages_median||300,description:'',genre:'',
+            image:edition.cover_i?`https://covers.openlibrary.org/b/id/${edition.cover_i}-M.jpg?default=false`:'',
+            identifiers:labelNames(edition.isbn),publishedDate:String(work.first_publish_year||''),source:'Open Library'
+        }];
+    });
+}
+
+function makeRecommendationCard(book,key){
     const card=document.createElement('article');
     card.className='card recommendation-card fade-in';
     card.dataset.recommendation=key;
+    card.dataset.language=book.language;
+    card.classList.toggle('recommendation-no-cover',!book.image);
     const open=document.createElement('button');
     open.type='button';
     open.className='recommendation-open';
     open.setAttribute('aria-label','Відкрити: '+book.title);
     open.innerHTML=`<img loading="lazy" decoding="async" src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
         <span class="min-w-0"><strong class="block">${escapeHtml(book.title)}</strong>
-            <span class="text-muted block text-xs">${escapeHtml(book.author)}</span>
+            <span class="text-muted block text-xs">${escapeHtml(book.author)} · ${recommendationLanguageLabels[book.language]}</span>
             <span class="text-muted line-clamp-2 text-xs">${escapeHtml(book.description)}</span></span>`;
+    open.querySelector('img').addEventListener('error',()=>card.classList.add('recommendation-no-cover'),{once:true});
     open.addEventListener('click',()=>showBookDetails(book,true));
     const dismiss=document.createElement('button');
     dismiss.type='button';
@@ -516,7 +823,16 @@ async function dismissRecommendation(key,card){
     const next=card.nextSibling;
     pendingRecommendationDismissals.add(key);
     card.remove();
-    if(container.querySelectorAll('.recommendation-card').length<4)fetchMoreRecommendations();
+    if(container.querySelectorAll('.recommendation-card').length<4){
+        fetchMoreRecommendations();
+        if(!feed.loading&&!container.querySelector('.recommendation-card, #recommendationMore')){
+            const empty=document.createElement('p');
+            empty.id='recommendationMore';
+            empty.className='recommendation-status text-muted';
+            empty.textContent='Усі знайдені книги вже переглянуто.';
+            container.append(empty);
+        }
+    }
     try{
         await db.collection('users').doc(user.uid).set({
             dismissedRecommendations:firebase.firestore.FieldValue.arrayUnion(key)
@@ -529,7 +845,7 @@ async function dismissRecommendation(key,card){
         if(currentUser===user){
             pendingRecommendationDismissals.delete(key);
             if(recommendationFeed===feed){
-                document.getElementById('recommendationEmpty')?.remove();
+                if(!container.querySelector('.recommendation-card'))document.getElementById('recommendationMore')?.remove();
                 container.insertBefore(card,next?.parentElement===container?next:null);
             }
             showWriteError(error);
@@ -542,64 +858,58 @@ async function fetchMoreRecommendations(){
     if(!feed||feed.loading||feed.queryIndex>=feed.queries.length)return;
     feed.loading=true;
     const list=document.getElementById('recommendationsList');
-    document.getElementById('recommendationEmpty')?.remove();
+    document.getElementById('recommendationMore')?.remove();
     const status=document.createElement('p');
     status.className='recommendation-status text-muted';
     status.textContent='Шукаємо книги…';
     list.append(status);
-    const newCards=[];
-    let attempts=0;
+    const candidates=[];
     let failed=false;
-    const existingTitles=new Set(allBookRecords.map(book=>normalizeReadingSearch(book.title)));
+    const existingTitles=new Set(myLibrary.map(book=>bookIdentity(book.title)));
     try{
-        while(newCards.length<5&&feed.queryIndex<feed.queries.length&&attempts<4){
-            const params=new URLSearchParams({key:googleBooksKey,q:feed.queries[feed.queryIndex],printType:'books',
-                maxResults:'40',startIndex:String(feed.startIndex)});
-            if(feed.language)params.set('langRestrict',feed.language);
-            attempts++;
-            let items;
-            try{
-                const response=await catalogResponse(`https://www.googleapis.com/books/v1/volumes?${params}`,feed.controller.signal);
-                items=Array.isArray(response.items)?response.items:[];
-            }catch{
-                if(feed!==recommendationFeed)return;
-                failed=true;
-                feed.queryIndex++;
-                feed.startIndex=0;
-                continue;
-            }
+        for(let attempt=0;attempt<3&&feed.queryIndex<feed.queries.length;attempt++){
+            const batch=feed.queries.slice(feed.queryIndex,feed.queryIndex+4);
+            feed.queryIndex+=batch.length;
+            const results=await Promise.allSettled(batch.map(query=>queryRecommendationCatalog(query,feed.controller.signal)));
             if(feed!==recommendationFeed)return;
-            if(items.length===40)feed.startIndex+=40;
-            else{feed.queryIndex++;feed.startIndex=0;}
-            for(const item of items){
-                const book=item?.volumeInfo;
-                if(typeof book?.title!=='string'||typeof book.description!=='string'||book.description.length<20||
-                    (book.pageCount>0&&book.pageCount<40)||existingTitles.has(normalizeReadingSearch(book.title)))continue;
-                if(feed.language&&book.language&&book.language!==feed.language)continue;
-                const key=recommendationKey(book.title,book.authors?.[0]||'Невідомий');
-                if(feed.seen.has(key)||dismissedRecommendations.has(key)||pendingRecommendationDismissals.has(key))continue;
-                feed.seen.add(key);
-                newCards.push(makeRecommendationCard(item,key));
+            for(const result of results){
+                if(result.status==='rejected'){failed=true;continue;}
+                candidates.push(...result.value.filter(book=>!existingTitles.has(bookIdentity(book.title))));
             }
+            const languages=feed.language?[feed.language]:Object.keys(recommendationLanguageCodes);
+            const available=candidates.filter(book=>{
+                const key=recommendationKey(book.title,book.author);
+                return !feed.seen.has(key)&&!dismissedRecommendations.has(key)&&!pendingRecommendationDismissals.has(key);
+            });
+            if(languages.every(language=>available.filter(book=>book.language===language).length>=4))break;
         }
-        if(feed!==recommendationFeed)return;
-        list.append(...newCards.filter(card=>!dismissedRecommendations.has(card.dataset.recommendation)&&
-            !pendingRecommendationDismissals.has(card.dataset.recommendation)));
+        const withCoverFirst=candidates.sort((a,b)=>Number(Boolean(b.image))-Number(Boolean(a.image)));
+        for(const book of withCoverFirst){
+            const key=recommendationKey(book.title,book.author);
+            if(feed.seen.has(key)||dismissedRecommendations.has(key)||pendingRecommendationDismissals.has(key))continue;
+            feed.seen.add(key);
+            const card=makeRecommendationCard(book,key);
+            const firstWithoutCover=list.querySelector('.recommendation-no-cover');
+            list.insertBefore(card,book.image?firstWithoutCover:null);
+        }
+        const footer=document.createElement('div');
+        footer.id='recommendationMore';
+        footer.className='recommendation-status text-muted';
         if(!list.querySelector('.recommendation-card')){
-            const empty=document.createElement('div');
-            empty.id='recommendationEmpty';
-            empty.className='recommendation-status text-muted';
-            empty.textContent=failed?'Деякі запити до каталогу не відповіли.':'За цими фільтрами книги поки не знайдено.';
-            if(feed.queryIndex<feed.queries.length){
-                const next=document.createElement('button');
-                next.type='button';
-                next.className='secondary-button';
-                next.textContent='Шукати ще';
-                next.addEventListener('click',fetchMoreRecommendations);
-                empty.append(next);
-            }
-            list.append(empty);
+            footer.textContent=failed?'Деякі каталоги не відповіли.':'За цими фільтрами книги поки не знайдено.';
         }
+        if(feed.queryIndex<feed.queries.length||failed){
+            const next=document.createElement('button');
+            next.type='button';
+            next.className='secondary-button';
+            next.textContent='Шукати ще';
+            next.addEventListener('click',()=>{
+                if(feed.queryIndex>=feed.queries.length)feed.queryIndex=0;
+                fetchMoreRecommendations();
+            });
+            footer.append(next);
+        }
+        if(footer.hasChildNodes())list.append(footer);
     }finally{
         status.remove();
         feed.loading=false;
