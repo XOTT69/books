@@ -98,7 +98,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=9">
+    <link rel="stylesheet" href="library.css?v=10">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -151,7 +151,7 @@
         <div id="tabLibrary" class="tab-content active fade-in">
             <header class="library-header">
                 <div><p class="brand-name">ЧитайКо</p><h1>Бібліотека</h1></div>
-                <button onclick="openSheet('searchSheet')" class="primary-button"><span aria-hidden="true">＋</span> Додати книгу</button>
+                <button onclick="openBookSearch()" class="primary-button"><span aria-hidden="true">＋</span> Додати книгу</button>
             </header>
             <div id="quickResume" class="hidden"></div>
             <div class="library-tools">
@@ -240,7 +240,7 @@
         </div>
     </nav>
 
-    <div class="backdrop fixed inset-0 z-40 bg-black/40 hidden" onclick="closeAllSheets()"></div>
+    <div class="backdrop fixed inset-0 z-40 bg-black/40 hidden" aria-hidden="true"></div>
 
     <!-- READER -->
     <div id="readerOverlay">
@@ -267,7 +267,10 @@
     <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" role="dialog" aria-modal="true" aria-label="Додати книгу" inert>
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
         <div class="sheet-header"><h2>Додати книгу</h2><button type="button" class="secondary-button" onclick="closeAllSheets()" aria-label="Закрити пошук">✕</button></div>
-        <div class="px-5 pb-4 shrink-0"><input type="search" id="searchInput" enterkeyhint="search" aria-label="Назва, автор або ISBN" placeholder="Назва, автор або ISBN…" class="search-box"></div>
+        <div class="px-5 pb-4 shrink-0"><div class="catalog-search-field">
+            <input type="text" id="searchInput" inputmode="search" enterkeyhint="search" autocapitalize="none" autocomplete="off" aria-label="Назва, автор або ISBN" placeholder="Назва, автор або ISBN…" class="search-box">
+            <button type="button" id="clearBookSearch" aria-label="Очистити пошук" hidden>✕</button>
+        </div></div>
         <div id="searchResults" class="sheet-scroll px-4 pb-6 overflow-y-auto flex-1">
             <button onclick="openScanner()" class="w-full mb-2 p-3 text-center text-sm font-semibold text-white bg-zinc-800 rounded-xl active:scale-95 transition-transform">📷 Сканувати штрих-код</button>
             <button onclick="openManualForm()" class="w-full mb-3 p-3 text-center text-sm font-semibold text-primary-600 bg-primary-50 rounded-xl active:scale-95 transition-transform">✍️ Додати вручну</button>
@@ -316,6 +319,6 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="app.js?v=9"></script>
+    <script defer src="app.js?v=10"></script>
 </body>
 </html>
