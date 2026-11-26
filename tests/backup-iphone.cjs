@@ -93,6 +93,23 @@ async function verify(browser,device,url){
         assert.equal(await page.evaluate(()=>store.get('2024-08-18').title),'Уточнена назва');
         assert.equal(await page.evaluate(()=>store.get('2024-08-18').review),'Нотатка 2024-08-18');
         await page.getByRole('button',{name:'Закрити картку'}).tap();
+        await page.evaluate(()=>{failLibrary();});
+        assert.match(await page.locator('#librarySync').innerText(),/Помилка синхронізації/);
+        await page.evaluate(()=>document.querySelector('#librarySync button').click());
+        assert.match(await page.locator('#librarySync').innerText(),/Синхронізовано/);
+        const tracked=await page.evaluate(()=>{
+            currentReaderBookId='2024-08-18';
+            startTimer();
+            readingStartTime=Date.now()-31000;
+            tickReaderTimer();
+            readingStartTime=Date.now()-4000;
+            pauseReaderTimer();
+            tickReaderTimer();
+            stopTimer();
+            currentReaderBookId=null;
+            return store.get('2024-08-18').timeSpent;
+        });
+        assert.equal(tracked,35);
         const perf=await page.evaluate(()=>{
             const stats=[];
             for(const count of [100,500,1000]){

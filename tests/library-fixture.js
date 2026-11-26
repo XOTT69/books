@@ -9,13 +9,14 @@ const mockSaved=JSON.parse(localStorage.getItem('fixtureDatabase')||'null');
 const store=new Map(mockSaved?.books||fixtures.map(({id,...book})=>[id,book]));
 const profile=mockSaved?.profile||{readingGoal:12,sentinel:'unchanged',shelfNames:['Нічне читання','Літні книги'],shelfCatalog:{'known-modern':{name:'Сучасна'}}};
 const writes=[];
-let onLibrary,onProfile;
+let onLibrary,onProfile,onLibraryError;
 function persist(){
     localStorage.setItem('fixtureDatabase',JSON.stringify({books:[...store],profile}));
 }
 const snapshot=()=>({docs:[...store].map(([id,book])=>({id,data:()=>structuredClone(book)}))});
 const profileSnapshot=()=>({exists:true,data:()=>structuredClone(profile)});
 const fieldValue={
+    increment:value=>({__op:'increment',value}),
     arrayUnion:(...values)=>({__op:'union',values}),
     arrayRemove:(...values)=>({__op:'remove',values})
 };
@@ -24,7 +25,8 @@ function applyFields(record,fields){
         const path=field.split('.');
         const target=path.slice(0,-1).reduce((obj,key)=>obj[key]||=( {} ),record);
         const key=path.at(-1);
-        if(value?.__op==='union')target[key]=[...new Set([...(target[key]||[]),...value.values])];
+        if(value?.__op==='increment')target[key]=(target[key]||0)+value.value;
+        else if(value?.__op==='union')target[key]=[...new Set([...(target[key]||[]),...value.values])];
         else if(value?.__op==='remove')target[key]=(target[key]||[]).filter(item=>!value.values.includes(item));
         else if(value&&typeof value==='object'&&!Array.isArray(value)&&field==='shelfCatalog'){
             target[key]||={};
@@ -56,7 +58,7 @@ const ref=id=>({id,collection:()=>collection,
     },
     async delete(){throw new Error('Hard book deletion was attempted');}
 });
-const collection={doc:ref,orderBy:()=>collection,onSnapshot(options,callback){onLibrary=callback;callback(snapshot());return ()=>{onLibrary=null;};}};
+const collection={doc:ref,orderBy:()=>collection,onSnapshot(options,callback,error){onLibrary=callback;onLibraryError=error;callback(snapshot());return ()=>{onLibrary=null;};}};
 const firestore={enablePersistence:async()=>{},collection:()=>collection,
     batch(){
         const queued=[];
@@ -76,4 +78,4 @@ window.localforage={keys:async()=>['epub_reading','epub_legacy'],getItem:async()
 window.alert=message=>{throw new Error(message);};
 window.Chart=function(){this.destroy=()=>{};};
 Object.assign(window,{store,profile,snapshot,profileSnapshot,writes,
-    publishLibrary:()=>onLibrary(snapshot()),publishProfile:()=>onProfile(profileSnapshot())});
+    failLibrary:()=>onLibraryError(Error('Offline test')),publishLibrary:()=>onLibrary(snapshot()),publishProfile:()=>onProfile(profileSnapshot())});

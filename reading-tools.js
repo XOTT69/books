@@ -528,20 +528,6 @@ async function commitLibraryImport(form){
     plan.running=true;
     button.disabled=true;
     try{
-        if(plan.shelves?.length||Object.keys(plan.catalog||{}).length){
-            const ref=db.collection('users').doc(plan.user.uid);
-            await db.runTransaction(async transaction=>{
-                const profile=(await transaction.get(ref)).data()||{};
-                const knownNames=new Set(labelNames(profile.shelfNames).map(labelKey));
-                const missing=plan.shelves.filter(name=>!knownNames.has(labelKey(name)));
-                const additions=Object.fromEntries(Object.entries(plan.catalog).filter(([id])=>
-                    !Object.hasOwn(profile.shelfCatalog||{},id)&&!Object.hasOwn(deviceShelfCatalog,id)));
-                const fields={};
-                if(Object.keys(additions).length)fields.shelfCatalog=additions;
-                if(missing.length)fields.shelfNames=firebase.firestore.FieldValue.arrayUnion(...missing);
-                if(Object.keys(fields).length)transaction.set(ref,fields,{merge:true});
-            });
-        }
         let processed=0;
         for(const chunk of splitImportWrites(selected)){
             if(plan.user!==currentUser)break;
@@ -575,8 +561,33 @@ async function commitLibraryImport(form){
             processed+=chunk.length;
             status.textContent=`Опрацьовано ${processed} з ${selected.length}.`;
         }
+        if(plan.user!==currentUser)return;
+        if(plan.shelves?.length||Object.keys(plan.catalog||{}).length){
+            const ref=db.collection('users').doc(plan.user.uid);
+            await db.runTransaction(async transaction=>{
+                const profile=(await transaction.get(ref)).data()||{};
+                const knownNames=new Set(labelNames(profile.shelfNames).map(labelKey));
+                const missing=plan.shelves.filter(name=>!knownNames.has(labelKey(name)));
+                const additions=Object.fromEntries(Object.entries(plan.catalog).filter(([id])=>
+                    !Object.hasOwn(profile.shelfCatalog||{},id)&&!Object.hasOwn(deviceShelfCatalog,id)));
+                const fields={};
+                if(Object.keys(additions).length)fields.shelfCatalog=additions;
+                if(missing.length)fields.shelfNames=firebase.firestore.FieldValue.arrayUnion(...missing);
+                if(Object.keys(fields).length)transaction.set(ref,fields,{merge:true});
+            }).catch(error=>{
+                if(error.code!=='permission-denied'||currentUser!==plan.user)throw error;
+                const byId={...Object.fromEntries(plan.shelves.map(name=>[legacyShelfId(name),{name}])),...plan.catalog};
+                const missing=Object.entries(byId).filter(([id])=>!Object.hasOwn(shelfCatalog,id)&&!Object.hasOwn(deviceShelfCatalog,id));
+                const previous=deviceShelfCatalog;
+                deviceShelfCatalog={...previous,...Object.fromEntries(missing)};
+                if(!saveDeviceShelves(plan.user)){deviceShelfCatalog=previous;throw error;}
+                refreshShelfViews();
+                plan.localShelves=true;
+            });
+        }
         const {added,updated,changed}=plan.result;
         status.textContent=`Додано ${added}, оновлено ${updated}.${changed?` Пропущено змінені після перегляду записи або поля: ${changed}.`:''}`;
+        if(plan.localShelves)status.textContent+=' Полиці збережено на цьому пристрої.';
         plan.done=true;
     }catch(error){
         console.warn(error);
