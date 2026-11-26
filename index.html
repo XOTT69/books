@@ -82,7 +82,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=23">
+    <link rel="stylesheet" href="library.css?v=24">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -219,7 +219,7 @@
                 <button onclick="toggleAppTheme()" class="w-full p-4 card flex justify-between items-center"><span class="font-bold text-sm">Тема оформлення</span><span class="text-xl">🌓</span></button>
                 <button type="button" onclick="openLibraryTrash()" class="w-full p-4 card text-left font-bold text-sm">Кошик <span id="trashCount" class="text-muted"></span></button>
                 <button onclick="exportLibrary()" class="w-full p-4 card text-left font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</button>
-                <button type="button" onclick="openLibraryTools('duplicates')" class="w-full p-4 card text-left font-bold text-sm">Об’єднати дублікати</button>
+                <button type="button" onclick="openLibraryTools('duplicates')" class="w-full p-4 card text-left font-bold text-sm">Повторні записи</button>
                 <button onclick="importLibrary()" class="w-full p-4 card text-left font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</button>
                 <button onclick="clearAppCache()" class="w-full p-4 card text-left font-bold text-sm text-amber-600">🔄 Очистити кеш</button>
                 <button onclick="logout()" class="w-full p-4 card text-left font-bold text-sm text-red-500">🚪 Вийти</button>
@@ -327,8 +327,8 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="book-tools.js?v=23"></script>
-    <script defer src="reading-tools.js?v=23"></script>
-    <script defer src="app.js?v=23"></script>
+    <script defer src="book-tools.js?v=24"></script>
+    <script defer src="reading-tools.js?v=24"></script>
+    <script defer src="app.js?v=24"></script>
 </body>
 </html>
