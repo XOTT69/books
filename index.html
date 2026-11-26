@@ -87,7 +87,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=19">
+    <link rel="stylesheet" href="library.css?v=20">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -145,8 +145,9 @@
                 <button onclick="openBookSearch()" class="primary-button"><span aria-hidden="true">＋</span> Додати книгу</button>
             </header>
             <div id="quickResume" class="hidden"></div>
+            <section id="rereadReminders" class="card-elevated reminder-list" hidden></section>
             <div class="library-tools">
-                <input type="search" id="librarySearchInput" enterkeyhint="search" aria-label="Пошук у бібліотеці" placeholder="Пошук у бібліотеці…" class="search-box" oninput="filterLibrary(this.value)">
+                <input type="search" id="librarySearchInput" enterkeyhint="search" aria-label="Пошук книг, нотаток і цитат" placeholder="Книги, нотатки, цитати…" class="search-box" oninput="filterLibrary(this.value)">
                 <div class="view-switch" aria-label="Вигляд бібліотеки">
                     <button onclick="setViewMode('list')" id="view_list" aria-label="Список" aria-pressed="true">☰</button>
                     <button onclick="setViewMode('grid')" id="view_grid" aria-label="Обкладинки" aria-pressed="false">⊞</button>
@@ -190,6 +191,12 @@
                 <button onclick="loadRealRecommendations('Саморозвиток','rec_self')" id="rec_self" class="pill inactive">🧠 Саморозвиток</button>
                 <button onclick="loadRealRecommendations('Фантастика','rec_scifi')" id="rec_scifi" class="pill inactive">🚀 Фантастика</button>
             </div>
+            <div class="library-filters recommendation-filters">
+                <label>Мова <select id="recommendationLanguage" onchange="changeRecommendationLanguage()" aria-label="Мова рекомендацій">
+                    <option value="">Усі мови</option><option value="uk">Українська</option>
+                    <option value="en">Англійська</option><option value="pl">Польська</option><option value="ru">Російська</option>
+                </select></label>
+            </div>
             <div id="recommendationsList" class="space-y-3 mt-3"></div>
             <div id="recScrollTarget" class="h-10 w-full pb-20"></div>
         </div>
@@ -211,7 +218,10 @@
                 <div class="flex items-center gap-2 mt-3"><input type="number" id="goalInput" min="1" max="200" value="12" class="w-16 p-2 bg-surface rounded-lg text-center font-bold text-sm border border-slate-100 outline-none" onchange="saveGoal(this.value)"><span class="text-xs text-muted">книг на рік</span></div>
             </div>
             <section class="card-elevated year-stats">
-                <h3 id="yearStatsTitle">Підсумки року</h3>
+                <div class="year-stats-heading">
+                    <h3 id="yearStatsTitle">Підсумки року</h3>
+                    <button type="button" class="secondary-button" onclick="openReadingCalendar()">Календар читання</button>
+                </div>
                 <dl><div><dt>Унікальні книги</dt><dd id="yearUniqueBooks">0</dd></div>
                 <div><dt>Перечитування</dt><dd id="yearRereads">0</dd></div></dl>
             </section>
@@ -332,7 +342,8 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="book-tools.js?v=19"></script>
-    <script defer src="app.js?v=19"></script>
+    <script defer src="book-tools.js?v=20"></script>
+    <script defer src="reading-tools.js?v=20"></script>
+    <script defer src="app.js?v=20"></script>
 </body>
 </html>
