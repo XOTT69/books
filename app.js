@@ -10,8 +10,7 @@ let rendition=null,currentReaderBookId=null,currentBookInstance=null;
 let readerOpening=false,readerProgressTimer,flushReaderProgress;
 let readerTheme=localStorage.getItem('readerTheme')||'light',readerFontSize=parseInt(localStorage.getItem('readerFontSize'))||100;
 let readingTimer=null,readingStartTime=0,currentSessionSeconds=0;
-let recStartIndex=0,currentRecQueries=[],currentRecQueryIndex=0,isFetchingRecs=false,currentRecCategory=null;
-let shownRecTitles=new Set(),libraryFilterQuery='',readerDepsLoaded=false;
+let libraryFilterQuery='',readerDepsLoaded=false;
 let currentTab='library';
 let finishedFilters={year:'',rating:'',reread:false};
 let localEpubIds=new Set();
@@ -61,7 +60,7 @@ function bookCover(value){
     return PLACEHOLDER_IMG;
 }
 function libraryMatch(candidate,books=myLibrary){
-    const exact=books.find(book=>book.id===candidate.id||(book.googleId&&book.googleId===candidate.googleId));
+    const exact=books.find(book=>(candidate.id&&book.id===candidate.id)||(book.googleId&&book.googleId===candidate.googleId));
     if(exact)return exact;
     const isbn=(Array.isArray(candidate.identifiers)?candidate.identifiers:[]).map(canonicalIsbn).filter(Boolean);
     const normalized=value=>String(value||'').normalize('NFKC').toLocaleLowerCase('uk').replace(/[^\p{L}\p{N}]/gu,'');
@@ -91,6 +90,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     viewport?.addEventListener('scroll',scheduleViewportUpdate);
     window.addEventListener('resize',scheduleViewportUpdate);
     window.addEventListener('pageshow',scheduleViewportUpdate);
+    document.addEventListener('visibilitychange',()=>{
+        if(!document.hidden&&currentUser)renderRereadReminders();
+    });
     scheduleViewportUpdate();
     document.addEventListener('focusin',scheduleViewportUpdate);
     document.addEventListener('focusout',scheduleViewportUpdate);
@@ -108,7 +110,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     const target=document.getElementById('recScrollTarget');
     if(target&&'IntersectionObserver' in window){
         const observer=new IntersectionObserver(entries=>{
-            if(entries[0].isIntersecting&&currentTab==='discover'&&!isFetchingRecs&&currentRecQueries.length)fetchMoreRecommendations();
+            if(entries[0].isIntersecting&&currentTab==='discover')fetchMoreRecommendations();
         },{rootMargin:'300px'});
         observer.observe(target);
     }
@@ -331,7 +333,7 @@ function switchTab(tab,direction=0){
         else button.removeAttribute('aria-current');
     });
     if(tab==='profile'){calculateStats();updateStreakWidget();updateGoalWidget();}
-    if(tab==='discover'&&!currentRecCategory)loadRealRecommendations('auto','rec_auto');
+    if(tab==='discover'&&!recommendationFeed)loadRealRecommendations('auto','rec_auto');
 }
 
 function enableTabSwipe(screen){
@@ -486,7 +488,6 @@ async function calculateStats(){
 
 // ===== EXPORT/IMPORT =====
 function exportLibrary(){if(!allBookRecords.length)return alert('Порожньо!');const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(allBookRecords.map(exportBookRecord),null,2));const a=document.createElement('a');a.href=d;a.download=`chitayko_${new Date().toISOString().slice(0,10)}.json`;a.click();}
-function importLibrary(){const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const t=await f.text(),books=JSON.parse(t);if(!Array.isArray(books))throw new Error('Bad');if(!confirm(`Імпортувати ${books.length} книг?`))return;const ex=new Set(allBookRecords.map(b=>(b.title||'').toLowerCase().trim()));let imp=0;const batch=db.batch();books.forEach(book=>{const ti=(book.title||'').toLowerCase().trim();if(ex.has(ti))return;const ref=db.collection('users').doc(currentUser.uid).collection('books').doc();const c={...book};delete c.id;if(!c.dateAdded)c.dateAdded=Date.now();batch.set(ref,c);imp++;});await batch.commit();alert(`✅ ${imp} книг!`);}catch(err){alert('Помилка: '+err.message);}};inp.click();}
 async function clearAppCache(){
     try{
         if('serviceWorker' in navigator){
@@ -510,6 +511,7 @@ auth.onAuthStateChanged(user=>{
     currentUser=user;
     document.body.classList.toggle('app-open',Boolean(user));
     resetBookTools();
+    resetReadingTools();
     myLibrary=[];
     localEpubIds=new Set();
     if(user){
@@ -554,7 +556,7 @@ function loadLibrary(){
 async function updateBookInFirestore(id,u){if(currentUser)await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(u);}
 let filterFrame;
 function filterLibrary(query){
-    const normalized=query.toLowerCase().trim();
+    const normalized=normalizeReadingSearch(query);
     if(libraryFilterQuery===normalized)return;
     libraryFilterQuery=normalized;
     cancelAnimationFrame(filterFrame);
@@ -562,13 +564,16 @@ function filterLibrary(query){
 }
 
 // ===== SHEETS =====
-let sheetTrigger,detailsOpenedFromSearch=false;
+let sheetTrigger,detailsOpenedFromSearch=false,detailsOpenedFromCalendar=false;
 
 function openSheet(id){
     const sheet=document.getElementById(id);
     const current=document.querySelector('.bottom-sheet.open');
     if(current===sheet)return;
-    if(id==='detailsSheet')detailsOpenedFromSearch=current?.id==='searchSheet';
+    if(id==='detailsSheet'){
+        detailsOpenedFromSearch=current?.id==='searchSheet';
+        detailsOpenedFromCalendar=current?.id==='libraryToolsSheet'&&libraryToolsView?.mode==='calendar';
+    }
     const focus=document.activeElement;
     if(!current)sheetTrigger=focus?.matches('button,a')?focus:null;
     if(current?.contains(focus)||focus?.matches('input,textarea'))focus.blur();
@@ -590,7 +595,9 @@ function hideSheet(sheet){
 
 function closeAllSheets(){
     detailsOpenedFromSearch=false;
+    detailsOpenedFromCalendar=false;
     libraryToolsView=null;
+    cancelLibraryImport();
     cancelBookSearch();
     const sheet=document.querySelector('.bottom-sheet.open');
     if(sheet){
@@ -606,6 +613,7 @@ function closeAllSheets(){
 }
 function closeDetailsSheet(){
     if(detailsOpenedFromSearch)openSheet('searchSheet');
+    else if(detailsOpenedFromCalendar)openReadingCalendar(false);
     else closeAllSheets();
 }
 
@@ -668,8 +676,6 @@ function closeScanner(){
 const searchInput=document.getElementById('searchInput'),searchItems=document.getElementById('searchItems');
 const searchResults=document.getElementById('searchResults');
 const clearSearchButton=document.getElementById('clearBookSearch');
-function isEnglishTitle(t){if(!t)return true;const l=t.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);if(!l)return false;const e=t.match(/[a-zA-Z]/g);return(e&&e.length>(l.length*0.4));}
-function isCyrillic(s){return/[а-яА-ЯіІїЇєЄґҐ]/.test(s);}
 
 const googleBooksKey='AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME';
 let searchController;
@@ -942,7 +948,7 @@ function renderReadingHistory(book){
                 ${dateInput('Початок','dateStarted')}${dateInput('Завершення','dateFinished')}
             </div></details>
         </div>
-        ${completed?`<div class="history-actions">${actions}<details><summary>Додати минуле перечитування</summary>
+        ${completed?`<div class="history-actions">${actions}${book.activeReread?'':renderReminderEditor(book)}<details><summary>Додати минуле перечитування</summary>
             <form class="history-dates" onsubmit="savePastReread(event,'${id}')">
                 <label class="history-date">Початок<input name="started" type="date" max="${todayDate()}"></label>
                 <label class="history-date">Завершення<input name="finished" type="date" max="${todayDate()}" required></label>
@@ -987,7 +993,7 @@ function saveRereadProgress(id,sessionId,progress){
 
 function statusChanges(book,status,date,sessionId){
     if(status==='reading'&&!book.activeReread&&(isCompleted(book)||book.dateFinished)){
-        return {status,activeReread:{id:sessionId,started:date}};
+        return {status,activeReread:{id:sessionId,started:date},...(book.rereadReminderMonth?{rereadReminderMonth:null}:{})};
     }
     if(book.status===status)return;
     if(status==='finished'&&book.activeReread){
@@ -1322,7 +1328,7 @@ function renderBookCard(book){
             <img loading="lazy" decoding="async" src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
             <span class="book-card-info"><strong>${title}</strong><span class="text-muted">${author}</span></span>
         </button>
-        ${renderBookLabels(book)}${progress}${completion}${actions}
+        ${renderBookLabels(book)}${renderReadingSearchMatch(book,libraryFilterQuery)}${progress}${completion}${actions}
     </article>`;
 }
 
@@ -1338,8 +1344,8 @@ function setFinishedFilters(){
 function render(){
     const q=libraryFilterQuery;
     updateOrganizationFilters();
-    const matching=myLibrary.filter(book=>matchesOrganizationFilters(book)&&
-        (!q||book.title?.toLowerCase().includes(q)||book.author?.toLowerCase().includes(q)));
+    renderRereadReminders();
+    const matching=myLibrary.filter(book=>matchesOrganizationFilters(book)&&matchesReadingSearch(book,q));
     const reading=matching.filter(book=>book.status==='reading');
     const planned=matching.filter(book=>book.status==='planned');
     const finished=matching.filter(isCompleted);
@@ -1389,86 +1395,4 @@ function render(){
             if(element.dataset.id)updateBookInFirestore(element.dataset.id,{sortOrder:index});
         });}
     });
-}
-
-// ===== RECOMMENDATIONS =====
-const curatedCategories={
-    'Академія магії':['"академия магии" фэнтези','"магическая академия"','ромфант академия','академия волшебства'],
-    'Фентезі':['"фэнтези" бестселлер','эпическое фэнтези','Джон Толкин','Джордж Мартин','Брэндон Сандерсон','Робин Хобб','Ник Перумов','боевое фэнтези'],
-    'Детектив':['"детектив" бестселлер','Агата Кристи','Ю Несбё','Стиг Ларссон','Борис Акунин','психологический детектив'],
-    'Трилер':['"триллер" бестселлер','Стивен Кинг','Джиллиан Флинн','Дэн Браун','Франк Тилье','психологический триллер'],
-    'Романтика':['"любовный роман" бестселлер','Николас Спаркс','Джоджо Мойес','Колин Гувер','современный любовный роман'],
-    'Саморозвиток':['"саморазвитие" бестселлер','Роберт Кийосаки','Марк Мэнсон','Джо Диспенза','Джеймс Клир','психология успеха'],
-    'Фантастика':['"научная фантастика" бестселлер','Айзек Азимов','Рэй Брэдбери','Энди Вейер','Сергей Лукьяненко','космическая фантастика']
-};
-
-async function loadRealRecommendations(cat='auto',btnId='rec_auto'){
-    if(currentRecCategory===cat)return;currentRecCategory=cat;recStartIndex=0;currentRecQueryIndex=0;currentRecQueries=[];shownRecTitles.clear();
-    const list=document.getElementById('recommendationsList');list.innerHTML='<div class="p-10 text-muted text-sm text-center animate-pulse">🔍 Шукаємо...</div>';
-    document.querySelectorAll('#recTabs .pill').forEach(b=>{b.className='pill inactive';});
-    if(document.getElementById(btnId))document.getElementById(btnId).className='pill active';
-    let pool=[];
-    if(cat==='auto'){
-        let authors=myLibrary.map(b=>b.author).filter(a=>a&&a.length>2&&!a.toLowerCase().includes('невідомий'));
-        if(authors.length>0){let counts={};authors.forEach(a=>counts[a]=(counts[a]||0)+1);pool.push(...Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,10).map(a=>`inauthor:"${a}"`));}
-        let gen=Object.values(curatedCategories).flat();gen.sort(()=>0.5-Math.random());pool.push(...gen);
-    }else{pool=[...curatedCategories[cat]];pool.sort(()=>0.5-Math.random());}
-    currentRecQueries=pool;await fetchMoreRecommendations(true);
-}
-
-async function fetchMoreRecommendations(isFirst=false){
-    if(isFetchingRecs||currentRecQueryIndex>=currentRecQueries.length)return;isFetchingRecs=true;
-    const lst=document.getElementById('recommendationsList');
-    if(!isFirst&&!document.getElementById('recLoadingMore')){const d=document.createElement('div');d.id='recLoadingMore';d.className='py-6 text-center text-muted animate-pulse text-sm';d.innerHTML='Ще...';lst.appendChild(d);}
-    let finalBooks=[],empty=0;
-    while(finalBooks.length<5&&currentRecQueryIndex<currentRecQueries.length&&empty<3){
-        const q=currentRecQueries[currentRecQueryIndex];
-        const url=`https://www.googleapis.com/books/v1/volumes?key=AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME&q=${encodeURIComponent(q)}&maxResults=40&startIndex=${recStartIndex}`;
-        try{
-            const res=await fetch(url).then(r=>r.ok?r.json():{items:[]}).catch(()=>({items:[]}));
-            let items=res.items||[];
-            if(items.length<30){currentRecQueryIndex++;recStartIndex=0;}else{recStartIndex+=40;}
-            const badWords=['учебник','словарь','журнал','комикс','манга','підручник','словник','вісник','сборник','збірник','посібник','пособие','том ','випуск','выпуск','зошит','тетрадь','хрестоматия','дневник'];
-            const existingTitles=new Set(allBookRecords.map(b=>(b.title||'').trim().toLowerCase()));
-            let valid=items.filter(item=>{
-                const b=item.volumeInfo;
-                if(!b.title||!b.description||b.description.length<20)return false;
-                if(b.pageCount!==undefined&&b.pageCount>0&&b.pageCount<40)return false;
-                if(!isCyrillic(b.title)||isEnglishTitle(b.title))return false;
-                const tL=b.title.toLowerCase();
-                if(badWords.some(w=>tL.includes(w)))return false;
-                if(existingTitles.has(tL))return false;
-                const key=tL+(b.authors?b.authors[0]:'');
-                if(shownRecTitles.has(key))return false;
-                return true;
-            });
-            const u=new Map();
-            valid.forEach(i=>{const b=i.volumeInfo;const key=b.title.toLowerCase()+(b.authors?b.authors[0]:'');u.set(key,i);});
-            let ub=Array.from(u.values());
-            ub.forEach(i=>{const b=i.volumeInfo;shownRecTitles.add(b.title.toLowerCase()+(b.authors?b.authors[0]:''));finalBooks.push(i);});
-            if(ub.length===0)empty++;else empty=0;
-        }catch(e){empty++;currentRecQueryIndex++;recStartIndex=0;}
-    }
-    if(isFirst)lst.innerHTML='';
-    if(document.getElementById('recLoadingMore'))document.getElementById('recLoadingMore').remove();
-    if(finalBooks.length===0&&isFirst){lst.innerHTML='<div class="p-10 text-center text-muted text-sm">Не знайшли нових книг 😔<br><span class="text-xs">Спробуйте іншу категорію</span></div>';}
-    else if(finalBooks.length>0){
-        finalBooks.sort(()=>0.5-Math.random());
-        let h='';
-        finalBooks.forEach(i=>{
-            const b=i.volumeInfo;
-            const img=(b.imageLinks?.thumbnail||PLACEHOLDER_IMG).replace(/^http:\/\//i,'https://');
-            const bk={googleId:i.id||Math.random().toString(),title:b.title,author:b.authors?b.authors[0]:'Невідомий',pagesTotal:b.pageCount||300,image:img,description:b.description||'',genre:(b.categories&&b.categories[0])||''};
-            h+=`<div onclick="showBookDetails(${JSON.stringify(bk).replace(/"/g,'&quot;')},true)" class="card p-3.5 flex gap-3 items-start cursor-pointer active:scale-[0.98] transition-transform fade-in">
-                <img loading="lazy" decoding="async" src="${bk.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-13 h-[72px] rounded-xl shadow-sm object-cover flex-shrink-0">
-                <div class="flex-1 min-w-0">
-                    <div class="font-bold text-sm leading-tight truncate">${bk.title}</div>
-                    <div class="text-xs text-muted mt-0.5">${bk.author}</div>
-                    <div class="text-[11px] text-muted mt-1 line-clamp-2 leading-snug opacity-70">${bk.description}</div>
-                </div>
-            </div>`;
-        });
-        const tmp=document.createElement('div');tmp.innerHTML=h;while(tmp.firstChild)lst.appendChild(tmp.firstChild);
-    }
-    isFetchingRecs=false;
 }

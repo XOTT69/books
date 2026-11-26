@@ -99,6 +99,7 @@ function loadLibraryOrganization(user){
     unsubscribeOrganization=db.collection('users').doc(user.uid).onSnapshot(snapshot=>{
         if(currentUser!==user)return;
         const profile=snapshot.data()||{};
+        applyRecommendationPreferences(profile);
         if(profile.readingGoal){
             localStorage.setItem('readingGoal',profile.readingGoal);
             updateGoalWidget();
@@ -276,7 +277,7 @@ function actionButton(action,label,classes='',value=''){
     return `<button type="button" class="tool-action ${classes}" data-action="${action}" data-value="${escapeHtml(value)}">${label}</button>`;
 }
 function refreshLibraryTools(){
-    if(!libraryToolsView)return;
+    if(!libraryToolsView||refreshReadingTools())return;
     const {mode,id}=libraryToolsView;
     const bookMode=mode==='actions'||mode==='organize';
     const book=bookMode?libraryBook(id):null;
@@ -427,6 +428,7 @@ function enableLibraryToolsControls(){
         if(!button||!libraryToolsView||!currentUser)return;
         const {id}=libraryToolsView;
         const {action,value}=button.dataset;
+        if(handleReadingToolAction(action,value))return;
         if(action==='favorite'){
             const book=libraryBook(id);
             if(book)updateBookInFirestore(id,{favorite:book.favorite!==true}).catch(showWriteError);
@@ -445,6 +447,7 @@ function enableLibraryToolsControls(){
         }
     });
     holder.addEventListener('change',event=>{
+        if(handleReadingToolChange(event.target))return;
         if(event.target.matches('[data-shelf]')&&libraryToolsView?.id){
             updateBookShelf(libraryToolsView.id,event.target.dataset.shelf,event.target.checked);
         }
@@ -456,6 +459,7 @@ function enableLibraryToolsControls(){
         event.preventDefault();
         const form=event.target;
         if(!libraryToolsView||!currentUser||!form.dataset.form)return;
+        if(form.dataset.form==='import-plan'){commitLibraryImport(form);return;}
         if(form.dataset.form==='delete-shelf'){saveShelfChange(form);return;}
         const name=form.elements.label.value.normalize('NFKC').trim().replace(/\s+/g,' ');
         if(!name)return;

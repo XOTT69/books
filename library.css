@@ -491,3 +491,68 @@ body.dark .tool-danger { color: #f7a39b; }
 .shelf-row-actions { display: flex; gap: .25rem; }
 .shelf-row-actions button { min-width: 44px; min-height: 44px; padding-inline: .45rem; font-size: 1rem; }
 .shelf-cancel { margin-top: .75rem; min-height: 44px; }
+
+.year-stats-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+.calendar-year, .recommendation-filters label { display: flex; align-items: center; gap: .5rem; color: var(--muted); font-size: .85rem; }
+.calendar-year select, .import-plan select {
+    min-height: 44px;
+    border: 1px solid var(--line);
+    border-radius: .55rem;
+    padding: .35rem .65rem;
+    background: var(--paper);
+    color: var(--ink);
+}
+.calendar-months { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; margin-block: .75rem; }
+.calendar-months button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .15rem;
+    min-width: 0;
+    min-height: 44px;
+    padding: .4rem .5rem;
+    border: 1px solid var(--line);
+    border-radius: .55rem;
+    color: var(--ink);
+    font-size: .8rem;
+    text-align: start;
+}
+.calendar-months button[aria-pressed=true] { background: var(--soft); border-color: var(--accent-text); color: var(--accent-text); }
+.calendar-months small, .calendar-book small, .calendar-book time, .reminder-book small { color: var(--muted); font-size: .75rem; }
+.calendar-month-heading { margin: 1rem 0 .45rem; font: 600 1.2rem var(--serif); }
+.calendar-book > span { display: grid; gap: .15rem; }
+.calendar-book time { flex-shrink: 0; }
+.reading-search-match { margin-top: .65rem; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
+.reading-search-match strong { color: var(--accent-text); }
+.reminder-list { padding: .8rem; margin-bottom: .9rem; }
+.reminder-list[hidden] { display: none; }
+.reminder-list h2 { margin-bottom: .45rem; font: 600 1.2rem var(--serif); }
+.reminder-editor { margin: .65rem 0; }
+.reminder-editor label { display: block; color: var(--muted); font-size: .8rem; margin-bottom: .25rem; }
+.reminder-editor > div { display: flex; flex-wrap: wrap; gap: .4rem; }
+.reminder-editor input { flex: 1 1 8rem; width: auto; font-size: 16px; }
+.reminder-editor button:disabled { opacity: .5; }
+.import-plan { display: grid; gap: .75rem; }
+.import-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem; color: var(--muted); font-size: .84rem; }
+.import-summary strong { color: var(--ink); }
+.import-plan summary { cursor: pointer; color: var(--accent-text); font-weight: 700; font-size: .86rem; }
+.import-plan li { padding-top: .3rem; overflow-wrap: anywhere; }
+.import-plan fieldset { display: grid; gap: .45rem; margin-top: .65rem; padding: .5rem; border: 1px solid var(--line); border-radius: .6rem; min-width: 0; }
+.import-plan legend { font-weight: 700; padding-inline: .3rem; overflow-wrap: anywhere; }
+.import-plan label { display: grid; gap: .25rem; min-width: 0; font-size: .8rem; color: var(--muted); }
+.import-plan select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.import-values p { color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.import-values > div { margin-block: .4rem; }
+.import-plan button:disabled { opacity: .55; }
+.recommendation-filters { margin: .25rem 0 .65rem; }
+.recommendation-card { padding: .7rem; }
+.recommendation-open { display: flex; align-items: start; width: 100%; gap: .7rem; text-align: start; }
+.recommendation-open img { width: 3rem; aspect-ratio: 2/3; object-fit: cover; border-radius: .3rem; flex-shrink: 0; }
+.recommendation-open strong { font: 650 1.05rem var(--serif); overflow-wrap: anywhere; }
+.recommendation-dismiss { display: block; margin-left: auto; min-height: 44px; padding-inline: .45rem; color: var(--muted); font-size: .8rem; }
+.recommendation-dismiss:hover { color: var(--accent-text); }
+.recommendation-status { display: grid; justify-items: center; gap: .65rem; padding: .75rem; text-align: center; font-size: .85rem; }
+
+@media (max-width: 47.99rem) {
+    .import-plan select, .calendar-year select, #recommendationLanguage { font-size: 16px; }
+}
