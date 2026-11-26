@@ -124,7 +124,7 @@ body.dark :is(#appScreen, .bottom-sheet) :is(.text-amber-600, .text-amber-400) {
 .resume-card h2 { font: 600 1.1rem var(--serif); }
 .resume-card p { margin-top: .2rem; font-size: .75rem; color: var(--muted); }
 
-body .nav-bar, body.dark .nav-bar { background: var(--paper); border-color: var(--line); color: var(--ink); padding-bottom: env(safe-area-inset-bottom); }
+body .nav-bar, body.dark .nav-bar { background: var(--paper); color: var(--ink); }
 .nav-bar .nav-tab:not(.active) { opacity: 1; color: var(--muted); }
 .nav-bar .nav-tab.active { background: var(--soft); color: var(--accent-text); }
 
@@ -175,8 +175,10 @@ body .bottom-sheet, body .bottom-sheet #statusButtons { background: var(--paper)
 
 :root {
     --nav-height: 3.6rem;
+    --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --nav-total: calc(var(--nav-height) + var(--safe-bottom) + 1px);
+    --nav-bottom: var(--safe-bottom);
+    --nav-total: calc(var(--nav-height) + var(--nav-bottom) + 1px);
     --viewport-height: 100vh;
 }
 @supports (height: 100dvh) {
@@ -190,7 +192,7 @@ body .nav-bar, body.dark .nav-bar {
     inset: auto 0 0;
     z-index: 30;
     border-top: 1px solid var(--line);
-    padding: 0 max(.65rem, env(safe-area-inset-right)) var(--safe-bottom) max(.65rem, env(safe-area-inset-left));
+    padding: 0 max(.65rem, env(safe-area-inset-right)) var(--nav-bottom) max(.65rem, env(safe-area-inset-left));
 }
 .nav-bar-inner {
     display: grid;
@@ -229,10 +231,21 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
 #scannerSheet > :first-child { padding-top: max(1rem, env(safe-area-inset-top)); }
 
 @media (max-width: 47.99rem), (pointer: coarse) and (max-height: 32rem) {
+    body.app-open {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        height: var(--viewport-height);
+        overflow: hidden;
+        background: var(--paper);
+    }
+    body.app-open .nav-bar { position: static; }
+    body.app-open.standalone-bottom-clipped,
+    body.standalone-bottom-clipped .nav-bar { background: var(--page); }
+    body.standalone-bottom-clipped .nav-bar { --nav-bottom: 0px; }
     .app-shell {
-        position: fixed;
-        inset: 0 0 var(--nav-total);
+        min-height: 0;
         overflow-y: auto;
+        background: var(--page);
         overscroll-behavior-y: contain;
         padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left));
     }

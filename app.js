@@ -87,6 +87,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     viewport?.addEventListener('resize',scheduleViewportUpdate);
     viewport?.addEventListener('scroll',scheduleViewportUpdate);
     window.addEventListener('resize',scheduleViewportUpdate);
+    window.addEventListener('pageshow',scheduleViewportUpdate);
+    scheduleViewportUpdate();
     document.addEventListener('focusin',scheduleViewportUpdate);
     document.addEventListener('focusout',scheduleViewportUpdate);
     document.addEventListener('keydown',event=>{
@@ -125,7 +127,20 @@ function updateKeyboardLayout(){
     }else{
         style.removeProperty('--keyboard-inset');
         style.removeProperty('--sheet-height');
+        updateStandaloneBottomInset(layoutHeight);
     }
+}
+
+function updateStandaloneBottomInset(layoutHeight){
+    if(navigator.standalone!==true||!navigator.userAgent.includes('iPhone')||innerWidth>=layoutHeight){
+        document.body.classList.remove('standalone-bottom-clipped');
+        return;
+    }
+    // Older Home Screen installs can report the top inset inside a shortened viewport.
+    const safeTop=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-top'))||0;
+    const missingHeight=screen.height-layoutHeight;
+    const clipped=safeTop>=44&&Math.abs(missingHeight-safeTop)<=8;
+    document.body.classList.toggle('standalone-bottom-clipped',clipped);
 }
 
 function enableBackdropDismiss(){
@@ -320,6 +335,7 @@ auth.onAuthStateChanged(async user=>{
     unsubscribeLibrary?.();
     unsubscribeLibrary=null;
     currentUser=user;
+    document.body.classList.toggle('app-open',Boolean(user));
     myLibrary=[];
     localEpubIds=new Set();
     if(user){
