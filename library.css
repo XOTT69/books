@@ -321,7 +321,7 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
     .app-shell, .sheet-scroll { scrollbar-width: none; }
     #authScreen { padding-top: max(1.5rem, env(safe-area-inset-top)); }
     #searchSheet, #detailsSheet, #libraryToolsSheet { border-radius: 1.25rem 1.25rem 0 0; }
-    #searchInput, #librarySearchInput, #authScreen input, #editContent input, #detailsContent textarea, #detailsContent select, #detailsContent input[type=date], .tool-form input, #goalInput {
+    #searchInput, #librarySearchInput, #authScreen input, #editContent input, #detailsContent textarea, #detailsContent select, #detailsContent input[type=date], .tool-form input, #goalInput, #appScreen select, #libraryToolsSheet select, #libraryToolsSheet input:not([type=checkbox]):not([type=radio]) {
         font-size: 16px;
     }
     .book-card, .resume-card { box-shadow: none; }
