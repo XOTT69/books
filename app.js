@@ -4,6 +4,7 @@ firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(),db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.log(e.code));
 
+let libraryReady=false;
 let currentUser=null,myLibrary=[],tempSelectedBook=null,timeoutId=null;
 let currentLibraryTab='reading',viewMode=localStorage.getItem('viewMode')||'list';
 let rendition=null,currentReaderBookId=null,currentBookInstance=null;
@@ -48,7 +49,7 @@ function currentPages(book){
     return Number(book.activeReread?book.rereadProgress?.[book.activeReread.id]?.pagesRead:book.pagesRead)||0;
 }
 function progressPercent(book){
-    return Math.min(100,Math.max(0,Math.round(currentPages(book)/(book.pagesTotal||300)*100)));
+    return book.pagesTotal>0?Math.min(100,Math.max(0,Math.round(currentPages(book)/book.pagesTotal*100))):0;
 }
 function libraryBook(id){
     return myLibrary.find(book=>book.id===id);
@@ -435,9 +436,16 @@ function updateViewButtons(){
 }
 
 // ===== GOAL =====
-function saveGoal(v){const g=parseInt(v)||12;if(currentUser)db.collection('users').doc(currentUser.uid).set({readingGoal:g},{merge:true});localStorage.setItem('readingGoal',g);updateGoalWidget();}
+async function saveGoal(value){
+    const goal=Number(value),user=currentUser;
+    if(!user||!Number.isInteger(goal)||goal<1||goal>200){updateGoalWidget();return;}
+    try{
+        await db.collection('users').doc(user.uid).set({readingGoal:goal},{merge:true});
+        if(currentUser===user){localStorage.setItem('readingGoal_'+user.uid,goal);updateGoalWidget();}
+    }catch(error){updateGoalWidget();showWriteError(error);}
+}
 function updateGoalWidget(){
-    const g=parseInt(localStorage.getItem('readingGoal'))||12,y=new Date().getFullYear();
+    const g=Number(localStorage.getItem('readingGoal_'+currentUser?.uid))||12,y=new Date().getFullYear();
     const f=readingWorks.filter(book=>completionDates(book).some(date=>date.startsWith(String(y)))).length;
     const p=Math.min(100,Math.round((f/g)*100));
     document.getElementById('goalYear').innerText=y;
@@ -474,7 +482,7 @@ function renderQuickResume(){
     qr.innerHTML=`<div class="resume-card">
         <img src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
         <div class="min-w-0"><h2 class="truncate">${escapeHtml(book.title)}</h2>
-        <p>Сторінка ${currentPages(book)} з ${Number(book.pagesTotal)||300}</p></div>
+        <p>Сторінка ${currentPages(book)}${book.pagesTotal?' з '+Number(book.pagesTotal):''}</p></div>
         <button class="primary-button" onclick="readSavedEpub('${escapeHtml(book.id)}')">Продовжити</button>
     </div>`;
 }
@@ -486,6 +494,7 @@ async function calculateStats(){
     const thisYear=fin.filter(book=>completionDates(book).some(date=>date.startsWith(year)));
     document.getElementById('yearStatsTitle').textContent=`Підсумки ${year} року`;
     document.getElementById('yearUniqueBooks').textContent=thisYear.length;
+    document.getElementById('yearCompletions').textContent=thisYear.reduce((sum,book)=>sum+completionDates(book).filter(date=>date.startsWith(year)).length,0);
     document.getElementById('yearRereads').textContent=thisYear.reduce((sum,book)=>sum+rereads(book).filter(entry=>entry.finished.startsWith(year)).length,0);
     const tp=fin.reduce((s,b)=>s+(parseInt(b.pagesTotal)||0),0);
     const tt=myLibrary.reduce((s,b)=>s+(b.timeSpent||0),0);
@@ -506,7 +515,16 @@ async function calculateStats(){
 }
 
 // ===== EXPORT/IMPORT =====
-function exportLibrary(){if(!allBookRecords.length)return alert('Порожньо!');const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(allBookRecords.map(exportBookRecord),null,2));const a=document.createElement('a');a.href=d;a.download=`chitayko_${new Date().toISOString().slice(0,10)}.json`;a.click();}
+function exportLibrary(){
+    if(!currentUser||!libraryReady){alert('Дочекайтеся завантаження бібліотеки перед експортом.');return;}
+    const file={format:'chytayko-library',version:1,shelves:shelfNames,catalog:{...shelfCatalog,...deviceShelfCatalog},records:allBookRecords.map(backupBookRecord)};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(file,null,2)],{type:'application/json'}));
+    const link=document.createElement('a');
+    link.href=url;
+    link.download='chytayko_'+todayDate()+'.json';
+    link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
 async function clearAppCache(){
     try{
         if('serviceWorker' in navigator){
@@ -527,6 +545,8 @@ auth.onAuthStateChanged(user=>{
     const as=document.getElementById('authScreen'),ap=document.getElementById('appScreen');
     unsubscribeLibrary?.();
     unsubscribeLibrary=null;
+    libraryReady=false;
+    if(currentReaderBookId)closeReader();
     currentUser=user;
     document.body.classList.toggle('app-open',Boolean(user));
     resetBookTools();
@@ -552,18 +572,32 @@ function logout(){auth.signOut();closeAllSheets();}
 function loadLibrary(){
     const user=currentUser;
     const key='library_cache_'+user.uid;
+    unsubscribeLibrary?.();
+    const status=document.getElementById('librarySync');
+    status.textContent='Завантажуємо бібліотеку…';
+    const timeKey='librarySync_'+user.uid;
+    function syncMessage(message){
+        const last=localStorage.getItem(timeKey);
+        status.textContent=message+(last?' · '+new Date(Number(last)).toLocaleString('uk-UA'):'');
+    }
     let receivedSnapshot=false;
     refreshLocalEpubs();
     localforage.getItem(key).then(cached=>{
         if(currentUser!==user||receivedSnapshot||!cached||myLibrary.length)return;
+        syncMessage('Локальна копія. Остання синхронізація');
         replaceBookRecords(cached);
         render();
         updateGoalWidget();
         renderQuickResume();
     }).catch(console.warn);
-    unsubscribeLibrary=db.collection('users').doc(user.uid).collection('books').onSnapshot(snapshot=>{
+    unsubscribeLibrary=db.collection('users').doc(user.uid).collection('books').onSnapshot({includeMetadataChanges:true},snapshot=>{
         if(currentUser!==user||(!snapshot.docs.length&&snapshot.metadata?.fromCache))return;
+        const metadataOnly=receivedSnapshot&&snapshot.docChanges?.().length===0;
         receivedSnapshot=true;
+        const remote=!snapshot.metadata?.fromCache&&!snapshot.metadata?.hasPendingWrites;
+        if(remote){libraryReady=true;localStorage.setItem(timeKey,Date.now());}
+        syncMessage(snapshot.metadata?.hasPendingWrites?'Очікує синхронізації':remote?'Синхронізовано':'Локальна копія. Остання синхронізація');
+        if(metadataOnly)return;
         replaceBookRecords(snapshot.docs.map(doc=>({...doc.data(),id:doc.id}))
             .sort((a,b)=>(Number(b.dateAdded)||0)-(Number(a.dateAdded)||0)));
         localforage.setItem(key,allBookRecords).catch(console.warn);
@@ -571,9 +605,19 @@ function loadLibrary(){
         updateGoalWidget();
         renderQuickResume();
         if(currentTab==='profile')calculateStats();
+    },error=>{
+        if(currentUser!==user)return;
+        libraryReady=false;
+        console.warn(error);
+        syncMessage('Помилка синхронізації. Остання синхронізація');
+        const retry=document.createElement('button');
+        retry.className='secondary-button';
+        retry.textContent='Повторити';
+        retry.onclick=loadLibrary;
+        status.append(' ',retry);
     });
 }
-async function updateBookInFirestore(id,u){if(currentUser)await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(u);}
+async function updateBookInFirestore(id,u){if(!currentUser)throw new Error('Authentication required');await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(u);}
 let filterFrame;
 function filterLibrary(query){
     const normalized=normalizeReadingSearch(query);
@@ -736,7 +780,7 @@ async function searchCatalogs(query,signal,onResults){
         const data=await catalogResponse(`https://www.googleapis.com/books/v1/volumes?${params}`,signal);
         return (data.items||[]).filter(item=>item.volumeInfo?.title).map(({id,volumeInfo:b})=>({
             googleId:id,title:b.title,author:b.authors?.[0]||'Невідомий',authors:b.authors||[],
-            pagesTotal:b.pageCount||300,image:b.imageLinks?.thumbnail||'',description:(b.description||'').replace(/<[^>]*>/g,''),
+            pagesTotal:b.pageCount||null,image:b.imageLinks?.thumbnail||'',description:(b.description||'').replace(/<[^>]*>/g,''),
             genre:b.categories?.[0]||'',publishedDate:b.publishedDate||'',
             identifiers:(b.industryIdentifiers||[]).map(value=>value.identifier),source:'Google Books'
         }));
@@ -747,7 +791,7 @@ async function searchCatalogs(query,signal,onResults){
         const data=await catalogResponse(`https://itunes.apple.com/search?${params}`,signal);
         return (data.results||[]).filter(book=>book.trackName).map(book=>({
             googleId:`apple_${book.trackId}`,title:book.trackName,author:book.artistName||'Невідомий',
-            pagesTotal:300,image:(book.artworkUrl100||'').replace('100x100bb','400x400bb'),
+            pagesTotal:null,image:(book.artworkUrl100||'').replace('100x100bb','400x400bb'),
             description:(book.description||'').replace(/<[^>]*>/g,''),genre:book.genres?.[0]||'',
             publishedDate:(book.releaseDate||'').slice(0,4),source:'Apple Books'
         }));
@@ -764,7 +808,7 @@ async function searchCatalogs(query,signal,onResults){
         const data=await catalogResponse(`https://openlibrary.org/search.json?${params}`,signal);
         return (data.docs||[]).filter(book=>book.key&&book.title).map(book=>({
             googleId:`openlibrary_${book.key.split('/').pop()}`,title:book.title,author:book.author_name?.[0]||'Невідомий',
-            authors:book.author_name||[],pagesTotal:book.number_of_pages_median||300,
+            authors:book.author_name||[],pagesTotal:book.number_of_pages_median||null,
             image:book.cover_i?`https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg?default=false`:'',
             description:'',genre:'',publishedDate:String(book.first_publish_year||''),
             identifiers:isbn&&(book.isbn||[]).some(value=>canonicalIsbn(value)===isbn)?[isbn]:[],source:'Open Library'
@@ -918,13 +962,13 @@ function showBookDetails(bookData,isNew=false,completionDate){
     const showDate=dateValue(completionDate??(updateOpenCard&&details.dataset.book===lb.id?details.dataset.completion:''));
     tempSelectedBook=isNew?bookData:null;toggleEditMode(false);
     const sa=escapeHtml(lb.author||'Невідомий');
-    let h=`<div class="detail-cover flex gap-4 mb-5 fade-in"><img loading="lazy" decoding="async" ${isNew?`src="${bookCover(lb.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"`:libraryCoverAttributes(lb)} alt="" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${escapeHtml(lb.title||'Без назви')}</h3><button onclick="openBookSearch(this.textContent.trim())" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal||300} стор.</span>${!isNew&&!lb.activeReread?`<select aria-label="Статус книги" onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
+    let h=`<div class="detail-cover flex gap-4 mb-5 fade-in"><img loading="lazy" decoding="async" ${isNew?`src="${bookCover(lb.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"`:libraryCoverAttributes(lb)} alt="" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${escapeHtml(lb.title||'Без назви')}</h3><button onclick="openBookSearch(this.textContent.trim())" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal?Number(lb.pagesTotal)+' стор.':'Кількість сторінок невідома'}</span>${!isNew&&!lb.activeReread?`<select aria-label="Статус книги" onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
     if(!isNew){
         h+=renderBookLabels(lb);
         h+=renderReadingHistory(lb,showDate);
         // Progress slider
-        if(lb.status==='reading'){
-            h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-muted mb-2">📊 Прогрес: <span id="sliderVal">${currentPages(lb)}</span> / ${lb.pagesTotal||300} стор.</p><input type="range" min="0" max="${lb.pagesTotal||300}" value="${currentPages(lb)}" class="progress-slider" oninput="document.getElementById('sliderVal').innerText=this.value" onchange="updateProgress('${lb.id}',this.value)"></div>`;
+        if(lb.status==='reading'&&lb.pagesTotal>0){
+            h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-muted mb-2">📊 Прогрес: <span id="sliderVal">${currentPages(lb)}</span> / ${Number(lb.pagesTotal)} стор.</p><input type="range" min="0" max="${Number(lb.pagesTotal)}" value="${currentPages(lb)}" class="progress-slider" oninput="document.getElementById('sliderVal').innerText=this.value" onchange="updateProgress('${lb.id}',this.value)"></div>`;
         }
         h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-muted mb-2">📖 Читалка</p><div class="flex gap-2"><button onclick="readSavedEpub('${lb.id}')" class="flex-1 py-2.5 bg-primary-600 text-white rounded-xl font-bold text-xs active:scale-95 shadow-md shadow-primary-200">Читати</button><div class="relative flex-1"><input type="file" id="epubFileModal_${lb.id}" accept=".epub" class="hidden" onchange="handleFileSelectAndSave(event,'${lb.id}')"><button onclick="document.getElementById('epubFileModal_${lb.id}').click()" class="w-full py-2.5 bg-slate-100 rounded-xl font-bold text-xs active:scale-95">📥 .epub</button></div></div></div>`;
         const hl=lb.highlights||[];
@@ -934,7 +978,7 @@ function showBookDetails(bookData,isNew=false,completionDate){
         h+=`<div class="mb-5 p-4 card-elevated"><div class="flex justify-between items-center mb-2"><p class="text-[10px] font-bold uppercase text-muted">Нотатки</p><button onclick="saveReview('${lb.id}',this)" class="text-primary-600 bg-primary-50 px-3 py-1 rounded-lg text-[10px] font-bold active:scale-95">Зберегти</button></div><textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[60px]" placeholder="Враження...">${escapeHtml(lb.review||'')}</textarea></div>`;
     }
     h+=`<div class="desc-scroll mb-4"><p class="text-[10px] font-bold uppercase text-muted mb-1">Анотація</p><p class="text-sm text-muted leading-relaxed">${escapeHtml(lb.description||'Немає.')}</p></div>`;
-    if(!isNew&&(!showDate||showDate===dateValue(lb.dateFinished)||readingHistoryForCard(lb).recordCount<=1))h+=`<button onclick="moveBookToTrash(document.getElementById('detailsContent').dataset.book)" class="w-full py-3 text-red-500 bg-red-50 rounded-xl font-bold text-sm active:scale-95 mb-4">До кошика</button>`;
+    if(!isNew&&(!showDate||showDate===dateValue(lb.dateFinished)||readingHistoryForCard(lb).recordCount<=1))h+=`<button class="secondary-button" onclick="openRecordEditor('${lb.id}')">Редагувати книгу</button><button onclick="moveBookToTrash(document.getElementById('detailsContent').dataset.book)" class="w-full py-3 text-red-500 bg-red-50 rounded-xl font-bold text-sm active:scale-95 mb-4">До кошика</button>`;
     const sameRecord=details.dataset.book===lb.id;
     details.dataset.book=lb.id||'';
     details.dataset.completion=showDate;
@@ -1057,7 +1101,7 @@ function statusChanges(book,status,date,sessionId){
         return {status,rereads:[...rereads(book),entry],activeReread:null};
     }
     if(book.activeReread)return;
-    if(status==='finished')return {status,pagesRead:book.pagesTotal||300,dateFinished:book.dateFinished||date};
+    if(status==='finished')return {status,pagesRead:book.pagesTotal||book.pagesRead||0,dateFinished:book.dateFinished||date};
     if(status==='reading')return {status,dateStarted:book.dateStarted||date};
     return {status};
 }
@@ -1130,7 +1174,34 @@ async function changeStatusFromDetails(id,status){
     }
 }
 function toggleEditMode(v){if(v){document.getElementById('detailsContent').classList.add('hidden');document.getElementById('editContent').classList.remove('hidden');}else{document.getElementById('detailsContent').classList.remove('hidden');document.getElementById('editContent').classList.add('hidden');}}
-function saveBookEdits(){const u={title:document.getElementById('editTitle').value.trim()||'Без назви',author:document.getElementById('editAuthor').value.trim()||'Невідомий',pagesTotal:parseInt(document.getElementById('editPages').value)||300,image:document.getElementById('editImage').value.trim()};if(tempSelectedBook==='manual'){tempSelectedBook={...u,description:'Вручну.'};toggleEditMode(false);showBookDetails(tempSelectedBook,true);}else{updateBookInFirestore(tempSelectedBook.id,u);showBookDetails({...tempSelectedBook,...u});}}
+function openRecordEditor(id){
+    const book=libraryBook(id);
+    if(!book)return;
+    tempSelectedBook=book;
+    for(const [input,key] of [['editTitle','title'],['editAuthor','author'],['editPages','pagesTotal'],['editImage','image']]){
+        document.getElementById(input).value=book[key]??'';
+    }
+    toggleEditMode(true);
+}
+async function saveBookEdits(){
+    const book=tempSelectedBook;
+    const pages=document.getElementById('editPages');
+    if(!pages.reportValidity())return false;
+    const fields={title:document.getElementById('editTitle').value.trim()||'Без назви',
+        author:document.getElementById('editAuthor').value.trim()||'Невідомий',
+        pagesTotal:Number(pages.value)||null,image:document.getElementById('editImage').value.trim()};
+    if(book==='manual'){showBookDetails({...fields,description:'Вручну.'},true);return true;}
+    if(!book?.id)return false;
+    const button=document.querySelector('#editContent button');
+    button.disabled=true;
+    button.textContent='Зберігаємо…';
+    try{
+        await updateBookInFirestore(book.id,fields);
+        if(tempSelectedBook===book&&document.getElementById('detailsSheet').classList.contains('open'))showBookDetails({...book,...fields});
+        return true;
+    }catch(error){showWriteError(error);return false;}
+    finally{button.disabled=false;button.textContent='Зберегти';}
+}
 function cancelBookEdit(){
     if(tempSelectedBook==='manual')closeDetailsSheet();
     else toggleEditMode(false);
@@ -1153,7 +1224,7 @@ async function saveReview(id,button){
 let addingBook=false;
 async function addBookWithStatus(status){
     if(!currentUser||!tempSelectedBook||addingBook)return;
-    if(tempSelectedBook==='manual')saveBookEdits();
+    if(tempSelectedBook==='manual'&&!await saveBookEdits())return;
     const selected=tempSelectedBook;
     if(!selected)return;
     const existing=libraryMatch(selected);
@@ -1167,7 +1238,7 @@ async function addBookWithStatus(status){
     buttons.forEach(button=>button.disabled=true);
     try{
         await db.collection('users').doc(user.uid).collection('books').add({
-            ...selected,status,pagesRead:status==='finished'?selected.pagesTotal:0,dateAdded:Date.now(),
+            ...selected,status,pagesRead:status==='finished'?selected.pagesTotal||0:0,dateAdded:Date.now(),
             rating:0,review:'',highlights:[],timeSpent:0,lastFileName:null,sortOrder:0,
             dateStarted:status==='reading'?date:null,dateFinished:status==='finished'?date:null
         });
@@ -1204,9 +1275,49 @@ async function saveManualDate(id,field,input){
 }
 
 // ===== READER =====
-function startTimer(){readingStartTime=Date.now();currentSessionSeconds=0;document.getElementById('readerTimer').innerText="00:00";readingTimer=setInterval(()=>{currentSessionSeconds=Math.floor((Date.now()-readingStartTime)/1000);const m=String(Math.floor(currentSessionSeconds/60)).padStart(2,'0'),s=String(currentSessionSeconds%60).padStart(2,'0'),h=Math.floor(currentSessionSeconds/3600);document.getElementById('readerTimer').innerText=h>0?`${h}:${m}:${s}`:`${m}:${s}`;},1000);}
-function stopTimer(){if(readingTimer&&currentReaderBookId){clearInterval(readingTimer);readingTimer=null;const b=myLibrary.find(x=>x.id===currentReaderBookId);if(b&&currentUser&&currentSessionSeconds>5){updateBookInFirestore(b.id,{timeSpent:firebase.firestore.FieldValue.increment(currentSessionSeconds)}).catch(console.warn);}}}
-window.addEventListener('beforeunload',stopTimer);
+let timerAccount=null,savedSessionSeconds=0;
+function tickReaderTimer(flush=false){
+    if(readingStartTime){
+        const now=Date.now();
+        const elapsed=Math.max(0,Math.floor((now-readingStartTime)/1000));
+        currentSessionSeconds+=elapsed;
+        readingStartTime+=elapsed*1000;
+    }
+    const delta=currentSessionSeconds-savedSessionSeconds;
+    if(delta>0&&(flush||delta>=30)&&currentReaderBookId&&currentUser===timerAccount){
+        savedSessionSeconds=currentSessionSeconds;
+        updateBookInFirestore(currentReaderBookId,{timeSpent:firebase.firestore.FieldValue.increment(delta)}).catch(showWriteError);
+    }
+    const seconds=String(currentSessionSeconds%60).padStart(2,'0');
+    const minutes=Math.floor(currentSessionSeconds/60);
+    document.getElementById('readerTimer').innerText=minutes+':'+seconds;
+}
+function startTimer(){
+    timerAccount=currentUser;
+    currentSessionSeconds=savedSessionSeconds=0;
+    readingStartTime=document.hidden?0:Date.now();
+    tickReaderTimer();
+    readingTimer=setInterval(()=>tickReaderTimer(),1000);
+}
+function pauseReaderTimer(){
+    if(!readingTimer)return;
+    tickReaderTimer(true);
+    readingStartTime=0;
+}
+document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)pauseReaderTimer();
+    else if(readingTimer&&!readingStartTime)readingStartTime=Date.now();
+});
+window.addEventListener('pagehide',pauseReaderTimer);
+window.addEventListener('pageshow',()=>{
+    if(readingTimer&&!readingStartTime&&!document.hidden)readingStartTime=Date.now();
+});
+function stopTimer(){
+    pauseReaderTimer();
+    clearInterval(readingTimer);
+    readingTimer=null;
+    timerAccount=null;
+}
 function toggleReaderSettings(){document.getElementById('readerSettingsMenu').classList.toggle('hidden');}
 function applyReaderSettings(){if(!rendition)return;rendition.themes.fontSize(readerFontSize+"%");rendition.themes.select(readerTheme);}
 function changeFontSize(d){readerFontSize=Math.max(50,Math.min(200,readerFontSize+d));localStorage.setItem('readerFontSize',readerFontSize);applyReaderSettings();}
@@ -1287,7 +1398,7 @@ async function openEpubReader(bookId,source){
                 flushReaderProgress=null;
                 if(currentUser!==readerUser)return;
                 const progress={lastCfi:start.cfi};
-                if(percentage>0)progress.pagesRead=Math.round(percentage/100*(bd.pagesTotal||300));
+                if(percentage>0&&bd.pagesTotal>0)progress.pagesRead=Math.round(percentage/100*bd.pagesTotal);
                 const write=bd.activeReread
                     ?saveRereadProgress(bookId,bd.activeReread.id,progress)
                     :updateBookInFirestore(bookId,progress);
@@ -1352,12 +1463,12 @@ function renderBookCard(book,completion){
     const author=escapeHtml(book.author);
     const reading=currentLibraryTab==='reading';
     const planned=currentLibraryTab==='planned';
-    const pages=Number(book.pagesTotal)||300;
+    const pages=Number(book.pagesTotal)||0;
     const completedDate=completion?.date||'';
     const count=rereads(readingHistoryForCard(book)).length;
     const progress=reading?`<div class="book-progress">
-        <progress max="100" value="${progressPercent(book)}" aria-label="Прогрес читання"></progress>
-        <span>Сторінка ${currentPages(book)} з ${pages}</span>
+        <progress max="100" ${pages?`value="${progressPercent(book)}"`:''} aria-label="Прогрес читання"></progress>
+        <span>Сторінка ${currentPages(book)}${pages?' з '+pages:''}</span>
     </div>`:'';
     const recordActions=!completion?.sessionLabel||completedDate===dateValue(book.dateFinished);
     const completionMarkup=currentLibraryTab==='finished'?`<div class="book-meta">
@@ -1400,6 +1511,42 @@ function updateBookCards(container,markup){
     return true;
 }
 
+// Keep visible cards mounted when a snapshot changes another book.
+const collectionMarkup=new WeakMap();
+function displayCollection(container,sections,classes){
+    const layout=JSON.stringify([classes,sections.map(section=>section.year)]);
+    const changed=layout!==booksMarkup;
+    if(changed){
+        updateBookCards(container,sections.map(({year})=>(year?`<h2 class="library-year">${escapeHtml(year)}</h2>`:'')+
+            `<div class="${classes}"></div>`).join(''));
+        booksMarkup=layout;
+    }
+    const wrappers=container.querySelectorAll('.book-collection');
+    sections.forEach(({entries},index)=>{
+        const wrapper=wrappers[index];
+        const previous=new Map([...wrapper.children].map(node=>[node.dataset.cardKey,node]));
+        let cursor=wrapper.firstElementChild;
+        for(const entry of entries){
+            const key=JSON.stringify([entry.book.id,entry.date||'']);
+            const markup=renderBookCard(entry.book,entry);
+            let node=previous.get(key);
+            previous.delete(key);
+            if(!node||collectionMarkup.get(node)!==markup){
+                const template=document.createElement('template');
+                template.innerHTML=markup;
+                const replacement=template.content.firstElementChild;
+                replacement.dataset.cardKey=key;
+                collectionMarkup.set(replacement,markup);
+                if(node){if(cursor===node)cursor=replacement;node.replaceWith(replacement);}
+                node=replacement;
+            }
+            if(node!==cursor)wrapper.insertBefore(node,cursor);
+            cursor=node.nextElementSibling;
+        }
+        for(const stale of previous.values())stale.remove();
+    });
+    return changed;
+}
 function render(){
     const q=libraryFilterQuery;
     updateOrganizationFilters();
@@ -1443,11 +1590,11 @@ function render(){
             if(!groups.has(year))groups.set(year,[]);
             groups.get(year).push(completion);
         }
-        updateBookCards(container,[...groups].map(([year,entries])=>`<h2 class="library-year">${year}</h2><div class="${classes}">${entries.map(entry=>renderBookCard(entry.book,entry)).join('')}</div>`).join(''));
+        displayCollection(container,[...groups].map(([year,entries])=>({year,entries})),classes);
         return;
     }
     list.sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-    if(!updateBookCards(container,`<div class="${classes} ${canReorderBooks()?'sortable-list':''}">${list.map(book=>renderBookCard(book)).join('')}</div>`))return;
+    if(!displayCollection(container,[{entries:list.map(book=>({book}))}],classes+(canReorderBooks()?' sortable-list':'')))return;
     const sortable=container.querySelector('.sortable-list');
     if(sortable&&window.Sortable)new Sortable(sortable,{
         delay:300,delayOnTouchOnly:true,animation:reducedMotion.matches?0:150,ghostClass:'sortable-ghost',

@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ЧитайКо</title>
-    <link rel="icon" href="icon.png">
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="manifest" href="manifest.json?v=14">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="manifest" href="manifest.json?v=27">
     <meta name="theme-color" content="#fffcf6">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="stylesheet" href="utilities.css">
@@ -82,7 +82,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=26">
+    <link rel="stylesheet" href="library.css?v=27">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -199,7 +199,7 @@
             <div class="card-elevated p-5 mb-4">
                 <div class="flex items-center justify-between mb-3"><span class="text-sm font-bold">🎯 Ціль на <span id="goalYear"></span></span><span id="goalProgress" class="text-sm font-black text-primary-600">0/12</span></div>
                 <div class="w-full bg-primary-100 h-2.5 rounded-full overflow-hidden"><div id="goalBar" class="bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full transition-all duration-500" style="width:0%"></div></div>
-                <div class="flex items-center gap-2 mt-3"><input type="number" id="goalInput" min="1" max="200" value="12" class="w-16 p-2 bg-surface rounded-lg text-center font-bold text-sm border border-slate-100 outline-none" onchange="saveGoal(this.value)"><span class="text-xs text-muted">книг на рік</span></div>
+                <div class="flex items-center gap-2 mt-3"><input type="number" id="goalInput" min="1" max="200" value="12" class="w-16 p-2 bg-surface rounded-lg text-center font-bold text-sm border border-slate-100 outline-none" onchange="saveGoal(this.value)"><span class="text-xs text-muted">унікальних книг на рік</span></div>
             </div>
             <section class="card-elevated year-stats">
                 <div class="year-stats-heading">
@@ -207,6 +207,7 @@
                     <button type="button" class="secondary-button" onclick="openReadingCalendar()">Календар читання</button>
                 </div>
                 <dl><div><dt>Унікальні книги</dt><dd id="yearUniqueBooks">0</dd></div>
+                <div><dt>Завершені читання</dt><dd id="yearCompletions">0</dd></div>
                 <div><dt>Перечитування</dt><dd id="yearRereads">0</dd></div></dl>
             </section>
             <div class="grid grid-cols-3 gap-3 mb-4">
@@ -218,9 +219,12 @@
             <div class="space-y-2 mb-8">
                 <button onclick="toggleAppTheme()" class="w-full p-4 card flex justify-between items-center"><span class="font-bold text-sm">Тема оформлення</span><span class="text-xl">🌓</span></button>
                 <button type="button" onclick="openLibraryTrash()" class="w-full p-4 card text-left font-bold text-sm">Кошик <span id="trashCount" class="text-muted"></span></button>
-                <button onclick="exportLibrary()" class="w-full p-4 card text-left font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</button>
+                <p id="librarySync" class="text-muted text-sm" role="status"></p>
+                <button onclick="exportLibrary()" class="w-full p-4 card text-left font-bold text-sm text-emerald-600">Завантажити резервну копію JSON</button>
+                <p class="text-muted text-xs">Копія містить записи, дати, нотатки, цитати, полиці й кошик. Файли EPUB зберігаються на пристрої.</p>
                 <button type="button" onclick="openLibraryTools('duplicates')" class="w-full p-4 card text-left font-bold text-sm">Повторні записи</button>
-                <button onclick="importLibrary()" class="w-full p-4 card text-left font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</button>
+                <button onclick="importLibrary(true)" class="w-full p-4 card text-left font-bold text-sm">Відновити копію ЧитайКо</button>
+                <button onclick="importLibrary()" class="w-full p-4 card text-left font-bold text-sm text-blue-600">Імпортувати та об’єднати книги</button>
                 <button onclick="clearAppCache()" class="w-full p-4 card text-left font-bold text-sm text-amber-600">🔄 Очистити кеш</button>
                 <button onclick="logout()" class="w-full p-4 card text-left font-bold text-sm text-red-500">🚪 Вийти</button>
             </div>
@@ -285,7 +289,7 @@
             <h3 class="text-lg font-bold mb-3">Редагувати</h3>
             <input type="text" id="editTitle" placeholder="Назва" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
             <input type="text" id="editAuthor" placeholder="Автор" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
-            <input type="number" id="editPages" placeholder="Сторінок" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
+            <input type="number" id="editPages" min="1" step="1" placeholder="Сторінок" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
             <input type="url" id="editImage" placeholder="URL обкладинки" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-xs">
             <div class="flex gap-2 pt-2"><button onclick="saveBookEdits()" class="flex-1 p-3.5 bg-primary-600 text-white font-bold rounded-xl text-sm active:scale-95">Зберегти</button><button onclick="cancelBookEdit()" class="flex-1 p-3.5 bg-slate-100 font-bold rounded-xl text-sm active:scale-95">Скасувати</button></div>
         </div>
@@ -327,8 +331,8 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="book-tools.js?v=26"></script>
-    <script defer src="reading-tools.js?v=26"></script>
-    <script defer src="app.js?v=26"></script>
+    <script defer src="book-tools.js?v=27"></script>
+    <script defer src="reading-tools.js?v=27"></script>
+    <script defer src="app.js?v=27"></script>
 </body>
 </html>
