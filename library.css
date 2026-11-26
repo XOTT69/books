@@ -12,6 +12,10 @@
     --gold: #795521;
     --shadow: 0 12px 32px #4339210c;
     --serif: Georgia, 'Times New Roman', serif;
+    --motion-fast: 150ms;
+    --motion-content: 200ms;
+    --motion-sheet: 280ms;
+    --ease-out: cubic-bezier(.2,.75,.25,1);
 }
 
 html { background: var(--window-color); }
@@ -128,11 +132,24 @@ body.dark :is(#appScreen, .bottom-sheet) :is(.text-amber-600, .text-amber-400) {
 
 body .nav-bar, body.dark .nav-bar { background: var(--paper); color: var(--ink); }
 .nav-bar .nav-tab:not(.active) { opacity: 1; color: var(--muted); }
-.nav-bar .nav-tab.active { background: var(--soft); color: var(--accent-text); }
+.nav-bar .nav-tab.active { color: var(--accent-text); }
 
 body .bottom-sheet, body .bottom-sheet #statusButtons { background: var(--paper); color: var(--ink); border-color: var(--line); }
-.bottom-sheet { visibility: hidden; padding-bottom: var(--app-bottom-inset); }
-.bottom-sheet.open { visibility: visible; }
+.bottom-sheet {
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(100%);
+    padding-bottom: var(--app-bottom-inset);
+    transition: transform var(--motion-sheet) var(--ease-out), visibility 0s linear var(--motion-sheet);
+}
+.bottom-sheet.open { visibility: visible; pointer-events: auto; transform: translateY(0); transition-delay: 0s; }
+.backdrop {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--motion-sheet) var(--ease-out), visibility 0s linear var(--motion-sheet);
+}
+body.modal-open .backdrop { visibility: visible; opacity: 1; pointer-events: auto; transition-delay: 0s; }
 .details-toolbar {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -186,10 +203,6 @@ body .bottom-sheet, body .bottom-sheet #statusButtons { background: var(--paper)
     #tabProfile { max-width: 43rem; margin-inline: auto; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    body, .fade-in, .bottom-sheet, .card, .progress-bar { animation-duration: .01ms !important; transition-duration: .01ms !important; }
-}
-
 :root {
     --nav-height: 3.6rem;
     --safe-top: env(safe-area-inset-top, 0px);
@@ -212,15 +225,34 @@ body .nav-bar, body.dark .nav-bar {
     padding: 0 max(.65rem, env(safe-area-inset-right)) var(--app-bottom-inset) max(.65rem, env(safe-area-inset-left));
 }
 .nav-bar-inner {
+    --nav-gap: .35rem;
+    --nav-highlight-x: 0px;
+    position: relative;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: center;
     height: var(--nav-height);
     max-width: 28rem;
     margin-inline: auto;
-    gap: .35rem;
+    gap: var(--nav-gap);
 }
+.nav-bar-inner::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: calc((100% - 2 * var(--nav-gap)) / 3);
+    height: 44px;
+    border-radius: .65rem;
+    background: var(--soft);
+    pointer-events: none;
+    transform: translate(var(--nav-highlight-x), -50%);
+    transition: transform var(--motion-sheet) var(--ease-out), background-color var(--motion-fast) ease;
+}
+.nav-bar[data-selected-tab="discover"] .nav-bar-inner { --nav-highlight-x: calc(100% + var(--nav-gap)); }
+.nav-bar[data-selected-tab="profile"] .nav-bar-inner { --nav-highlight-x: calc(200% + 2 * var(--nav-gap)); }
 .nav-bar .nav-tab {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -262,8 +294,12 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
         background: var(--paper);
     }
     body.app-open:not(.keyboard-open) { height: var(--visible-viewport-height, var(--viewport-height)); }
-    body.app-open .nav-bar { position: static; }
+    body.app-open .nav-bar {
+        position: static;
+        padding-bottom: max(var(--app-bottom-inset), 7px);
+    }
     .nav-bar-inner { align-items: end; }
+    .nav-bar-inner::before { top: auto; bottom: 0; transform: translateX(var(--nav-highlight-x)); }
     .nav-bar .nav-tab {
         justify-content: flex-end;
         padding-block-end: 3px;
@@ -313,4 +349,35 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
 
 @media (max-width: 47.99rem) and (orientation: portrait) {
     #detailsSheet { --details-top-gap: max(3.5rem, calc(var(--safe-top) + .5rem)); }
+}
+
+
+@keyframes content-enter {
+    from { opacity: .84; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes overlay-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fade-in, .tab-content.active, .search-result, .reading-history details[open] > :not(summary) {
+    animation: content-enter var(--motion-content) var(--ease-out);
+}
+#scannerSheet:not(.hidden), #readerOverlay {
+    animation: overlay-enter var(--motion-content) var(--ease-out);
+}
+.primary-button, .secondary-button, .nav-bar .nav-tab, .pill, .view-switch button, .search-result {
+    transition: color var(--motion-fast) ease, background-color var(--motion-fast) ease,
+        border-color var(--motion-fast) ease, transform var(--motion-fast) var(--ease-out);
+}
+.primary-button:active, .secondary-button:active, .nav-bar .nav-tab:active { transform: scale(.97); }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+    }
 }
