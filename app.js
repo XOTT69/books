@@ -16,6 +16,8 @@ let finishedFilters={year:'',rating:'',reread:false};
 let localEpubIds=new Set();
 let unsubscribeLibrary;
 let chartReady;
+let booksMarkup;
+const readingDateFormatter=new Intl.DateTimeFormat('uk-UA',{dateStyle:'medium',timeZone:'UTC'});
 
 function escapeHtml(value=''){
     return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -25,11 +27,13 @@ function todayDate(){
     return [now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
 }
 function dateValue(value){
-    return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value))?value:'';
+    if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return '';
+    const timestamp=Date.parse(value);
+    return Number.isFinite(timestamp)&&new Date(timestamp).toISOString().slice(0,10)===value?value:'';
 }
 function formatReadingDate(value){
     const date=dateValue(value);
-    return date?new Intl.DateTimeFormat('uk-UA',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(date)):'';
+    return date?readingDateFormatter.format(new Date(date)):'';
 }
 function rereads(book){
     return Array.isArray(book.rereads)?book.rereads.filter(entry=>entry&&dateValue(entry.finished)): [];
@@ -38,7 +42,7 @@ function completionDates(book){
     return [dateValue(book.dateFinished),...rereads(book).map(entry=>entry.finished)].filter(Boolean);
 }
 function isCompleted(book){
-    return book.status==='finished'||Boolean(book.activeReread)||rereads(book).length>0;
+    return book.status==='finished'||Boolean(dateValue(book.dateFinished)||book.activeReread)||rereads(book).length>0;
 }
 function currentPages(book){
     return Number(book.activeReread?book.rereadProgress?.[book.activeReread.id]?.pagesRead:book.pagesRead)||0;
@@ -59,15 +63,20 @@ function bookCover(value){
     }catch{}
     return PLACEHOLDER_IMG;
 }
+function bookIdentity(value){
+    return normalizeReadingSearch(value).replace(/[^\p{L}\p{N}]/gu,'');
+}
 function libraryMatch(candidate,books=myLibrary){
     const exact=books.find(book=>(candidate.id&&book.id===candidate.id)||(book.googleId&&book.googleId===candidate.googleId));
     if(exact)return exact;
     const isbn=(Array.isArray(candidate.identifiers)?candidate.identifiers:[]).map(canonicalIsbn).filter(Boolean);
-    const normalized=value=>String(value||'').normalize('NFKC').toLocaleLowerCase('uk').replace(/[^\p{L}\p{N}]/gu,'');
+    const workTitle=value=>bookIdentity(normalizeReadingSearch(value).replace(/\s*[:—-]?\s*(?:\[роман\]|\(роман\))$/u,''));
+    const title=workTitle(candidate.title);
+    const author=bookIdentity(candidate.author);
     return books.find(book=>{
         const own=(Array.isArray(book.identifiers)?book.identifiers:[]).map(canonicalIsbn).filter(Boolean);
-        if(own.length&&isbn.length)return own.some(value=>isbn.includes(value));
-        return normalized(book.title)===normalized(candidate.title)&&normalized(book.author)&&normalized(book.author)===normalized(candidate.author);
+        return own.some(value=>isbn.includes(value))||
+            (title&&author&&author!=='невідомий'&&title===workTitle(book.title)&&author===bookIdentity(book.author));
     });
 }
 
@@ -107,13 +116,6 @@ document.addEventListener('DOMContentLoaded',()=>{
         }
         if(document.body.classList.contains('modal-open'))dismissCurrentSheet();
     });
-    const target=document.getElementById('recScrollTarget');
-    if(target&&'IntersectionObserver' in window){
-        const observer=new IntersectionObserver(entries=>{
-            if(entries[0].isIntersecting&&currentTab==='discover')fetchMoreRecommendations();
-        },{rootMargin:'300px'});
-        observer.observe(target);
-    }
 });
 
 function updateKeyboardLayout(){
@@ -332,8 +334,8 @@ function switchTab(tab,direction=0){
         if(selected)button.setAttribute('aria-current','page');
         else button.removeAttribute('aria-current');
     });
-    if(tab==='profile'){calculateStats();updateStreakWidget();updateGoalWidget();}
-    if(tab==='discover'&&!recommendationFeed)loadRealRecommendations('auto','rec_auto');
+    if(tab==='profile'){calculateStats();updateGoalWidget();}
+    if(tab==='discover')loadRealRecommendations(recommendationFeed?.category);
 }
 
 function enableTabSwipe(screen){
@@ -388,7 +390,7 @@ function animateLibraryChange(){
     const books=document.getElementById('myBooksContainer');
     libraryTransition?.cancel();
     libraryTransition=books.animate?.(
-        [{opacity:.84,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],
+        [{opacity:.9},{opacity:1}],
         {duration:200,easing:'cubic-bezier(.2,.75,.25,1)'}
     );
 }
@@ -416,20 +418,6 @@ function updateGoalWidget(){
     document.getElementById('goalBar').style.width=p+'%';
     document.getElementById('goalInput').value=g;
 }
-
-// ===== STREAK =====
-async function updateStreakWidget(){
-    if(!currentUser)return;const days=[],today=new Date();
-    for(let i=13;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
-    let rd=new Set();
-    try{const snap=await db.collection('users').doc(currentUser.uid).collection('readingDays').where(firebase.firestore.FieldPath.documentId(),'>=',days[0]).where(firebase.firestore.FieldPath.documentId(),'<=',days[days.length-1]).get();snap.forEach(doc=>rd.add(doc.id));}catch(e){}
-    let streak=0;const ts=today.toISOString().slice(0,10);let cd=new Date(today);
-    if(!rd.has(ts))cd.setDate(cd.getDate()-1);
-    while(true){const ds=cd.toISOString().slice(0,10);if(rd.has(ds)){streak++;cd.setDate(cd.getDate()-1);}else break;}
-    document.getElementById('streakCount').innerText=`${streak} ${streak===1?'день':streak<5?'дні':'днів'}`;
-    document.getElementById('streakDots').innerHTML=days.map(d=>`<div class="streak-cell ${rd.has(d)?'active':'inactive'} ${d===ts?'ring-2 ring-primary-300 ring-offset-1':''}" title="${d}"></div>`).join('');
-}
-async function markReadingDay(){if(!currentUser)return;const t=new Date().toISOString().slice(0,10);try{await db.collection('users').doc(currentUser.uid).collection('readingDays').doc(t).set({minutes:Math.round(currentSessionSeconds/60),timestamp:Date.now()},{merge:true});}catch(e){}}
 
 // ===== CELEBRATION =====
 function showCelebration(){
@@ -480,7 +468,11 @@ async function calculateStats(){
     try{await (chartReady??=loadChartJS());}catch{chartReady=null;return;}
     if(currentTab!=='profile')return;
     const ctx=document.getElementById('statsChart');if(!ctx)return;
-    const months={};fin.forEach(b=>{if(b.dateFinished&&typeof b.dateFinished==='string'&&b.dateFinished.length>=7){const m=b.dateFinished.substring(0,7);months[m]=(months[m]||0)+1;}});
+    const months={};
+    for(const date of fin.flatMap(completionDates)){
+        const month=date.slice(0,7);
+        months[month]=(months[month]||0)+1;
+    }
     const labels=Object.keys(months).sort().slice(-8);const data=labels.map(l=>months[l]);
     if(window.myChart)window.myChart.destroy();
     window.myChart=new Chart(ctx,{type:'bar',data:{labels:labels.map(l=>l.slice(5)),datasets:[{data,backgroundColor:'#416357',borderRadius:8,barThickness:20}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});
@@ -542,10 +534,11 @@ function loadLibrary(){
         updateGoalWidget();
         renderQuickResume();
     }).catch(console.warn);
-    unsubscribeLibrary=db.collection('users').doc(user.uid).collection('books').orderBy('dateAdded','desc').onSnapshot(snapshot=>{
+    unsubscribeLibrary=db.collection('users').doc(user.uid).collection('books').onSnapshot(snapshot=>{
         if(currentUser!==user||(!snapshot.docs.length&&snapshot.metadata?.fromCache))return;
         receivedSnapshot=true;
-        replaceBookRecords(snapshot.docs.map(doc=>({...doc.data(),id:doc.id})));
+        replaceBookRecords(snapshot.docs.map(doc=>({...doc.data(),id:doc.id}))
+            .sort((a,b)=>(Number(b.dateAdded)||0)-(Number(a.dateAdded)||0)));
         localforage.setItem(key,allBookRecords).catch(console.warn);
         render();
         updateGoalWidget();
@@ -1099,13 +1092,12 @@ let addingBook=false;
 async function addBookWithStatus(status){
     if(!currentUser||!tempSelectedBook||addingBook)return;
     if(tempSelectedBook==='manual')saveBookEdits();
-    else{
-        const existing=libraryMatch(tempSelectedBook);
-        if(existing){showBookDetails(existing);return;}
-        if(libraryMatch(tempSelectedBook,trashedBooks)){openLibraryTrash();return;}
-    }
-
     const selected=tempSelectedBook;
+    if(!selected)return;
+    const existing=libraryMatch(selected);
+    if(existing){showBookDetails(existing);return;}
+    if(libraryMatch(selected,trashedBooks)){openLibraryTrash();return;}
+
     const date=todayDate();
     const user=currentUser;
     const buttons=document.querySelectorAll('#statusButtons button');
@@ -1155,7 +1147,7 @@ async function saveManualDate(id,field,input){
 
 // ===== READER =====
 function startTimer(){readingStartTime=Date.now();currentSessionSeconds=0;document.getElementById('readerTimer').innerText="00:00";readingTimer=setInterval(()=>{currentSessionSeconds=Math.floor((Date.now()-readingStartTime)/1000);const m=String(Math.floor(currentSessionSeconds/60)).padStart(2,'0'),s=String(currentSessionSeconds%60).padStart(2,'0'),h=Math.floor(currentSessionSeconds/3600);document.getElementById('readerTimer').innerText=h>0?`${h}:${m}:${s}`:`${m}:${s}`;},1000);}
-function stopTimer(){if(readingTimer&&currentReaderBookId){clearInterval(readingTimer);readingTimer=null;const b=myLibrary.find(x=>x.id===currentReaderBookId);if(b&&currentSessionSeconds>5){const t=(b.timeSpent||0)+currentSessionSeconds;db.collection('users').doc(currentUser.uid).collection('books').doc(currentReaderBookId).update({timeSpent:t});if(currentSessionSeconds>=300)markReadingDay();}}}
+function stopTimer(){if(readingTimer&&currentReaderBookId){clearInterval(readingTimer);readingTimer=null;const b=myLibrary.find(x=>x.id===currentReaderBookId);if(b&&currentUser&&currentSessionSeconds>5){updateBookInFirestore(b.id,{timeSpent:firebase.firestore.FieldValue.increment(currentSessionSeconds)}).catch(console.warn);}}}
 window.addEventListener('beforeunload',stopTimer);
 function toggleReaderSettings(){document.getElementById('readerSettingsMenu').classList.toggle('hidden');}
 function applyReaderSettings(){if(!rendition)return;rendition.themes.fontSize(readerFontSize+"%");rendition.themes.select(readerTheme);}
@@ -1281,7 +1273,6 @@ function closeReader(){
     currentReaderBookId=null;
     instance?.destroy();
     document.getElementById('viewer').replaceChildren();
-    updateStreakWidget();
 }
 
 // ===== RENDER =====
@@ -1341,6 +1332,15 @@ function setFinishedFilters(){
     render();
 }
 
+function updateBookCards(container,markup){
+    if(booksMarkup===markup)return false;
+    booksMarkup=markup;
+    const sortable=container.querySelector('.sortable-list');
+    if(sortable)window.Sortable?.get(sortable)?.destroy();
+    container.innerHTML=markup;
+    return true;
+}
+
 function render(){
     const q=libraryFilterQuery;
     updateOrganizationFilters();
@@ -1353,13 +1353,16 @@ function render(){
         document.getElementById('tab_'+tab).innerHTML=`${label} <span>${books.length}</span>`;
     }
     const container=document.getElementById('myBooksContainer');
-    container.querySelectorAll('.sortable-list').forEach(list=>window.Sortable?.get(list)?.destroy());
     const filters=document.getElementById('finishedFilters');
     filters.hidden=currentLibraryTab!=='finished';
     const yearSelect=document.getElementById('finishedYear');
     const years=[...new Set(myLibrary.filter(isCompleted).flatMap(completionDates).map(date=>date.slice(0,4)))].sort().reverse();
     if(!years.includes(finishedFilters.year))finishedFilters.year='';
-    yearSelect.innerHTML='<option value="">Усі роки</option>'+years.map(year=>`<option>${year}</option>`).join('');
+    const yearKey=years.join(',');
+    if(yearSelect.dataset.years!==yearKey){
+        yearSelect.dataset.years=yearKey;
+        yearSelect.innerHTML='<option value="">Усі роки</option>'+years.map(year=>`<option>${year}</option>`).join('');
+    }
     yearSelect.value=finishedFilters.year;
     const filtered=hasOrganizationFilters()||(!filters.hidden&&(finishedFilters.year||finishedFilters.rating||finishedFilters.reread));
     const list=currentLibraryTab==='reading'?reading:currentLibraryTab==='planned'?planned:finished.filter(book=>
@@ -1368,8 +1371,8 @@ function render(){
         (!finishedFilters.reread||rereads(book).length>0));
     if(!list.length){
         const tips={reading:'Додайте книгу, щоб почати читати.',planned:'Тут будуть книги, які ви хочете прочитати.',finished:'Тут будуть завершені книги.'};
-        container.innerHTML=`<div class="library-empty"><h2>${q||filtered?'Книг не знайдено':'Поки порожньо'}</h2>
-            <p>${q||filtered?'Спробуйте інший запит або змініть фільтри.':tips[currentLibraryTab]}</p></div>`;
+        updateBookCards(container,`<div class="library-empty"><h2>${q||filtered?'Книг не знайдено':'Поки порожньо'}</h2>
+            <p>${q||filtered?'Спробуйте інший запит або змініть фільтри.':tips[currentLibraryTab]}</p></div>`);
         return;
     }
     const classes=`book-collection ${viewMode==='grid'?'book-grid':''}`;
@@ -1382,11 +1385,11 @@ function render(){
             if(!groups.has(year))groups.set(year,[]);
             groups.get(year).push(book);
         }
-        container.innerHTML=[...groups].map(([year,books])=>`<h2 class="library-year">${year}</h2><div class="${classes}">${books.map(renderBookCard).join('')}</div>`).join('');
+        updateBookCards(container,[...groups].map(([year,books])=>`<h2 class="library-year">${year}</h2><div class="${classes}">${books.map(renderBookCard).join('')}</div>`).join(''));
         return;
     }
     list.sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-    container.innerHTML=`<div class="${classes} ${canReorderBooks()?'sortable-list':''}">${list.map(renderBookCard).join('')}</div>`;
+    if(!updateBookCards(container,`<div class="${classes} ${canReorderBooks()?'sortable-list':''}">${list.map(renderBookCard).join('')}</div>`))return;
     const sortable=container.querySelector('.sortable-list');
     if(sortable&&window.Sortable)new Sortable(sortable,{
         delay:300,delayOnTouchOnly:true,animation:reducedMotion.matches?0:150,ghostClass:'sortable-ghost',

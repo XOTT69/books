@@ -319,8 +319,6 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
         font-size: 16px;
     }
     .book-card, .resume-card { box-shadow: none; }
-    .book-collection > .book-card { content-visibility: auto; contain-intrinsic-height: auto 9rem; }
-    .book-grid > .book-card { contain-intrinsic-height: auto 17rem; }
 }
 
 @media (pointer: coarse) and (max-height: 32rem) {
@@ -361,6 +359,7 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
     to { opacity: 1; transform: translate(0, 0); }
 }
 .tab-content.active { animation: tab-enter var(--motion-content) var(--ease-out); }
+@media (pointer: coarse) { .tab-content.active { animation-name: overlay-enter; } }
 
 @keyframes overlay-enter {
     from { opacity: 0; }
@@ -556,3 +555,31 @@ body.dark .tool-danger { color: #f7a39b; }
 @media (max-width: 47.99rem) {
     .import-plan select, .calendar-year select, #recommendationLanguage { font-size: 16px; }
 }
+
+.recommendation-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+}
+.recommendation-filters { justify-content: space-between; }
+#recommendationsList { display: flex; flex-direction: column; }
+#recommendationsList > .recommendation-no-cover { order: 1; }
+#recommendationsList > .recommendation-status { order: 2; }
+.recommendation-settings { display: grid; gap: .8rem; }
+.recommendation-settings > div {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: .4rem;
+}
+.recommendation-settings label, .import-plan .duplicate-choice {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    gap: .5rem;
+    padding: .4rem .65rem;
+    border-radius: .6rem;
+    background: var(--soft);
+    color: var(--ink);
+}
+.recommendation-settings input, .duplicate-choice input { accent-color: var(--accent); }
+.duplicate-plan li { white-space: normal; }

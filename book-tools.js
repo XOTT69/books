@@ -235,6 +235,10 @@ function openLibraryTools(mode,id,returnToSearch=false){
                     <button type="submit" class="secondary-button">Додати тег</button>
                 </form>
             </section>`;
+    }else if(mode==='duplicates'){
+        previewDuplicateBooks();
+    }else if(mode==='recommendation-settings'){
+        renderRecommendationSettings();
     }else if(mode==='shelves'){
         holder.innerHTML=`<div id="libraryShelfItems" class="tool-list"></div>${shelfForm('Створити полицю')}`;
     }else if(mode==='rename-shelf'||mode==='delete-shelf'){
@@ -330,7 +334,7 @@ function refreshLibraryTools(){
             '<p class="text-muted">Поки немає полиць.</p>';
     }else{
         holder.innerHTML=trashedBooks.length?`<ul class="tool-list">${trashedBooks.map(record=>
-            `<li class="trash-row"><span><strong>${escapeHtml(record.title)}</strong><span class="text-muted">${escapeHtml(record.author||'')}</span></span>
+            `<li class="trash-row"><span><strong>${escapeHtml(record.title)}</strong><span class="text-muted">${escapeHtml(record.author||'')}</span>${record.mergedInto?'<small class="text-muted">Дублікат після об’єднання</small>':''}</span>
                 <button type="button" class="secondary-button" data-action="restore" data-value="${escapeHtml(record.id)}"
                     aria-label="Відновити: ${escapeHtml(record.title)}">Відновити</button></li>`).join('')}</ul>`:
             '<p class="text-muted">Кошик порожній.</p>';
@@ -460,6 +464,8 @@ function enableLibraryToolsControls(){
         const form=event.target;
         if(!libraryToolsView||!currentUser||!form.dataset.form)return;
         if(form.dataset.form==='import-plan'){commitLibraryImport(form);return;}
+        if(form.dataset.form==='duplicates'){mergeDuplicateBooks(form);return;}
+        if(form.dataset.form==='recommendation-settings'){saveRecommendationGenres(form);return;}
         if(form.dataset.form==='delete-shelf'){saveShelfChange(form);return;}
         const name=form.elements.label.value.normalize('NFKC').trim().replace(/\s+/g,' ');
         if(!name)return;
@@ -497,7 +503,7 @@ function restoreBook(id){
     if(!currentUser||!(lastTrash?.id===id||trashedBooks.some(book=>book.id===id)))return;
     const user=currentUser;
     if(lastTrash?.id===id)hideTrashUndo();
-    updateBookInFirestore(id,{deletedAt:null}).catch(error=>{
+    updateBookInFirestore(id,{deletedAt:null,mergedInto:firebase.firestore.FieldValue.delete()}).catch(error=>{
         if(currentUser===user)showWriteError(error);
     });
 }
