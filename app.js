@@ -77,6 +77,7 @@ function libraryMatch(candidate){
 document.addEventListener('DOMContentLoaded',()=>{
     if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn);
     document.querySelectorAll('.bottom-sheet').forEach(enableSheetDrag);
+    enableBackdropDismiss();
     const viewport=window.visualViewport;
     let viewportFrame;
     function scheduleViewportUpdate(){
@@ -89,8 +90,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.addEventListener('focusin',scheduleViewportUpdate);
     document.addEventListener('focusout',scheduleViewportUpdate);
     document.addEventListener('keydown',event=>{
-        if(event.key!=='Escape')return;
+        if(event.key!=='Escape'||event.defaultPrevented)return;
         if(scannerSession&&!scannerSession.cancelled){closeScanner();return;}
+        if(document.activeElement===searchInput||document.activeElement===clearSearchButton){
+            event.preventDefault();
+            if(searchInput.value)clearBookSearch();
+            else searchInput.blur();
+            return;
+        }
         if(document.getElementById('detailsSheet').classList.contains('open'))closeDetailsSheet();
         else if(document.body.classList.contains('modal-open'))closeAllSheets();
     });
@@ -108,7 +115,8 @@ function updateKeyboardLayout(){
     const layoutHeight=document.documentElement.clientHeight;
     const focused=document.activeElement;
     const textField=focused?.matches('textarea, input:is([type=search],[type=text],[type=email],[type=password],[type=url],[type=number]), [contenteditable=true]');
-    const keyboard=Boolean(viewport&&Math.abs(viewport.scale-1)<.03&&textField&&layoutHeight-viewport.height>115);
+    const keyboardWasOpen=document.body.classList.contains('keyboard-open');
+    const keyboard=Boolean(viewport&&Math.abs(viewport.scale-1)<.03&&(textField||keyboardWasOpen)&&layoutHeight-viewport.height>115);
     document.body.classList.toggle('keyboard-open',keyboard);
     const style=document.documentElement.style;
     if(keyboard){
@@ -118,6 +126,30 @@ function updateKeyboardLayout(){
         style.removeProperty('--keyboard-inset');
         style.removeProperty('--sheet-height');
     }
+}
+
+function enableBackdropDismiss(){
+    const backdrop=document.querySelector('.backdrop');
+    let tap;
+    backdrop.addEventListener('pointerdown',event=>{
+        if(!event.isPrimary||event.button!==0)return;
+        tap={id:event.pointerId,x:event.clientX,y:event.clientY};
+        backdrop.setPointerCapture(event.pointerId);
+        if(document.activeElement===searchInput)event.preventDefault();
+    });
+    backdrop.addEventListener('pointerup',event=>{
+        if(tap?.id!==event.pointerId)return;
+        const distance=Math.hypot(event.clientX-tap.x,event.clientY-tap.y);
+        tap=null;
+        if(distance>12||document.elementFromPoint(event.clientX,event.clientY)!==backdrop)return;
+        if(document.activeElement===searchInput){
+            searchInput.blur();
+            return;
+        }
+        if(document.body.classList.contains('keyboard-open'))return;
+        closeAllSheets();
+    });
+    backdrop.addEventListener('lostpointercapture',()=>{tap=null;});
 }
 
 function enableSheetDrag(sheet){
@@ -354,7 +386,7 @@ function openSheet(id){
     const current=document.querySelector('.bottom-sheet.open');
     if(current===sheet)return;
     const focus=document.activeElement;
-    if(!current)sheetTrigger=focus;
+    if(!current)sheetTrigger=focus?.matches('button,a')?focus:null;
     if(current?.contains(focus)||focus?.matches('input,textarea'))focus.blur();
     if(current){
         current.classList.remove('open');
@@ -372,6 +404,7 @@ function openSheet(id){
 
 function closeAllSheets(){
     detailsFromSearch=false;
+    resetBookSearch();
     const sheet=document.querySelector('.bottom-sheet.open');
     if(sheet){
         if(sheet.contains(document.activeElement))document.activeElement.blur();
@@ -444,6 +477,7 @@ function closeScanner(){
 // ===== SEARCH =====
 const searchInput=document.getElementById('searchInput'),searchItems=document.getElementById('searchItems');
 const searchResults=document.getElementById('searchResults');
+const clearSearchButton=document.getElementById('clearBookSearch');
 function isEnglishTitle(t){if(!t)return true;const l=t.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);if(!l)return false;const e=t.match(/[a-zA-Z]/g);return(e&&e.length>(l.length*0.4));}
 function isCyrillic(s){return/[а-яА-ЯіІїЇєЄґҐ]/.test(s);}
 
@@ -588,25 +622,74 @@ function renderSearchResults(books,failed){
     });
 }
 
-searchInput.addEventListener('input',event=>{
+function cancelBookSearch(){
     clearTimeout(timeoutId);
     searchController?.abort();
-    const query=event.target.value.trim();
+    searchController=null;
+    searchItems.removeAttribute('aria-busy');
+}
+
+function resetBookSearch(){
+    cancelBookSearch();
+    searchInput.value='';
+    clearSearchButton.hidden=true;
+    searchItems.replaceChildren();
     searchResults.scrollTop=0;
-    if(query.length<2){searchItems.removeAttribute('aria-busy');searchItems.replaceChildren();return;}
+}
+
+function clearBookSearch(){
+    searchInput.focus({preventScroll:true});
+    resetBookSearch();
+}
+
+function openBookSearch(author=''){
+    resetBookSearch();
+    openSheet('searchSheet');
+    if(author){
+        searchInput.value=`author:"${author}"`;
+        runBookSearch();
+    }
+}
+
+function runBookSearch(){
+    cancelBookSearch();
+    const query=searchInput.value.trim();
+    clearSearchButton.hidden=!searchInput.value;
+    searchResults.scrollTop=0;
+    if(query.length<2){searchItems.replaceChildren();return;}
     searchItems.setAttribute('aria-busy','true');
     searchItems.textContent='Шукаємо книги…';
     const controller=new AbortController();
     searchController=controller;
     timeoutId=setTimeout(async()=>{
-        const {books,failed}=await searchCatalogs(query,controller.signal,books=>renderSearchResults(books,false));
-        if(!controller.signal.aborted){
-            renderSearchResults(books,failed);
-            searchItems.removeAttribute('aria-busy');
+        try{
+            const {books,failed}=await searchCatalogs(query,controller.signal,results=>renderSearchResults(results,false));
+            if(!controller.signal.aborted)renderSearchResults(books,failed);
+        }catch(error){
+            if(!controller.signal.aborted){
+                console.warn(error);
+                renderSearchResults([],true);
+            }
+        }finally{
+            if(searchController===controller){
+                searchController=null;
+                searchItems.removeAttribute('aria-busy');
+            }
         }
     },450);
+}
+
+searchInput.addEventListener('input',runBookSearch);
+searchInput.addEventListener('keydown',event=>{
+    if(event.key!=='Enter'||event.isComposing)return;
+    event.preventDefault();
+    searchInput.blur();
 });
-window.searchAuthorBooks=function(a){closeAllSheets();setTimeout(()=>{const i=document.getElementById('searchInput');i.value=`author:"${a}"`;openSheet('searchSheet');i.dispatchEvent(new Event('input'));},350);}
+clearSearchButton.addEventListener('pointerdown',event=>{
+    if(document.activeElement===searchInput)event.preventDefault();
+});
+clearSearchButton.addEventListener('click',clearBookSearch);
+
 function openManualForm(){detailsFromSearch=true;tempSelectedBook='manual';toggleEditMode(true);document.getElementById('editTitle').value='';document.getElementById('editAuthor').value='';document.getElementById('editPages').value='';document.getElementById('editImage').value='';document.getElementById('statusButtons').classList.remove('hidden');openSheet('detailsSheet');}
 // ===== DETAILS =====
 function showBookDetails(bookData,isNew=false){
@@ -616,7 +699,7 @@ function showBookDetails(bookData,isNew=false){
     isNew=isNew&&!existing;
     tempSelectedBook=isNew?bookData:null;toggleEditMode(false);
     const sa=escapeHtml(lb.author||'Невідомий');
-    let h=`<div class="detail-cover flex gap-4 mb-5 fade-in"><img loading="lazy" decoding="async" src="${bookCover(lb.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${escapeHtml(lb.title||'Без назви')}</h3><button onclick="window.searchAuthorBooks(this.textContent.trim())" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal||300} стор.</span>${!isNew&&!lb.activeReread?`<select aria-label="Статус книги" onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
+    let h=`<div class="detail-cover flex gap-4 mb-5 fade-in"><img loading="lazy" decoding="async" src="${bookCover(lb.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${escapeHtml(lb.title||'Без назви')}</h3><button onclick="openBookSearch(this.textContent.trim())" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal||300} стор.</span>${!isNew&&!lb.activeReread?`<select aria-label="Статус книги" onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
     if(!isNew){
         h+=renderReadingHistory(lb);
         // Progress slider

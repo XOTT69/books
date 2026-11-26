@@ -258,3 +258,15 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
     .history-entry { flex-direction: column; }
     .history-dates { display: grid; grid-template-columns: minmax(0, 1fr); }
 }
+
+.catalog-search-field { position: relative; }
+.catalog-search-field .search-box { padding-inline-end: 3rem; }
+#clearBookSearch {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    width: 44px;
+    color: var(--muted);
+    border-radius: .65rem;
+}
+#clearBookSearch:hover { color: var(--ink); }
