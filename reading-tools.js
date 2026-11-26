@@ -583,7 +583,7 @@ function indexReadingHistories(books){
     const groups=groupReadingRecords(books);
     repeatedReadingRecords=groups.filter(group=>group.length>1);
     readingWorks=groups.map(group=>{
-        const history=readingHistoryForDisplay(group);
+        const history={...readingHistoryForDisplay(group),records:group};
         for(const book of group)readingHistories.set(book.id,history);
         const representative=group.find(isCompleted)||group[0];
         return {...representative,...history};
@@ -596,6 +596,30 @@ function readingHistoryForCard(book){
 
 function readingDatesForCard(book){
     return completionDates(readingHistoryForCard(book));
+}
+
+function finishedReadingCards(books,year=''){
+    const groups=new Map();
+    for(const book of books){
+        const history=readingHistoryForCard(book);
+        if(!groups.has(history))groups.set(history,[]);
+        groups.get(history).push(book);
+    }
+    return [...groups].flatMap(([history,records])=>{
+        const dates=completionDates(history).filter(date=>!year||date.startsWith(year));
+        if(!dates.length)return year?[]:[{book:records[0],date:''}];
+        if((history.recordCount||1)<=1)return [{book:records[0],date:dates.at(-1)}];
+
+        // Prefer the record whose own completion matches the card before falling back to a saved reread.
+        const primaryByDate=new Map(records.filter(book=>dateValue(book.dateFinished)).map(book=>[book.dateFinished,book]));
+        const reserved=new Set(primaryByDate.values());
+        return dates.map(date=>{
+            const book=primaryByDate.get(date)||records.find(record=>!reserved.has(record)&&completionDates(record).includes(date))||
+                records.find(record=>completionDates(record).includes(date))||records[0];
+            reserved.add(book);
+            return {book,date,sessionLabel:date===history.dateFinished?'Перше читання':'Перечитування'};
+        });
+    });
 }
 
 function previewDuplicateBooks(){

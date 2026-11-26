@@ -53,15 +53,39 @@ function progressPercent(book){
 function libraryBook(id){
     return myLibrary.find(book=>book.id===id);
 }
-function showLibraryBook(id){
-    showBookDetails(libraryBook(id));
+function showLibraryBook(id,completionDate=''){
+    showBookDetails(libraryBook(id),false,completionDate);
 }
-function bookCover(value){
+function bookCoverUrl(value){
     try{
         const url=new URL(value);
-        if(url.protocol==='https:'||url.protocol==='http:')return escapeHtml(url.href);
+        if(url.protocol==='https:'||url.protocol==='http:')return url.href;
     }catch{}
-    return PLACEHOLDER_IMG;
+    return '';
+}
+function bookCover(value){
+    return escapeHtml(bookCoverUrl(value)||PLACEHOLDER_IMG);
+}
+function libraryCoverAttributes(book){
+    const linked=readingHistoryForCard(book).records||[];
+    const title=bookIdentity(book.title).replace(/ё/g,'е');
+    const author=bookIdentity(book.author).replace(/ё/g,'е');
+    const verified=bookIsbns(book).some(isbn=>isbn==='9785179824992'||isbn==='9785041039349')||
+        (author==='натальяжильцова'&&['ведьматемногопламени','академиячерногодраконаведьматемногопламени'].includes(title));
+    const alternatives=[
+        book.image,...linked.map(record=>record.image),
+        verified?'https://books.google.com/books/content?id=hghZDwAAQBAJ&printsec=frontcover&img=1&zoom=1':''
+    ];
+    const sources=[...new Set(alternatives.map(bookCoverUrl).filter(Boolean))];
+    const src=escapeHtml(sources.shift()||PLACEHOLDER_IMG);
+    return `src="${src}" data-cover-alternatives="${escapeHtml(JSON.stringify(sources))}" onerror="useNextLibraryCover(this)"`;
+}
+function useNextLibraryCover(img){
+    const sources=JSON.parse(img.dataset.coverAlternatives);
+    const next=sources.shift();
+    img.dataset.coverAlternatives=JSON.stringify(sources);
+    if(!next)img.onerror=null;
+    img.src=next||PLACEHOLDER_IMG;
 }
 function bookIdentity(value){
     return normalizeReadingSearch(value).replace(/[^\p{L}\p{N}]/gu,'');
@@ -72,7 +96,7 @@ function bookIsbns(book){
 function bookWorkKey(book){
     const title=bookIdentity(normalizeReadingSearch(book.title).replace(/\s*[:—-]?\s*(?:\[роман\]|\(роман\))$/u,''));
     const author=bookIdentity(book.author);
-    return title&&author&&author!=='невідомий'?JSON.stringify([title,author]):'';
+    return title&&author&&author!=='невідомий'?JSON.stringify([title.replace(/ё/g,'е'),author.replace(/ё/g,'е')]):'';
 }
 function libraryMatch(candidate,books=myLibrary){
     const exact=books.find(book=>(candidate.id&&book.id===candidate.id)||(book.googleId&&book.googleId===candidate.googleId));
@@ -884,17 +908,20 @@ clearSearchButton.addEventListener('click',clearBookSearch);
 
 function openManualForm(){tempSelectedBook='manual';toggleEditMode(true);document.getElementById('editTitle').value='';document.getElementById('editAuthor').value='';document.getElementById('editPages').value='';document.getElementById('editImage').value='';document.getElementById('statusButtons').classList.remove('hidden');openSheet('detailsSheet');}
 // ===== DETAILS =====
-function showBookDetails(bookData,isNew=false){
+function showBookDetails(bookData,isNew=false,completionDate){
     if(!bookData||!bookData.title)return;
     const existing=isNew?libraryMatch(bookData):null;
     const lb=existing||bookData;
     isNew=isNew&&!existing;
+    const details=document.getElementById('detailsContent');
+    const updateOpenCard=document.getElementById('detailsSheet').classList.contains('open');
+    const showDate=dateValue(completionDate??(updateOpenCard&&details.dataset.book===lb.id?details.dataset.completion:''));
     tempSelectedBook=isNew?bookData:null;toggleEditMode(false);
     const sa=escapeHtml(lb.author||'Невідомий');
-    let h=`<div class="detail-cover flex gap-4 mb-5 fade-in"><img loading="lazy" decoding="async" src="${bookCover(lb.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${escapeHtml(lb.title||'Без назви')}</h3><button onclick="openBookSearch(this.textContent.trim())" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal||300} стор.</span>${!isNew&&!lb.activeReread?`<select aria-label="Статус книги" onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
+    let h=`<div class="detail-cover flex gap-4 mb-5 fade-in"><img loading="lazy" decoding="async" ${isNew?`src="${bookCover(lb.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"`:libraryCoverAttributes(lb)} alt="" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${escapeHtml(lb.title||'Без назви')}</h3><button onclick="openBookSearch(this.textContent.trim())" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal||300} стор.</span>${!isNew&&!lb.activeReread?`<select aria-label="Статус книги" onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
     if(!isNew){
         h+=renderBookLabels(lb);
-        h+=renderReadingHistory(lb);
+        h+=renderReadingHistory(lb,showDate);
         // Progress slider
         if(lb.status==='reading'){
             h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-muted mb-2">📊 Прогрес: <span id="sliderVal">${currentPages(lb)}</span> / ${lb.pagesTotal||300} стор.</p><input type="range" min="0" max="${lb.pagesTotal||300}" value="${currentPages(lb)}" class="progress-slider" oninput="document.getElementById('sliderVal').innerText=this.value" onchange="updateProgress('${lb.id}',this.value)"></div>`;
@@ -907,12 +934,12 @@ function showBookDetails(bookData,isNew=false){
         h+=`<div class="mb-5 p-4 card-elevated"><div class="flex justify-between items-center mb-2"><p class="text-[10px] font-bold uppercase text-muted">Нотатки</p><button onclick="saveReview('${lb.id}',this)" class="text-primary-600 bg-primary-50 px-3 py-1 rounded-lg text-[10px] font-bold active:scale-95">Зберегти</button></div><textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[60px]" placeholder="Враження...">${escapeHtml(lb.review||'')}</textarea></div>`;
     }
     h+=`<div class="desc-scroll mb-4"><p class="text-[10px] font-bold uppercase text-muted mb-1">Анотація</p><p class="text-sm text-muted leading-relaxed">${escapeHtml(lb.description||'Немає.')}</p></div>`;
-    if(!isNew)h+=`<button onclick="moveBookToTrash(document.getElementById('detailsContent').dataset.book)" class="w-full py-3 text-red-500 bg-red-50 rounded-xl font-bold text-sm active:scale-95 mb-4">До кошика</button>`;
-    const details=document.getElementById('detailsContent');
-    const updateOpenCard=document.getElementById('detailsSheet').classList.contains('open');
+    if(!isNew&&(!showDate||showDate===dateValue(lb.dateFinished)||readingHistoryForCard(lb).recordCount<=1))h+=`<button onclick="moveBookToTrash(document.getElementById('detailsContent').dataset.book)" class="w-full py-3 text-red-500 bg-red-50 rounded-xl font-bold text-sm active:scale-95 mb-4">До кошика</button>`;
+    const sameRecord=details.dataset.book===lb.id;
     details.dataset.book=lb.id||'';
+    details.dataset.completion=showDate;
     details.innerHTML=h;
-    if(!updateOpenCard)details.scrollTop=0;
+    if(!updateOpenCard||!sameRecord)details.scrollTop=0;
     document.getElementById('statusButtons').classList.toggle('hidden',!isNew);
     openSheet('detailsSheet');
 }
@@ -926,37 +953,39 @@ function firstReadingDates(book){
     return started===finished?started:`${started} — ${finished}`;
 }
 
-function renderTimelineEntry(label,{started,finished,startedDates}){
+function renderTimelineEntry(label,{started,finished,startedDates},selectedDate){
+    const attrs=finished&&finished===selectedDate?' aria-current="date"':'';
     if(startedDates?.length>1){
         const starts=startedDates.map(date=>date===finished?'у день завершення':formatReadingDate(date));
-        return `<div class="history-entry"><strong>${label}</strong><span class="history-entry-dates">
+        return `<div class="history-entry"${attrs}><strong>${label}</strong><span class="history-entry-dates">
             <span>Завершено ${formatReadingDate(finished)}</span>
             <small>Початок у різних записах — ${starts.join(', ')}</small>
         </span></div>`;
     }
     const date=firstReadingDates({dateStarted:started,dateFinished:finished});
-    return `<div class="history-entry"><strong>${label}</strong><span>${date}</span></div>`;
+    return `<div class="history-entry"${attrs}><strong>${label}</strong><span>${date}</span></div>`;
 }
 
-function renderReadingTimeline(book){
+function renderReadingTimeline(book,selectedDate){
     const history=readingHistoryForCard(book);
     const entries=rereads(history).slice().sort((a,b)=>b.finished.localeCompare(a.finished));
-    return `${entries.map(entry=>renderTimelineEntry('Перечитування',entry)).join('')}
+    return `${entries.map(entry=>renderTimelineEntry('Перечитування',entry,selectedDate)).join('')}
         ${(history.otherStarts||[]).map(date=>`<div class="history-entry"><strong>Початок читання</strong><span>${formatReadingDate(date)}</span></div>`).join('')}
-        ${renderTimelineEntry('Перше читання',{started:history.dateStarted,finished:history.dateFinished,startedDates:history.startedDates})}`;
+        ${renderTimelineEntry('Перше читання',{started:history.dateStarted,finished:history.dateFinished,startedDates:history.startedDates},selectedDate)}`;
 }
 
 function refreshOpenReadingTimeline(){
     if(!document.getElementById('detailsSheet').classList.contains('open'))return;
     const book=libraryBook(document.getElementById('detailsContent').dataset.book);
     const timeline=document.getElementById('readingTimeline');
-    if(book&&timeline)timeline.innerHTML=renderReadingTimeline(book);
+    if(book&&timeline)timeline.innerHTML=renderReadingTimeline(book,document.getElementById('detailsContent').dataset.completion);
 }
 
-function renderReadingHistory(book){
+function renderReadingHistory(book,selectedDate){
     const id=escapeHtml(book.id);
     const history=readingHistoryForCard(book);
     const completed=isCompleted(book)||Boolean(book.dateFinished);
+    const related=history.records||[];
     const dateInput=(label,field)=>`<label class="history-date">${label}<input type="date" value="${dateValue(book[field])}"
         onchange="saveManualDate('${id}','${field}',this)"></label>`;
     const actions=book.activeReread
@@ -965,7 +994,12 @@ function renderReadingHistory(book){
     return `<section class="reading-history card-elevated">
         <h4>Історія читання</h4>
         ${book.activeReread?`<div class="history-entry"><strong>Перечитування триває</strong><span>${formatReadingDate(book.activeReread.started)}</span></div>`:''}
-        <div id="readingTimeline">${renderReadingTimeline(book)}</div>
+        <div id="readingTimeline">${renderReadingTimeline(book,selectedDate)}</div>
+        ${related.length>1?`<details class="history-edit"><summary>Збережені записи (${related.length})</summary>
+            <div class="tool-list">${related.map(record=>`<button type="button" class="tool-action" data-book="${escapeHtml(record.id)}"
+                ${record.id===book.id?'aria-current="true" disabled':''} onclick="showLibraryBook(this.dataset.book)">
+                ${escapeHtml(firstReadingDates(record))}${record.id===book.id?' · Відкритий запис':''}</button>`).join('')}</div>
+        </details>`:''}
         <details class="history-edit"><summary>${history.recordCount>1?'Редагувати дати цього запису':'Редагувати дати'}</summary><div class="history-dates">
             ${dateInput('Початок','dateStarted')}${dateInput('Завершення','dateFinished')}
         </div></details>
@@ -1312,22 +1346,23 @@ function setLibraryTab(tab){
     if(changed)animateLibraryChange();
 }
 
-function renderBookCard(book){
+function renderBookCard(book,completion){
     const id=escapeHtml(book.id);
     const title=escapeHtml(book.title);
     const author=escapeHtml(book.author);
     const reading=currentLibraryTab==='reading';
     const planned=currentLibraryTab==='planned';
     const pages=Number(book.pagesTotal)||300;
-    const completedDate=readingDatesForCard(book).sort().at(-1);
+    const completedDate=completion?.date||'';
     const count=rereads(readingHistoryForCard(book)).length;
     const progress=reading?`<div class="book-progress">
         <progress max="100" value="${progressPercent(book)}" aria-label="Прогрес читання"></progress>
         <span>Сторінка ${currentPages(book)} з ${pages}</span>
     </div>`:'';
-    const completion=currentLibraryTab==='finished'?`<div class="book-meta">
+    const recordActions=!completion?.sessionLabel||completedDate===dateValue(book.dateFinished);
+    const completionMarkup=currentLibraryTab==='finished'?`<div class="book-meta">
         ${completedDate?`<span>${formatReadingDate(completedDate)}</span>`:''}
-        ${count?`<span>Перечитувань: ${count}</span>`:''}
+        ${completion?.sessionLabel?`<span>${completion.sessionLabel}</span>`:count?`<span>Перечитувань: ${count}</span>`:''}
         ${book.rating?`<span class="book-rating">★ ${Number(book.rating)||0}</span>`:''}
     </div>`:'';
     const actions=planned?`<button class="secondary-button" onclick="changeStatus('${id}','reading',event)">Почати читати</button>`
@@ -1337,13 +1372,13 @@ function renderBookCard(book){
             <button class="secondary-button" onclick="document.getElementById('epubFile_${id}').click()">EPUB</button>
             <button class="secondary-button" onclick="changeStatus('${id}','finished',event)">Завершити</button>
         </div>`:'';
-    return `<article data-id="${id}" class="book-card card ${viewMode==='grid'?'book-card-grid':''}">
-        <div class="book-card-tools">${canReorderBooks()?'<span class="book-reorder-handle" title="Перетягнути, щоб змінити порядок" aria-hidden="true">⠿</span>':''}<button type="button" class="book-actions-trigger" aria-label="Дії: ${title}" aria-haspopup="dialog">⋯</button></div>
-        <button type="button" class="book-card-main" aria-label="Відкрити: ${title}">
-            <img loading="lazy" decoding="async" src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
+    return `<article data-id="${id}"${completedDate?` data-finished="${completedDate}"`: ''} class="book-card card ${viewMode==='grid'?'book-card-grid':''}">
+        <div class="book-card-tools">${canReorderBooks()?'<span class="book-reorder-handle" title="Перетягнути, щоб змінити порядок" aria-hidden="true">⠿</span>':''}${recordActions?`<button type="button" class="book-actions-trigger" aria-label="Дії: ${title}" aria-haspopup="dialog">⋯</button>`:''}</div>
+        <button type="button" class="book-card-main" aria-label="Відкрити: ${title}${completion?.sessionLabel?', '+formatReadingDate(completedDate):''}">
+            <img loading="lazy" decoding="async" ${libraryCoverAttributes(book)} alt="">
             <span class="book-card-info"><strong>${title}</strong><span class="text-muted">${author}</span></span>
         </button>
-        ${renderBookLabels(book)}${renderReadingSearchMatch(book,libraryFilterQuery)}${progress}${completion}${actions}
+        ${renderBookLabels(book)}${renderReadingSearchMatch(book,libraryFilterQuery)}${progress}${completionMarkup}${actions}
     </article>`;
 }
 
@@ -1373,7 +1408,7 @@ function render(){
     const reading=matching.filter(book=>book.status==='reading');
     const planned=matching.filter(book=>book.status==='planned');
     const finished=matching.filter(isCompleted);
-    for(const [tab,label,books] of [['reading','Читаю',reading],['planned','Заплановано',planned],['finished','Прочитано',finished]]){
+    for(const [tab,label,books] of [['reading','Читаю',reading],['planned','Заплановано',planned],['finished','Прочитано',finishedReadingCards(finished)]]){
         document.getElementById('tab_'+tab).innerHTML=`${label} <span>${books.length}</span>`;
     }
     const container=document.getElementById('myBooksContainer');
@@ -1389,10 +1424,10 @@ function render(){
     }
     yearSelect.value=finishedFilters.year;
     const filtered=hasOrganizationFilters()||(!filters.hidden&&(finishedFilters.year||finishedFilters.rating||finishedFilters.reread));
-    const list=currentLibraryTab==='reading'?reading:currentLibraryTab==='planned'?planned:finished.filter(book=>
-        (!finishedFilters.year||readingDatesForCard(book).some(date=>date.startsWith(finishedFilters.year)))&&
-        (!finishedFilters.rating||Number(book.rating)===Number(finishedFilters.rating))&&
-        (!finishedFilters.reread||rereads(readingHistoryForCard(book)).length>0));
+    const list=currentLibraryTab==='reading'?reading:currentLibraryTab==='planned'?planned:
+        finishedReadingCards(finished.filter(book=>
+            (!finishedFilters.rating||Number(book.rating)===Number(finishedFilters.rating))&&
+            (!finishedFilters.reread||rereads(readingHistoryForCard(book)).length>0)),finishedFilters.year);
     if(!list.length){
         const tips={reading:'Додайте книгу, щоб почати читати.',planned:'Тут будуть книги, які ви хочете прочитати.',finished:'Тут будуть завершені книги.'};
         updateBookCards(container,`<div class="library-empty"><h2>${q||filtered?'Книг не знайдено':'Поки порожньо'}</h2>
@@ -1401,19 +1436,18 @@ function render(){
     }
     const classes=`book-collection ${viewMode==='grid'?'book-grid':''}`;
     if(currentLibraryTab==='finished'){
-        const date=book=>readingDatesForCard(book).filter(value=>!finishedFilters.year||value.startsWith(finishedFilters.year)).sort().at(-1)||'';
-        list.sort((a,b)=>date(b).localeCompare(date(a)));
+        list.sort((a,b)=>b.date.localeCompare(a.date));
         const groups=new Map();
-        for(const book of list){
-            const year=date(book).slice(0,4)||'Без дати';
+        for(const completion of list){
+            const year=completion.date.slice(0,4)||'Без дати';
             if(!groups.has(year))groups.set(year,[]);
-            groups.get(year).push(book);
+            groups.get(year).push(completion);
         }
-        updateBookCards(container,[...groups].map(([year,books])=>`<h2 class="library-year">${year}</h2><div class="${classes}">${books.map(renderBookCard).join('')}</div>`).join(''));
+        updateBookCards(container,[...groups].map(([year,entries])=>`<h2 class="library-year">${year}</h2><div class="${classes}">${entries.map(entry=>renderBookCard(entry.book,entry)).join('')}</div>`).join(''));
         return;
     }
     list.sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-    if(!updateBookCards(container,`<div class="${classes} ${canReorderBooks()?'sortable-list':''}">${list.map(renderBookCard).join('')}</div>`))return;
+    if(!updateBookCards(container,`<div class="${classes} ${canReorderBooks()?'sortable-list':''}">${list.map(book=>renderBookCard(book)).join('')}</div>`))return;
     const sortable=container.querySelector('.sortable-list');
     if(sortable&&window.Sortable)new Sortable(sortable,{
         delay:300,delayOnTouchOnly:true,animation:reducedMotion.matches?0:150,ghostClass:'sortable-ghost',

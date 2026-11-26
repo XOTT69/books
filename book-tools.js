@@ -208,7 +208,7 @@ function enableBookLongPress(container){
         if(!event.isPrimary||event.button!==0||event.pointerType==='mouse')return;
         const button=event.target.closest('.book-card-main');
         const card=button?.closest('[data-id]');
-        if(!card)return;
+        if(!card?.querySelector('.book-actions-trigger'))return;
         const timer=setTimeout(()=>{
             if(!card.isConnected||document.body.classList.contains('modal-open'))return;
             openedButton=button;
@@ -224,11 +224,12 @@ function enableBookLongPress(container){
     for(const type of ['pointerup','pointercancel','pointerleave'])container.addEventListener(type,cancelHold,{passive:true});
     container.addEventListener('contextmenu',event=>{
         const button=event.target.closest('.book-card-main');
-        if(!button)return;
+        const card=button?.closest('[data-id]');
+        if(!card?.querySelector('.book-actions-trigger'))return;
         event.preventDefault();
         if(event.pointerType==='mouse'||(!event.pointerType&&matchMedia('(hover:hover)').matches)){
             cancelHold();
-            openBookActions(button.closest('[data-id]').dataset.id);
+            openBookActions(card.dataset.id);
         }
     });
     container.addEventListener('click',event=>{
@@ -239,9 +240,9 @@ function enableBookLongPress(container){
             openedButton=null;
             return;
         }
-        const id=button.closest('[data-id]').dataset.id;
+        const {id,finished}=button.closest('[data-id]').dataset;
         if(button.matches('.book-actions-trigger'))openBookActions(id);
-        else showLibraryBook(id);
+        else showLibraryBook(id,finished);
     });
 }
 
