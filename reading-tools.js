@@ -2,7 +2,9 @@
 const monthFormatter=new Intl.DateTimeFormat('uk-UA',{month:'long',timeZone:'UTC'});
 let calendarMonth;
 let pendingImport;
-let pendingDuplicates;
+let readingHistories=new Map();
+let readingWorks=[];
+let repeatedReadingRecords=[];
 
 function normalizeReadingSearch(value){
     return typeof value==='string'?value.normalize('NFKC').toLocaleLowerCase('uk').replace(/['’ʼ]/g,'’').replace(/\s+/g,' ').trim():'';
@@ -36,7 +38,7 @@ function validMonth(value){
 }
 
 function calendarEvents(){
-    return myLibrary.flatMap(book=>[
+    return readingWorks.flatMap(book=>[
         {book,date:dateValue(book.dateFinished),label:'Перше читання'},
         ...rereads(book).map(entry=>({book,date:entry.finished,label:'Перечитування'}))
     ]).filter(entry=>entry.date).sort((a,b)=>b.date.localeCompare(a.date));
@@ -90,7 +92,8 @@ function refreshReadingTools(){
         return true;
     }
     if(libraryToolsView.mode==='duplicates'){
-        document.getElementById('libraryToolsTitle').textContent='Об’єднати дублікати';
+        document.getElementById('libraryToolsTitle').textContent='Повторні записи';
+        previewDuplicateBooks();
         return true;
     }
     if(libraryToolsView.mode==='import'){
@@ -530,64 +533,68 @@ async function commitLibraryImport(form){
     }
 }
 
-// ===== DUPLICATE BOOKS =====
-function previewDuplicateBooks(){
-    const groups=groupBookRecords(myLibrary).filter(group=>group.length>1).map(group=>group.slice().sort((a,b)=>
-        Number(localEpubIds.has(b.id))-Number(localEpubIds.has(a.id))||
-        Number(Boolean(b.activeReread))-Number(Boolean(a.activeReread))||
-        Number(Boolean(b.lastCfi))-Number(Boolean(a.lastCfi))||a.id.localeCompare(b.id)));
-    pendingDuplicates={user:currentUser,groups};
-    document.getElementById('libraryToolsContent').innerHTML=groups.length?
-        `<form class="import-plan duplicate-plan" data-form="duplicates">
-            <p class="text-muted">Перевірте збіги. Дати, нотатки й цитати об’єднаються в одній картці. Початкові дублікати можна відновити з кошика.</p>
-            ${groups.map(([primary,...others],index)=>{
-                const merged=combinedReadingHistory([primary,...others]);
-                return `<fieldset><legend>${escapeHtml(primary.title)}</legend>
-                    <label class="duplicate-choice"><input type="checkbox" name="duplicate" value="${index}" checked> Об’єднати ${others.length+1} записи</label>
-                    <details><summary>Переглянути записи й дати</summary><ul>${[primary,...others].map(book=>
-                        `<li>${escapeHtml(book.title)} · ${escapeHtml(book.author||'Автор невідомий')} · ${escapeHtml(importSummary('history',book))}</li>`).join('')}</ul>
-                        <p><strong>Об’єднана історія</strong> ${escapeHtml(importSummary('history',merged))}</p>
-                    </details></fieldset>`;
-            }).join('')}
-            <p class="text-muted" role="status"></p><button type="submit" class="primary-button">Об’єднати вибрані</button>
-        </form>`:'<p class="text-muted">У бібліотеці немає записів зі збігом за ідентифікаторами або за назвою й автором.</p>';
+// Reading history joins dated sessions for display without changing any source record.
+function groupReadingRecords(books){
+    const byKey=new Map();
+    const groups=new Set();
+    for(const book of books){
+        const keys=['record:'+book.id,...bookIsbns(book).map(isbn=>'isbn:'+isbn)];
+        if(book.mergedInto)keys.push('record:'+book.mergedInto);
+        if(book.googleId)keys.push('catalog:'+book.googleId);
+        const work=bookWorkKey(book);
+        if(work)keys.push('work:'+work);
+        const matches=[...new Set(keys.map(key=>byKey.get(key)).filter(Boolean))];
+        const group=matches.shift()||{books:[],keys:new Set()};
+        group.books.push(book);
+        for(const match of matches){
+            group.books.push(...match.books);
+            for(const key of match.keys){group.keys.add(key);byKey.set(key,group);}
+            groups.delete(match);
+        }
+        for(const key of keys){group.keys.add(key);byKey.set(key,group);}
+        groups.add(group);
+    }
+    return [...groups].map(group=>group.books);
 }
 
-async function mergeDuplicateBooks(form){
-    const plan=pendingDuplicates;
-    if(!plan||plan.running||currentUser!==plan.user)return;
-    const groups=new FormData(form).getAll('duplicate').map(value=>plan.groups[Number(value)]).filter(Boolean);
-    const status=form.querySelector('[role=status]');
-    if(!groups.length){status.textContent='Виберіть записи для об’єднання.';return;}
-    const parent=db.collection('users').doc(plan.user.uid).collection('books');
-    const button=form.querySelector('[type=submit]');
-    plan.running=true;
-    button.disabled=true;
-    let merged=0,changed=0,failed=0;
-    for(const group of groups){
-        if(currentUser!==plan.user)break;
-        const refs=group.map(book=>parent.doc(book.id));
-        try{
-            const success=await db.runTransaction(async transaction=>{
-                const snapshots=await Promise.all(refs.map(ref=>transaction.get(ref)));
-                if(snapshots.some((snapshot,index)=>!snapshot.exists||!dataEquals({...snapshot.data(),id:group[index].id},group[index])))return false;
-                const [primary,...others]=group;
-                const data=combinedBookData(primary,others);
-                const changes=Object.fromEntries(Object.entries(data).filter(([key,value])=>key!=='id'&&!dataEquals(primary[key],value)));
-                if(Object.keys(changes).length)transaction.update(refs[0],changes);
-                const deletedAt=Date.now();
-                for(const ref of refs.slice(1))transaction.update(ref,{deletedAt,mergedInto:primary.id});
-                return true;
-            });
-            if(success)merged++;
-            else changed++;
-        }catch(error){
-            console.warn(error);
-            failed++;
-        }
-    }
-    plan.running=false;
-    status.textContent=`Об’єднано наборів записів: ${merged}.${changed?' Змінені записи пропущено. Відкрийте перегляд ще раз.':''}${failed?' Частину наборів не вдалося зберегти. Відкрийте перегляд і повторіть.':''}`;
+function indexReadingHistories(books){
+    readingHistories=new Map();
+    const groups=groupReadingRecords(books);
+    repeatedReadingRecords=groups.filter(group=>group.length>1);
+    readingWorks=groups.map(group=>{
+        const history=combinedReadingHistory(group);
+        const datesWithStart=new Set([history.dateStarted,...rereads(history).map(entry=>entry.started)]);
+        const otherStarts=[...new Set(group.filter(book=>!dateValue(book.dateFinished))
+            .map(book=>dateValue(book.dateStarted)).filter(date=>date&&!datesWithStart.has(date)))].sort();
+        const display={...history,otherStarts,recordCount:group.length};
+        for(const book of group)readingHistories.set(book.id,display);
+        const representative=group.find(isCompleted)||group[0];
+        return {...representative,...history};
+    });
+}
+
+function readingHistoryForCard(book){
+    return readingHistories.get(book.id)||book;
+}
+
+function readingDatesForCard(book){
+    return completionDates(readingHistoryForCard(book));
+}
+
+function previewDuplicateBooks(){
+    const groups=repeatedReadingRecords;
+    document.getElementById('libraryToolsContent').innerHTML=groups.length?
+        `<div class="import-plan duplicate-plan">
+            <p class="text-muted">Картка кожного запису показує всі дати читання цієї книжки. Нотатки й цитати зберігаються у відповідних записах.</p>
+            ${groups.map(([primary,...others])=>{
+                const history=readingHistoryForCard(primary);
+                return `<details><summary>${escapeHtml(primary.title)} · ${others.length+1} записи</summary>
+                    <p>${escapeHtml(importSummary('history',history))}</p>
+                    <div class="tool-list">${[primary,...others].map(book=>actionButton('calendar-book',
+                        escapeHtml(book.title)+' · '+escapeHtml(firstReadingDates(book)),'',book.id)).join('')}</div>
+                </details>`;
+            }).join('')}
+        </div>`:'<p class="text-muted">У бібліотеці немає записів зі збігом за ідентифікаторами або за назвою й автором.</p>';
 }
 
 // ===== PERSONAL RECOMMENDATIONS =====
@@ -686,7 +693,9 @@ function cleanRecommendationPreferences(raw){
 function resetReadingTools(){
     calendarMonth=null;
     pendingImport=null;
-    pendingDuplicates=null;
+    readingHistories=new Map();
+    readingWorks=[];
+    repeatedReadingRecords=[];
     recommendationFeed?.controller.abort();
     recommendationFeed=null;
     recommendationPager?.disconnect();

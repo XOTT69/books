@@ -66,18 +66,20 @@ function bookCover(value){
 function bookIdentity(value){
     return normalizeReadingSearch(value).replace(/[^\p{L}\p{N}]/gu,'');
 }
+function bookIsbns(book){
+    return labelNames(book.identifiers).map(canonicalIsbn).filter(Boolean);
+}
+function bookWorkKey(book){
+    const title=bookIdentity(normalizeReadingSearch(book.title).replace(/\s*[:—-]?\s*(?:\[роман\]|\(роман\))$/u,''));
+    const author=bookIdentity(book.author);
+    return title&&author&&author!=='невідомий'?JSON.stringify([title,author]):'';
+}
 function libraryMatch(candidate,books=myLibrary){
     const exact=books.find(book=>(candidate.id&&book.id===candidate.id)||(book.googleId&&book.googleId===candidate.googleId));
     if(exact)return exact;
-    const isbn=(Array.isArray(candidate.identifiers)?candidate.identifiers:[]).map(canonicalIsbn).filter(Boolean);
-    const workTitle=value=>bookIdentity(normalizeReadingSearch(value).replace(/\s*[:—-]?\s*(?:\[роман\]|\(роман\))$/u,''));
-    const title=workTitle(candidate.title);
-    const author=bookIdentity(candidate.author);
-    return books.find(book=>{
-        const own=(Array.isArray(book.identifiers)?book.identifiers:[]).map(canonicalIsbn).filter(Boolean);
-        return own.some(value=>isbn.includes(value))||
-            (title&&author&&author!=='невідомий'&&title===workTitle(book.title)&&author===bookIdentity(book.author));
-    });
+    const isbn=bookIsbns(candidate);
+    const work=bookWorkKey(candidate);
+    return books.find(book=>bookIsbns(book).some(value=>isbn.includes(value))||(work&&work===bookWorkKey(book)));
 }
 
 // ===== INIT =====
@@ -412,7 +414,7 @@ function updateViewButtons(){
 function saveGoal(v){const g=parseInt(v)||12;if(currentUser)db.collection('users').doc(currentUser.uid).set({readingGoal:g},{merge:true});localStorage.setItem('readingGoal',g);updateGoalWidget();}
 function updateGoalWidget(){
     const g=parseInt(localStorage.getItem('readingGoal'))||12,y=new Date().getFullYear();
-    const f=myLibrary.filter(book=>completionDates(book).some(date=>date.startsWith(String(y)))).length;
+    const f=readingWorks.filter(book=>completionDates(book).some(date=>date.startsWith(String(y)))).length;
     const p=Math.min(100,Math.round((f/g)*100));
     document.getElementById('goalYear').innerText=y;
     document.getElementById('goalProgress').innerText=`${f}/${g}`;
@@ -456,7 +458,7 @@ function renderQuickResume(){
 // ===== STATS =====
 async function calculateStats(){
     const year=String(new Date().getFullYear());
-    const fin=myLibrary.filter(isCompleted);
+    const fin=readingWorks.filter(isCompleted);
     const thisYear=fin.filter(book=>completionDates(book).some(date=>date.startsWith(year)));
     document.getElementById('yearStatsTitle').textContent=`Підсумки ${year} року`;
     document.getElementById('yearUniqueBooks').textContent=thisYear.length;
@@ -924,10 +926,25 @@ function firstReadingDates(book){
     return started===finished?started:`${started} — ${finished}`;
 }
 
+function renderReadingTimeline(book){
+    const history=readingHistoryForCard(book);
+    const entries=rereads(history).slice().sort((a,b)=>b.finished.localeCompare(a.finished));
+    return `${entries.map(entry=>`<div class="history-entry"><strong>Перечитування</strong><span>${entry.started?formatReadingDate(entry.started)+' — ':''}${formatReadingDate(entry.finished)}</span></div>`).join('')}
+        ${(history.otherStarts||[]).map(date=>`<div class="history-entry"><strong>Початок читання</strong><span>${formatReadingDate(date)}</span></div>`).join('')}
+        <div class="history-entry"><strong>Перше читання</strong><span>${firstReadingDates(history)}</span></div>`;
+}
+
+function refreshOpenReadingTimeline(){
+    if(!document.getElementById('detailsSheet').classList.contains('open'))return;
+    const book=libraryBook(document.getElementById('detailsContent').dataset.book);
+    const timeline=document.getElementById('readingTimeline');
+    if(book&&timeline)timeline.innerHTML=renderReadingTimeline(book);
+}
+
 function renderReadingHistory(book){
     const id=escapeHtml(book.id);
+    const history=readingHistoryForCard(book);
     const completed=isCompleted(book)||Boolean(book.dateFinished);
-    const entries=rereads(book).slice().sort((a,b)=>b.finished.localeCompare(a.finished));
     const dateInput=(label,field)=>`<label class="history-date">${label}<input type="date" value="${dateValue(book[field])}"
         onchange="saveManualDate('${id}','${field}',this)"></label>`;
     const actions=book.activeReread
@@ -936,12 +953,10 @@ function renderReadingHistory(book){
     return `<section class="reading-history card-elevated">
         <h4>Історія читання</h4>
         ${book.activeReread?`<div class="history-entry"><strong>Перечитування триває</strong><span>${formatReadingDate(book.activeReread.started)}</span></div>`:''}
-        ${entries.map(entry=>`<div class="history-entry"><strong>Перечитування</strong><span>${entry.started?formatReadingDate(entry.started)+' — ':''}${formatReadingDate(entry.finished)}</span></div>`).join('')}
-        <div class="history-entry"><strong>Перше читання</strong><span>${firstReadingDates(book)}</span>
-            <details class="history-edit"><summary>Редагувати дати</summary><div class="history-dates">
-                ${dateInput('Початок','dateStarted')}${dateInput('Завершення','dateFinished')}
-            </div></details>
-        </div>
+        <div id="readingTimeline">${renderReadingTimeline(book)}</div>
+        <details class="history-edit"><summary>${history.recordCount>1?'Редагувати дати цього запису':'Редагувати дати'}</summary><div class="history-dates">
+            ${dateInput('Початок','dateStarted')}${dateInput('Завершення','dateFinished')}
+        </div></details>
         ${completed?`<div class="history-actions">${actions}${book.activeReread?'':renderReminderEditor(book)}<details><summary>Додати минуле перечитування</summary>
             <form class="history-dates" onsubmit="savePastReread(event,'${id}')">
                 <label class="history-date">Початок<input name="started" type="date" max="${todayDate()}"></label>
@@ -1136,10 +1151,6 @@ async function saveManualDate(id,field,input){
         }
         const value=input.value||null;
         await updateBookInFirestore(id,{[field]:value});
-        if(input.isConnected){
-            const updated={...book,...libraryBook(id),[field]:value};
-            input.closest('.history-entry').querySelector(':scope > span').textContent=firstReadingDates(updated);
-        }
     }catch(error){
         input.value=dateValue(book[field]);
         showWriteError(error);
@@ -1296,8 +1307,8 @@ function renderBookCard(book){
     const reading=currentLibraryTab==='reading';
     const planned=currentLibraryTab==='planned';
     const pages=Number(book.pagesTotal)||300;
-    const completedDate=completionDates(book).sort().at(-1);
-    const count=rereads(book).length;
+    const completedDate=readingDatesForCard(book).sort().at(-1);
+    const count=rereads(readingHistoryForCard(book)).length;
     const progress=reading?`<div class="book-progress">
         <progress max="100" value="${progressPercent(book)}" aria-label="Прогрес читання"></progress>
         <span>Сторінка ${currentPages(book)} з ${pages}</span>
@@ -1367,9 +1378,9 @@ function render(){
     yearSelect.value=finishedFilters.year;
     const filtered=hasOrganizationFilters()||(!filters.hidden&&(finishedFilters.year||finishedFilters.rating||finishedFilters.reread));
     const list=currentLibraryTab==='reading'?reading:currentLibraryTab==='planned'?planned:finished.filter(book=>
-        (!finishedFilters.year||completionDates(book).some(date=>date.startsWith(finishedFilters.year)))&&
+        (!finishedFilters.year||readingDatesForCard(book).some(date=>date.startsWith(finishedFilters.year)))&&
         (!finishedFilters.rating||Number(book.rating)===Number(finishedFilters.rating))&&
-        (!finishedFilters.reread||rereads(book).length>0));
+        (!finishedFilters.reread||rereads(readingHistoryForCard(book)).length>0));
     if(!list.length){
         const tips={reading:'Додайте книгу, щоб почати читати.',planned:'Тут будуть книги, які ви хочете прочитати.',finished:'Тут будуть завершені книги.'};
         updateBookCards(container,`<div class="library-empty"><h2>${q||filtered?'Книг не знайдено':'Поки порожньо'}</h2>
@@ -1378,7 +1389,7 @@ function render(){
     }
     const classes=`book-collection ${viewMode==='grid'?'book-grid':''}`;
     if(currentLibraryTab==='finished'){
-        const date=book=>completionDates(book).filter(value=>!finishedFilters.year||value.startsWith(finishedFilters.year)).sort().at(-1)||'';
+        const date=book=>readingDatesForCard(book).filter(value=>!finishedFilters.year||value.startsWith(finishedFilters.year)).sort().at(-1)||'';
         list.sort((a,b)=>date(b).localeCompare(date(a)));
         const groups=new Map();
         for(const book of list){

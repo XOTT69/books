@@ -2,6 +2,7 @@ let allBookRecords=[];
 let trashedBooks=[];
 let shelfNames=[];
 let shelfCatalog={};
+let deviceShelfCatalog={},deviceShelfMembership={};
 let shelvesById=new Map();
 let libraryShelfOptions=[],libraryTagOptions=[];
 let unsubscribeOrganization;
@@ -17,6 +18,8 @@ function isBookTrashed(book){
 function replaceBookRecords(books){
     allBookRecords=books;
     myLibrary=books.filter(book=>!isBookTrashed(book));
+    indexReadingHistories(myLibrary);
+    refreshOpenReadingTimeline();
     trashedBooks=books.filter(isBookTrashed).sort((a,b)=>b.deletedAt-a.deletedAt);
     refreshShelfOptions();
     libraryTagOptions=uniqueLabels(myLibrary.flatMap(book=>labelNames(book.tags)));
@@ -31,6 +34,15 @@ function resetBookTools(){
     trashedBooks=[];
     shelfNames=[];
     shelfCatalog={};
+    deviceShelfCatalog={};
+    deviceShelfMembership={};
+    try{
+        if(currentUser){
+            const saved=JSON.parse(localStorage.getItem('libraryShelves_'+currentUser.uid));
+            deviceShelfCatalog=saved?.catalog||{};
+            deviceShelfMembership=saved?.membership||{};
+        }
+    }catch{}
     shelvesById=new Map();
     libraryShelfOptions=[];
     libraryTagOptions=[];
@@ -72,12 +84,30 @@ function shelfOptions(names,catalog){
 }
 
 function refreshShelfOptions(){
-    libraryShelfOptions=shelfOptions(shelfNames,shelfCatalog);
+    libraryShelfOptions=shelfOptions(shelfNames,{...shelfCatalog,...deviceShelfCatalog});
     shelvesById=new Map(libraryShelfOptions.map(shelf=>[shelf.id,shelf]));
 }
 
 function bookShelfIds(book){
-    return new Set([...labelNames(book.shelfIds),...labelNames(book.shelves).map(legacyShelfId)]);
+    const ids=new Set([...labelNames(book.shelfIds),...labelNames(book.shelves).map(legacyShelfId)]);
+    for(const [id,added] of Object.entries(deviceShelfMembership[book.id]||{})){
+        if(added)ids.add(id);
+        else ids.delete(id);
+    }
+    return ids;
+}
+
+function saveDeviceShelves(user){
+    try{
+        localStorage.setItem('libraryShelves_'+user.uid,JSON.stringify({catalog:deviceShelfCatalog,membership:deviceShelfMembership}));
+        return true;
+    }catch{return false;}
+}
+
+function refreshShelfViews(){
+    refreshShelfOptions();
+    refreshLibraryTools();
+    render();
 }
 
 function activeBookShelfNames(book){
@@ -88,7 +118,7 @@ function activeBookShelfNames(book){
 }
 
 function exportBookRecord(book){
-    if(!book.shelves&&!book.shelfIds)return book;
+    if(!book.shelves&&!book.shelfIds&&!deviceShelfMembership[book.id])return book;
     const copy={...book};
     delete copy.shelfIds;
     copy.shelves=activeBookShelfNames(book);
@@ -235,8 +265,6 @@ function openLibraryTools(mode,id,returnToSearch=false){
                     <button type="submit" class="secondary-button">Додати тег</button>
                 </form>
             </section>`;
-    }else if(mode==='duplicates'){
-        previewDuplicateBooks();
     }else if(mode==='recommendation-settings'){
         renderRecommendationSettings();
     }else if(mode==='shelves'){
@@ -362,38 +390,71 @@ function updateBookLabel(id,field,name,add){
     if(!add&&variants.length)updateBookInFirestore(id,{[field]:fieldValue.arrayRemove(...variants)}).catch(showWriteError);
 }
 
-function updateBookShelf(bookId,shelfId,add){
+async function updateBookShelf(bookId,shelfId,add){
+    const user=currentUser;
     const book=libraryBook(bookId);
-    if(!book||!shelvesById.has(shelfId))return;
+    if(!user||!book||!shelvesById.has(shelfId)||bookShelfIds(book).has(shelfId)===add)return;
+    const memberships=deviceShelfMembership[bookId]||={};
+    memberships[shelfId]=add;
+    const savedLocally=saveDeviceShelves(user);
+    refreshShelfViews();
+
     const fieldValue=firebase.firestore.FieldValue;
-    if(add){
-        if(!bookShelfIds(book).has(shelfId))updateBookInFirestore(bookId,{shelfIds:fieldValue.arrayUnion(shelfId)}).catch(showWriteError);
-        return;
-    }
     const legacyNames=labelNames(book.shelves).filter(name=>legacyShelfId(name)===shelfId);
-    const updates={shelfIds:fieldValue.arrayRemove(shelfId)};
-    if(legacyNames.length)updates.shelves=fieldValue.arrayRemove(...legacyNames);
-    updateBookInFirestore(bookId,updates).catch(showWriteError);
+    const updates={shelfIds:add?fieldValue.arrayUnion(shelfId):fieldValue.arrayRemove(shelfId)};
+    if(!add&&legacyNames.length)updates.shelves=fieldValue.arrayRemove(...legacyNames);
+    const onlyOnDevice=Object.hasOwn(deviceShelfCatalog,shelfId)&&!Object.hasOwn(shelfCatalog,shelfId);
+    if(onlyOnDevice&&savedLocally)return;
+    try{
+        await updateBookInFirestore(bookId,updates);
+        if(currentUser===user&&memberships[shelfId]===add){
+            delete memberships[shelfId];
+            if(!Object.keys(memberships).length)delete deviceShelfMembership[bookId];
+            saveDeviceShelves(user);
+        }
+    }catch(error){
+        if(currentUser===user&&!savedLocally)showWriteError(error);
+    }
 }
 
-function createShelf(name,bookId){
+async function createShelf(name,bookId){
+    const user=currentUser;
+    if(!user||(bookId&&!libraryBook(bookId)))return;
     const existing=libraryShelfOptions.find(shelf=>labelKey(shelf.name)===labelKey(name));
     if(existing){
-        if(bookId)updateBookShelf(bookId,existing.id,true);
+        if(bookId)await updateBookShelf(bookId,existing.id,true);
         return;
     }
-    const user=db.collection('users').doc(currentUser.uid);
+    const ref=db.collection('users').doc(user.uid);
     const id=crypto.randomUUID();
-    const metadata={shelfCatalog:{[id]:{name}}};
-    if(!bookId){
-        user.set(metadata,{merge:true}).catch(showWriteError);
-        return;
+    const entry={name};
+    const metadata={shelfCatalog:{[id]:entry}};
+    deviceShelfCatalog[id]=entry;
+    if(bookId)(deviceShelfMembership[bookId]||={})[id]=true;
+    const savedLocally=saveDeviceShelves(user);
+    refreshShelfViews();
+    try{
+        if(bookId){
+            const batch=db.batch();
+            batch.set(ref,metadata,{merge:true});
+            batch.update(ref.collection('books').doc(bookId),{shelfIds:firebase.firestore.FieldValue.arrayUnion(id)});
+            await batch.commit();
+        }else await ref.set(metadata,{merge:true});
+        if(currentUser!==user)return;
+        if(deviceShelfCatalog[id]===entry){
+            shelfCatalog={...shelfCatalog,[id]:entry};
+            delete deviceShelfCatalog[id];
+        }
+        const memberships=deviceShelfMembership[bookId];
+        if(memberships?.[id]===true){
+            delete memberships[id];
+            if(!Object.keys(memberships).length)delete deviceShelfMembership[bookId];
+        }
+        saveDeviceShelves(user);
+        refreshShelfViews();
+    }catch(error){
+        if(currentUser===user&&!savedLocally)showWriteError(error);
     }
-    if(!libraryBook(bookId))return;
-    const batch=db.batch();
-    batch.set(user,metadata,{merge:true});
-    batch.update(user.collection('books').doc(bookId),{shelfIds:firebase.firestore.FieldValue.arrayUnion(id)});
-    batch.commit().catch(showWriteError);
 }
 
 async function saveShelfChange(form,name){
@@ -403,26 +464,51 @@ async function saveShelfChange(form,name){
     const ref=db.collection('users').doc(user.uid);
     const button=form.querySelector('[type=submit]');
     button.disabled=true;
+    const shelf=shelvesById.get(view.id);
+    if(!shelf){openLibraryShelves();return;}
+    if(!removing&&libraryShelfOptions.some(entry=>entry.id!==shelf.id&&labelKey(entry.name)===labelKey(name))){
+        form.elements.label.setCustomValidity('Полиця з такою назвою вже є.');
+        form.elements.label.reportValidity();
+        button.disabled=false;
+        return;
+    }
+    const change=removing?{name:shelf.name,deleted:true}:{name};
+    const onlyOnDevice=Object.hasOwn(deviceShelfCatalog,shelf.id)&&!Object.hasOwn(shelfCatalog,shelf.id);
+    const saveOnDevice=()=>{
+        deviceShelfCatalog[shelf.id]=change;
+        return saveDeviceShelves(user);
+    };
     try{
-        const result=await db.runTransaction(async transaction=>{
-            const profile=(await transaction.get(ref)).data()||{};
-            const options=shelfOptions(labelNames(profile.shelfNames),profile.shelfCatalog||{});
-            const shelf=options.find(entry=>entry.id===view.id);
-            if(!shelf)return;
-            if(!removing&&options.some(entry=>entry.id!==shelf.id&&labelKey(entry.name)===labelKey(name)))return 'duplicate';
-            const change=removing?{name:shelf.name,deleted:true}:{name};
-            transaction.set(ref,{shelfCatalog:{[shelf.id]:change}},{merge:true});
-        });
-        if(currentUser!==user||libraryToolsView!==view)return;
-        if(result==='duplicate'){
-            form.elements.label.setCustomValidity('Полиця з такою назвою вже є.');
-            form.elements.label.reportValidity();
+        if(onlyOnDevice){
+            if(!saveOnDevice())throw new Error('Device shelf storage unavailable');
         }else{
-            openLibraryShelves();
+            const result=await db.runTransaction(async transaction=>{
+                const profile=(await transaction.get(ref)).data()||{};
+                const options=shelfOptions(labelNames(profile.shelfNames),{...(profile.shelfCatalog||{}),...deviceShelfCatalog});
+                if(!options.some(entry=>entry.id===shelf.id))return 'missing';
+                if(!removing&&options.some(entry=>entry.id!==shelf.id&&labelKey(entry.name)===labelKey(name)))return 'duplicate';
+                transaction.set(ref,{shelfCatalog:{[shelf.id]:change}},{merge:true});
+            });
+            if(currentUser!==user)return;
+            if(result==='duplicate'&&libraryToolsView===view){
+                form.elements.label.setCustomValidity('Полиця з такою назвою вже є.');
+                form.elements.label.reportValidity();
+                return;
+            }
+            if(result==='missing')saveOnDevice();
+            else if(!result){
+                shelfCatalog={...shelfCatalog,[shelf.id]:change};
+                delete deviceShelfCatalog[shelf.id];
+                saveDeviceShelves(user);
+            }
         }
     }catch(error){
-        if(currentUser===user)showWriteError(error);
+        if(currentUser!==user)return;
+        if(!saveOnDevice()){showWriteError(error);return;}
     }finally{button.disabled=false;}
+    if(currentUser!==user)return;
+    refreshShelfViews();
+    if(libraryToolsView===view)openLibraryShelves();
 }
 
 function enableLibraryToolsControls(){
@@ -464,7 +550,6 @@ function enableLibraryToolsControls(){
         const form=event.target;
         if(!libraryToolsView||!currentUser||!form.dataset.form)return;
         if(form.dataset.form==='import-plan'){commitLibraryImport(form);return;}
-        if(form.dataset.form==='duplicates'){mergeDuplicateBooks(form);return;}
         if(form.dataset.form==='recommendation-settings'){saveRecommendationGenres(form);return;}
         if(form.dataset.form==='delete-shelf'){saveShelfChange(form);return;}
         const name=form.elements.label.value.normalize('NFKC').trim().replace(/\s+/g,' ');
@@ -503,7 +588,7 @@ function restoreBook(id){
     if(!currentUser||!(lastTrash?.id===id||trashedBooks.some(book=>book.id===id)))return;
     const user=currentUser;
     if(lastTrash?.id===id)hideTrashUndo();
-    updateBookInFirestore(id,{deletedAt:null,mergedInto:firebase.firestore.FieldValue.delete()}).catch(error=>{
+    updateBookInFirestore(id,{deletedAt:null}).catch(error=>{
         if(currentUser===user)showWriteError(error);
     });
 }
