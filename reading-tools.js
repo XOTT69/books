@@ -709,23 +709,31 @@ function changeRecommendationLanguage(){
 function recommendationQueries(category,language){
     const genres=category==='auto'?recommendationPreferences.genres:[category];
     const languages=language?[language]:Object.keys(recommendationLanguageCodes);
-    const queries=[];
-    const add=(source,code,query,title)=>queries.push({source,language:code,query,title});
-    const maxTerms=Math.max(...genres.flatMap(name=>languages.map(code=>recommendationGenres[name][code].length)));
-    for(let index=0;index<maxTerms;index++){
-        for(const name of genres){
-            const genre=recommendationGenres[name];
-            for(const code of languages){
-                const portalInUkrainian=name==='Попаданці'&&code==='uk';
-                const termIndex=portalInUkrainian&&index<genre.uk.length?(index+1)%genre.uk.length:index;
-                const term=genre[code][termIndex];
-                if(term)add('google',code,term,termIndex>0?term:undefined);
-                if(termIndex===0)add('openlibrary',code,'subject:"'+genre.subject+'"');
-                if(termIndex>0&&term)add('openlibrary',code,'title:"'+term+'"',term);
-            }
+    const perGenre=genres.map((name,genreIndex)=>{
+        const genre=recommendationGenres[name];
+        const codes=genreIndex%2?languages.slice().reverse():languages;
+        const terms=codes.map(code=>{
+            const [keyword,...titles]=genre[code];
+            const searches=[{query:keyword,subject:genre.subject},...titles.map(title=>({query:title,title}))];
+            if(name==='Попаданці'&&code==='uk')searches.push(searches.shift());
+            return searches;
+        });
+        const queries=[];
+        const maxTerms=Math.max(...terms.map(searches=>searches.length));
+        for(let index=0;index<maxTerms;index++){
+            codes.forEach((language,codeIndex)=>{
+                const search=terms[codeIndex][index];
+                if(!search)return;
+                const google={source:'google',language,query:search.query,title:search.title};
+                const open={source:'openlibrary',language,title:search.title,
+                    query:search.title?'title:"'+search.title+'"':'subject:"'+search.subject+'"'};
+                queries.push(...(genreIndex%3===2?[open,google]:[google,open]));
+            });
         }
-    }
-    return queries;
+        return queries;
+    });
+    const maxQueries=Math.max(...perGenre.map(queries=>queries.length));
+    return Array.from({length:maxQueries},(_,index)=>perGenre.map(queries=>queries[index]).filter(Boolean)).flat();
 }
 
 function loadRealRecommendations(category='auto'){
