@@ -31,7 +31,6 @@
         body.dark input,body.dark textarea,body.dark select{background:#18181b!important;color:#f4f4f5!important;border-color:#27272a!important}
         body.dark .search-box{background:#18181b;border-color:#27272a}
         body.dark .skeleton{background:#27272a}
-        body.dark .toast{background:#27272a;color:#f4f4f5;border-color:#3f3f46}
         body.dark .welcome-card{background:#18181b;border-color:#27272a}
         .card{background:#fff;border:1px solid #f4f4f5;border-radius:18px;transition:transform .12s}
         .card:active{transform:scale(.98)}
@@ -72,9 +71,6 @@
         .progress-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:#e4e4e7;outline:none}
         .progress-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#6366f1;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,.3)}
         body.dark .progress-slider{background:#27272a}
-        /* Toast */
-        .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-100px);background:#fff;border:1px solid #e4e4e7;border-radius:14px;padding:12px 20px;font-size:14px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.1);z-index:9999;transition:transform .4s cubic-bezier(.32,.72,0,1);max-width:90vw;text-align:center}
-        .toast.show{transform:translateX(-50%) translateY(0)}
         /* Skeleton */
         .skeleton{background:#f4f4f5;border-radius:12px;animation:pulse 1.5s infinite}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -91,12 +87,14 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=17">
+    <link rel="stylesheet" href="library.css?v=18">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
-    <!-- Toast -->
-    <div id="toast" class="toast">✓</div>
+    <div id="trashUndo" class="trash-undo" hidden>
+        <span role="status">Книгу переміщено до кошика</span>
+        <button type="button" class="secondary-button" onclick="undoTrash()">Скасувати</button>
+    </div>
 
     <!-- Pull to refresh indicator -->
     <div id="ptrIndicator" class="ptr-indicator"><div class="ptr-spinner"></div><span>Оновлення...</span></div>
@@ -159,6 +157,15 @@
                 <button onclick="setLibraryTab('planned')" id="tab_planned" class="pill inactive" aria-pressed="false">Заплановано</button>
                 <button onclick="setLibraryTab('finished')" id="tab_finished" class="pill inactive" aria-pressed="false">Прочитано</button>
             </div>
+            <details class="library-organization">
+                <summary>Полиці й теги</summary>
+                <div class="library-filters">
+                    <select id="libraryShelf" aria-label="Фільтр за полицею" onchange="setOrganizationFilters()"><option value="">Усі полиці</option></select>
+                    <select id="libraryTag" aria-label="Фільтр за тегом" onchange="setOrganizationFilters()"><option value="">Усі теги</option></select>
+                    <label><input type="checkbox" id="libraryFavorites" onchange="setOrganizationFilters()"> Обране</label>
+                    <button type="button" class="secondary-button" onclick="openLibraryShelves()">Мої полиці</button>
+                </div>
+            </details>
             <div id="finishedFilters" class="library-filters" hidden>
                 <select id="finishedYear" aria-label="Рік читання" onchange="setFinishedFilters()"><option value="">Усі роки</option></select>
                 <select id="finishedRating" aria-label="Оцінка" onchange="setFinishedFilters()">
@@ -216,6 +223,7 @@
             <div class="card-elevated p-4 mb-4"><p class="text-[10px] font-bold uppercase text-muted mb-2">📊 Книг по місяцях</p><div class="h-36 w-full"><canvas id="statsChart"></canvas></div></div>
             <div class="space-y-2 mb-8">
                 <button onclick="toggleAppTheme()" class="w-full p-4 card flex justify-between items-center"><span class="font-bold text-sm">Тема оформлення</span><span class="text-xl">🌓</span></button>
+                <button type="button" onclick="openLibraryTrash()" class="w-full p-4 card text-left font-bold text-sm">Кошик <span id="trashCount" class="text-muted"></span></button>
                 <button onclick="exportLibrary()" class="w-full p-4 card text-left font-bold text-sm text-emerald-600">📥 Експорт бібліотеки</button>
                 <button onclick="importLibrary()" class="w-full p-4 card text-left font-bold text-sm text-blue-600">📤 Імпорт бібліотеки</button>
                 <button onclick="clearAppCache()" class="w-full p-4 card text-left font-bold text-sm text-amber-600">🔄 Очистити кеш</button>
@@ -292,6 +300,16 @@
             <button onclick="addBookWithStatus('finished')" class="flex flex-col items-center p-3 bg-emerald-50 text-emerald-700 rounded-xl active:scale-95"><span class="text-lg">✅</span><span class="text-[10px] font-bold mt-0.5">Прочитав</span></button>
         </div>
     </div>
+    <div id="libraryToolsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" role="dialog" aria-modal="true" aria-labelledby="libraryToolsTitle" inert>
+        <div class="details-toolbar">
+            <div class="drag-handle" aria-hidden="true"><div></div></div>
+            <button type="button" class="secondary-button" onclick="closeLibraryTools()" aria-label="Закрити дії бібліотеки">✕</button>
+        </div>
+        <div class="sheet-scroll flex-1 overflow-y-auto">
+            <h2 id="libraryToolsTitle"></h2>
+            <div id="libraryToolsContent"></div>
+        </div>
+    </div>
     <script>
         const scriptLoads=new Map();
         function loadScript(src){
@@ -314,6 +332,7 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="app.js?v=17"></script>
+    <script defer src="book-tools.js?v=18"></script>
+    <script defer src="app.js?v=18"></script>
 </body>
 </html>
