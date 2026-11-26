@@ -1,74 +1,65 @@
-const CACHE_NAME = 'chitayko-v8';
+const CACHE_NAME = 'chitayko-v9';
+const ROOT = self.registration.scope;
+const SHELL = new URL('index.html', ROOT).href;
 const STATIC_ASSETS = [
-    '/',
-    '/index.html',
-    '/app.js?v=8',
-    '/library.css',
-    '/icon-192.png',
-    '/manifest.json',
-    '/icon.png',
-    'https://cdn.tailwindcss.com',
+    './',
+    'index.html',
+    'app.js?v=9',
+    'library.css?v=9',
+    'utilities.css',
+    'manifest.json',
+    'icon.png',
+    'icon-192.png'
+].map(path => new URL(path, ROOT).href);
+const DEPENDENCIES = [
     'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
-    'https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js',
+    'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js',
     'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
     'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js',
     'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js'
 ];
 
 self.addEventListener('install', event => {
-    self.skipWaiting();
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(cache =>
-            Promise.allSettled(STATIC_ASSETS.map(url => cache.add(url).catch(() => console.warn('SW: failed to cache', url))))
-        )
-    );
+    event.waitUntil((async () => {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.addAll(STATIC_ASSETS);
+        await Promise.allSettled(DEPENDENCIES.map(url => cache.add(url)));
+        await self.skipWaiting();
+    })());
 });
 
 self.addEventListener('activate', event => {
-    event.waitUntil(
-        caches.keys().then(names =>
-            Promise.all(names.filter(n => n.startsWith('chitayko-') && n !== CACHE_NAME).map(n => caches.delete(n)))
-        ).then(() => self.clients.claim())
-    );
+    event.waitUntil(caches.keys().then(names =>
+        Promise.all(names.filter(name => name.startsWith('chitayko-') && name !== CACHE_NAME)
+            .map(name => caches.delete(name)))
+    ).then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', event => {
-    const url = event.request.url;
-    if (event.request.method !== 'GET') return;
+    const {request} = event;
+    if (request.method !== 'GET') return;
 
-    if (url.includes('firestore.googleapis.com') ||
-        url.includes('googleapis.com/books') ||
-        url.includes('googleapis.com/identitytoolkit') ||
-        url.includes('securetoken.googleapis.com') ||
-        url.includes('itunes.apple.com') ||
-        url.startsWith('https://openlibrary.org/search.json') ||
-        url.includes('corsproxy.io')) {
+    if (request.mode === 'navigate' && request.url.startsWith(ROOT)) {
+        event.respondWith((async () => {
+            try {
+                return await fetch(request);
+            } catch {
+                return (await caches.open(CACHE_NAME)).match(SHELL);
+            }
+        })());
         return;
     }
 
-    if (event.request.mode === 'navigate') {
-        event.respondWith(
-            fetch(event.request)
-                .then(res => {
-                    const clone = res.clone();
-                    caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
-                    return res;
-                })
-                .catch(() => caches.match('/index.html'))
-        );
-        return;
-    }
-
-    event.respondWith(
-        caches.match(event.request).then(cached => {
-            const netFetch = fetch(event.request).then(res => {
-                if (res && res.status === 200 && res.type !== 'opaqueredirect') {
-                    const clone = res.clone();
-                    caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
-                }
-                return res;
-            }).catch(() => cached);
-            return cached || netFetch;
-        })
-    );
+    const url = new URL(request.url);
+    const readerDependency = request.destination === 'script' &&
+        ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com'].includes(url.hostname);
+    if (!STATIC_ASSETS.includes(request.url) && !DEPENDENCIES.includes(request.url) && !readerDependency) return;
+    event.respondWith((async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(request);
+        if (cached) return cached;
+        const response = await fetch(request);
+        if (response.ok || response.type === 'opaque') await cache.put(request, response.clone()).catch(() => {});
+        return response;
+    })());
 });
