@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn);
     document.querySelectorAll('.bottom-sheet').forEach(enableSheetDrag);
     enableDetailsSwipe(document.getElementById('detailsSheet'));
+    enableTabSwipe(document.getElementById('appScreen'));
     enableBackdropDismiss();
     const viewport=window.visualViewport;
     let viewportFrame;
@@ -207,16 +208,30 @@ function enableSheetDrag(sheet){
     for(const type of ['pointerup','pointercancel','lostpointercapture'])handle.addEventListener(type,end);
 }
 
+function consumeScroll(scrollers,distance){
+    for(const scroller of scrollers){
+        if(distance===0)break;
+        const limit=scroller.scrollHeight-scroller.clientHeight;
+        const previous=Math.max(0,Math.min(limit,scroller.scrollTop));
+        const next=Math.max(0,Math.min(limit,previous-distance));
+        scroller.scrollTop=next;
+        distance-=previous-next;
+    }
+    return distance;
+}
+
 function enableDetailsSwipe(sheet){
     let gesture;
     function finish(event){
         if(!gesture)return;
-        const {dragging,offset}=gesture;
+        const {claimed,offset,scrolled,velocity,lastAt}=gesture;
         gesture=null;
-        if(!dragging)return;
+        if(!claimed)return;
         resetSheetDrag(sheet);
-        if(event.type==='touchend'&&event.cancelable)event.preventDefault();
-        if(event.type==='touchend'&&offset>=sheetDismissDistance&&sheet.classList.contains('open'))dismissCurrentSheet();
+        if(event.type!=='touchend')return;
+        if(event.cancelable)event.preventDefault();
+        const flickFromScroll=scrolled&&offset>=24&&velocity>=.65&&event.timeStamp-lastAt<90;
+        if((offset>=sheetDismissDistance||flickFromScroll)&&sheet.classList.contains('open'))dismissCurrentSheet();
     }
 
     sheet.addEventListener('touchstart',event=>{
@@ -225,11 +240,15 @@ function enableDetailsSwipe(sheet){
         const target=event.target;
         if(target.closest('.drag-handle, button, a, input, select, textarea, summary, [contenteditable]'))return;
         if(document.body.classList.contains('keyboard-open')||window.getSelection()?.isCollapsed===false)return;
+        const scrollers=[];
         for(let element=target;element&&element!==sheet;element=element.parentElement){
-            if(element.scrollTop>1)return;
+            if(element.matches('.sheet-scroll, .desc-scroll, .overflow-y-auto')&&element.scrollHeight>element.clientHeight){
+                scrollers.push(element);
+            }
         }
         const touch=event.touches[0];
-        gesture={x:touch.clientX,y:touch.clientY,dragging:false,offset:0};
+        gesture={x:touch.clientX,y:touch.clientY,lastY:touch.clientY,lastAt:event.timeStamp,
+            scrollers,claimed:false,offset:0,scrolled:false,velocity:0};
     },{passive:true});
 
     sheet.addEventListener('touchmove',event=>{
@@ -239,17 +258,32 @@ function enableDetailsSwipe(sheet){
             return;
         }
         const touch=event.touches[0];
-        const x=touch.clientX-gesture.x;
-        const y=touch.clientY-gesture.y;
-        if(!gesture.dragging){
+        if(!gesture.claimed){
+            const x=touch.clientX-gesture.x;
+            const y=touch.clientY-gesture.y;
             if(Math.max(Math.abs(x),Math.abs(y))<5)return;
             if(y<=Math.abs(x)){gesture=null;return;}
-            gesture.dragging=true;
-            sheet.classList.add('sheet-dragging');
+            gesture.claimed=true;
         }
         event.preventDefault();
-        gesture.offset=Math.max(0,y);
-        sheet.style.transform=`translateY(${gesture.offset}px)`;
+
+        let distance=touch.clientY-gesture.lastY;
+        gesture.velocity=distance/Math.max(16,event.timeStamp-gesture.lastAt);
+        gesture.lastY=touch.clientY;
+        gesture.lastAt=event.timeStamp;
+        const previousOffset=gesture.offset;
+        if(distance<0&&gesture.offset>0){
+            const returnDistance=Math.min(-distance,gesture.offset);
+            gesture.offset-=returnDistance;
+            distance+=returnDistance;
+        }
+        const remaining=consumeScroll(gesture.scrollers,distance);
+        if(distance>remaining)gesture.scrolled=true;
+        gesture.offset+=Math.max(0,remaining);
+        if(gesture.offset!==previousOffset){
+            sheet.classList.add('sheet-dragging');
+            sheet.style.transform=`translateY(${gesture.offset}px)`;
+        }
     },{passive:false});
 
     sheet.addEventListener('touchend',finish,{passive:false});
@@ -272,28 +306,74 @@ function toggleAppTheme(){
 }
 
 // ===== TABS =====
-function switchTab(tab){
-    if(currentTab===tab)return;
-    currentTab=tab;
-    document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+const primaryTabs={library:'tabLibrary',discover:'tabDiscover',profile:'tabProfile'};
+const primaryTabOrder=Object.keys(primaryTabs);
 
-    const tabs={library:'tabLibrary',discover:'tabDiscover',profile:'tabProfile'};
-    const el=document.getElementById(tabs[tab]);
-    el.classList.add('active');
+function switchTab(tab,direction=0){
+    if(currentTab===tab)return;
+    document.getElementById(primaryTabs[currentTab]).classList.remove('active');
+    currentTab=tab;
+
+    const panel=document.getElementById(primaryTabs[tab]);
+    panel.style.setProperty('--tab-enter-x',(direction*12)+'px');
+    panel.classList.add('active');
     document.getElementById('appScreen').scrollTop=0;
     window.scrollTo(0,0);
     const nav=document.getElementById('mainBottomNav');
     nav.dataset.selectedTab=tab;
-    const btns=nav.querySelectorAll('.nav-tab');
-    const idx={library:0,discover:1,profile:2}[tab];
-    btns.forEach((button,index)=>{
-        const selected=index===idx;
+    const selectedIndex=primaryTabOrder.indexOf(tab);
+    nav.querySelectorAll('.nav-tab').forEach((button,index)=>{
+        const selected=index===selectedIndex;
         button.classList.toggle('active',selected);
         if(selected)button.setAttribute('aria-current','page');
         else button.removeAttribute('aria-current');
     });
     if(tab==='profile'){calculateStats();updateStreakWidget();updateGoalWidget();}
     if(tab==='discover'&&!currentRecCategory)loadRealRecommendations('auto','rec_auto');
+}
+
+function enableTabSwipe(screen){
+    let gesture;
+    const excluded='input, textarea, select, [contenteditable], #libraryTabs, #recTabs, canvas';
+    screen.addEventListener('touchstart',event=>{
+        gesture=null;
+        if(event.touches.length!==1||document.body.classList.contains('modal-open'))return;
+        if(event.target.closest(excluded)||window.getSelection()?.isCollapsed===false)return;
+        const touch=event.touches[0];
+        if(touch.clientX<24||touch.clientX>innerWidth-24)return;
+        gesture={x:touch.clientX,y:touch.clientY,tab:currentTab,target:event.target,offset:0,claimed:false};
+    },{passive:true});
+
+    screen.addEventListener('touchmove',event=>{
+        if(!gesture)return;
+        if(event.touches.length!==1||!event.cancelable||currentTab!==gesture.tab||
+            gesture.target.closest('.sortable-chosen, .sortable-drag')){
+            gesture=null;
+            return;
+        }
+        const touch=event.touches[0];
+        const x=touch.clientX-gesture.x;
+        const y=touch.clientY-gesture.y;
+        if(!gesture.claimed){
+            if(Math.max(Math.abs(x),Math.abs(y))<10)return;
+            if(Math.abs(x)<Math.abs(y)*1.3){gesture=null;return;}
+            gesture.claimed=true;
+        }
+        event.preventDefault();
+        gesture.offset=x;
+    },{passive:false});
+
+    screen.addEventListener('touchend',event=>{
+        const swipe=gesture;
+        gesture=null;
+        if(!swipe?.claimed||currentTab!==swipe.tab)return;
+        if(event.cancelable)event.preventDefault();
+        if(Math.abs(swipe.offset)<64)return;
+        const direction=swipe.offset<0?1:-1;
+        const next=primaryTabOrder[primaryTabOrder.indexOf(swipe.tab)+direction];
+        if(next)switchTab(next,direction);
+    },{passive:false});
+    screen.addEventListener('touchcancel',()=>{gesture=null;});
 }
 
 // ===== VIEW =====
