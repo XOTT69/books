@@ -1,6 +1,8 @@
 let allBookRecords=[];
 let trashedBooks=[];
 let shelfNames=[];
+let shelfCatalog={};
+let shelvesById=new Map();
 let libraryShelfOptions=[],libraryTagOptions=[];
 let unsubscribeOrganization;
 let organizationFilters={shelf:'',tag:'',favorite:false};
@@ -28,6 +30,8 @@ function resetBookTools(){
     allBookRecords=[];
     trashedBooks=[];
     shelfNames=[];
+    shelfCatalog={};
+    shelvesById=new Map();
     libraryShelfOptions=[];
     libraryTagOptions=[];
     organizationFilters={shelf:'',tag:'',favorite:false};
@@ -52,9 +56,45 @@ function uniqueLabels(names){
     }
     return [...labels.values()].sort((a,b)=>a.localeCompare(b,'uk'));
 }
-function refreshShelfOptions(){
-    libraryShelfOptions=uniqueLabels([...shelfNames,...allBookRecords.flatMap(book=>labelNames(book.shelves))]);
+// Legacy memberships keep their original label while the profile controls the displayed name.
+function legacyShelfId(name){
+    return 'legacy:'+encodeURIComponent(labelKey(name));
 }
+
+function shelfOptions(names,catalog){
+    const entries=new Map(uniqueLabels([...names,...allBookRecords.flatMap(book=>labelNames(book.shelves))])
+        .map(name=>[legacyShelfId(name),{id:legacyShelfId(name),name}]));
+    for(const [id,entry] of Object.entries(catalog)){
+        if(entry?.deleted===true)entries.delete(id);
+        else if(typeof entry?.name==='string'&&entry.name.trim())entries.set(id,{id,name:entry.name});
+    }
+    return [...entries.values()].sort((a,b)=>a.name.localeCompare(b.name,'uk'));
+}
+
+function refreshShelfOptions(){
+    libraryShelfOptions=shelfOptions(shelfNames,shelfCatalog);
+    shelvesById=new Map(libraryShelfOptions.map(shelf=>[shelf.id,shelf]));
+}
+
+function bookShelfIds(book){
+    return new Set([...labelNames(book.shelfIds),...labelNames(book.shelves).map(legacyShelfId)]);
+}
+
+function activeBookShelfNames(book){
+    return uniqueLabels([...bookShelfIds(book)].flatMap(id=>{
+        const shelf=shelvesById.get(id);
+        return shelf?[shelf.name]:[];
+    }));
+}
+
+function exportBookRecord(book){
+    if(!book.shelves&&!book.shelfIds)return book;
+    const copy={...book};
+    delete copy.shelfIds;
+    copy.shelves=activeBookShelfNames(book);
+    return copy;
+}
+
 function loadLibraryOrganization(user){
     unsubscribeOrganization=db.collection('users').doc(user.uid).onSnapshot(snapshot=>{
         if(currentUser!==user)return;
@@ -64,25 +104,29 @@ function loadLibraryOrganization(user){
             updateGoalWidget();
         }
         const shelves=labelNames(profile.shelfNames);
-        if(JSON.stringify(shelfNames)===JSON.stringify(shelves))return;
+        const catalog=profile.shelfCatalog||{};
+        if(JSON.stringify(shelfNames)===JSON.stringify(shelves)&&JSON.stringify(shelfCatalog)===JSON.stringify(catalog))return;
         shelfNames=shelves;
+        shelfCatalog=catalog;
         refreshShelfOptions();
-        updateOrganizationFilters();
         refreshLibraryTools();
-        if(organizationFilters.shelf)render();
+        render();
     },console.warn);
 }
 
 function updateOrganizationFilters(){
-    const options={shelf:libraryShelfOptions,tag:libraryTagOptions};
+    const options={
+        shelf:libraryShelfOptions,
+        tag:libraryTagOptions.map(name=>({id:labelKey(name),name}))
+    };
     for(const [field,id,all] of [['shelf','libraryShelf','Усі полиці'],['tag','libraryTag','Усі теги']]){
         const select=document.getElementById(id);
         const labels=options[field];
-        if(organizationFilters[field]&&!labels.some(name=>labelKey(name)===organizationFilters[field])){
+        if(organizationFilters[field]&&!labels.some(label=>label.id===organizationFilters[field])){
             organizationFilters[field]='';
         }
-        const markup=`<option value="">${all}</option>`+labels.map(name=>
-            `<option value="${escapeHtml(labelKey(name))}">${escapeHtml(name)}</option>`).join('');
+        const markup=`<option value="">${all}</option>`+labels.map(label=>
+            `<option value="${escapeHtml(label.id)}">${escapeHtml(label.name)}</option>`).join('');
         if(select.innerHTML!==markup)select.innerHTML=markup;
         select.value=organizationFilters[field];
     }
@@ -101,7 +145,7 @@ function hasOrganizationFilters(){
 }
 function matchesOrganizationFilters(book){
     return (!organizationFilters.favorite||book.favorite===true)&&
-        (!organizationFilters.shelf||labelNames(book.shelves).some(name=>labelKey(name)===organizationFilters.shelf))&&
+        (!organizationFilters.shelf||bookShelfIds(book).has(organizationFilters.shelf))&&
         (!organizationFilters.tag||labelNames(book.tags).some(name=>labelKey(name)===organizationFilters.tag));
 }
 function canReorderBooks(){
@@ -109,9 +153,9 @@ function canReorderBooks(){
 }
 
 function renderBookLabels(book){
-    const shelves=uniqueLabels(labelNames(book.shelves));
+    const shelves=activeBookShelfNames(book);
     const tags=uniqueLabels(labelNames(book.tags));
-    if(!book.favorite&&!shelves.length&&!tags.length)return '';
+    if(book.favorite!==true&&!shelves.length&&!tags.length)return '';
     return `<div class="book-labels">
         ${book.favorite===true?'<span class="book-label favorite-label">♥ Обране</span>':''}
         ${shelves.map(name=>`<span class="book-label">${escapeHtml(name)}</span>`).join('')}
@@ -192,6 +236,15 @@ function openLibraryTools(mode,id,returnToSearch=false){
             </section>`;
     }else if(mode==='shelves'){
         holder.innerHTML=`<div id="libraryShelfItems" class="tool-list"></div>${shelfForm('Створити полицю')}`;
+    }else if(mode==='rename-shelf'||mode==='delete-shelf'){
+        const shelf=shelvesById.get(id);
+        if(!shelf){openLibraryShelves();return;}
+        const operation=mode==='rename-shelf'
+            ?shelfForm('Зберегти','rename-shelf',shelf.name)
+            :`<p class="text-muted">Видалити полицю «${escapeHtml(shelf.name)}»? Усі книги з неї залишаться в бібліотеці з датами й нотатками.</p>
+                <form class="tool-form" data-form="delete-shelf"><button type="submit" class="secondary-button tool-danger">Видалити полицю</button></form>`;
+        holder.innerHTML=operation+
+            '<button type="button" class="secondary-button shelf-cancel" data-action="cancel-shelf">До моїх полиць</button>';
     }
     holder.parentElement.scrollTop=0;
     refreshLibraryTools();
@@ -213,9 +266,9 @@ function closeLibraryTools(){
     else closeAllSheets();
 }
 
-function shelfForm(button){
-    return `<form class="tool-form" data-form="shelf">
-        <input name="label" class="search-box" aria-label="Назва полиці" placeholder="Назва полиці" maxlength="40" required>
+function shelfForm(button,mode='shelf',name=''){
+    return `<form class="tool-form" data-form="${mode}">
+        <input name="label" class="search-box" aria-label="Назва полиці" placeholder="Назва полиці" value="${escapeHtml(name)}" maxlength="40" required>
         <button type="submit" class="secondary-button">${button}</button>
     </form>`;
 }
@@ -225,14 +278,22 @@ function actionButton(action,label,classes='',value=''){
 function refreshLibraryTools(){
     if(!libraryToolsView)return;
     const {mode,id}=libraryToolsView;
-    const book=id?libraryBook(id):null;
-    if(id&&!book){
+    const bookMode=mode==='actions'||mode==='organize';
+    const book=bookMode?libraryBook(id):null;
+    if(bookMode&&!book){
         if(document.getElementById('libraryToolsSheet').classList.contains('open'))closeLibraryTools();
         return;
     }
     const title=document.getElementById('libraryToolsTitle');
     const holder=document.getElementById('libraryToolsContent');
-    title.textContent={actions:book?.title,organize:'Полиці й теги',shelves:'Мої полиці',trash:'Кошик'}[mode];
+    title.textContent={
+        actions:book?.title,organize:'Полиці й теги',shelves:'Мої полиці',trash:'Кошик',
+        'rename-shelf':'Перейменувати полицю','delete-shelf':'Видалити полицю'
+    }[mode];
+    if(mode==='rename-shelf'||mode==='delete-shelf'){
+        if(!shelvesById.has(id))openLibraryShelves();
+        return;
+    }
     if(mode==='actions'){
         const active=document.activeElement?.dataset.action;
         const statuses=Object.entries(bookStatusLabels).filter(([status])=>status!==book.status&&
@@ -250,10 +311,10 @@ function refreshLibraryTools(){
         </div>`;
         if(active)holder.querySelector(`[data-action="${active}"]`)?.focus({preventScroll:true});
     }else if(mode==='organize'){
-        const selected=new Set(labelNames(book.shelves).map(labelKey));
+        const selected=bookShelfIds(book);
         const shelves=libraryShelfOptions;
-        document.getElementById('bookShelfOptions').innerHTML=shelves.length?shelves.map(name=>
-            `<label><input type="checkbox" data-shelf="${escapeHtml(name)}" ${selected.has(labelKey(name))?'checked':''}> ${escapeHtml(name)}</label>`).join(''):
+        document.getElementById('bookShelfOptions').innerHTML=shelves.length?shelves.map(shelf=>
+            `<label><input type="checkbox" data-shelf="${escapeHtml(shelf.id)}" ${selected.has(shelf.id)?'checked':''}> ${escapeHtml(shelf.name)}</label>`).join(''):
             '<p class="text-muted">Поки немає полиць.</p>';
         document.getElementById('bookTagItems').innerHTML=uniqueLabels(labelNames(book.tags)).map(name=>
             `<button type="button" class="book-label tag-remove" data-action="remove-tag" data-value="${escapeHtml(name)}" aria-label="Прибрати тег ${escapeHtml(name)}">#${escapeHtml(name)} <span aria-hidden="true">×</span></button>`).join('');
@@ -261,10 +322,10 @@ function refreshLibraryTools(){
         const shelves=libraryShelfOptions;
         const counts=new Map();
         for(const book of myLibrary){
-            for(const key of new Set(labelNames(book.shelves).map(labelKey)))counts.set(key,(counts.get(key)||0)+1);
+            for(const key of bookShelfIds(book))counts.set(key,(counts.get(key)||0)+1);
         }
         document.getElementById('libraryShelfItems').innerHTML=shelves.length?shelves.map(name=>
-            actionButton('filter-shelf',`<span>${escapeHtml(name)}</span><span class="text-muted">${counts.get(labelKey(name))||0}</span>`,'',name)).join(''):
+            renderShelfRow(name,counts.get(name.id)||0)).join(''):
             '<p class="text-muted">Поки немає полиць.</p>';
     }else{
         holder.innerHTML=trashedBooks.length?`<ul class="tool-list">${trashedBooks.map(record=>
@@ -273,6 +334,18 @@ function refreshLibraryTools(){
                     aria-label="Відновити: ${escapeHtml(record.title)}">Відновити</button></li>`).join('')}</ul>`:
             '<p class="text-muted">Кошик порожній.</p>';
     }
+}
+
+function renderShelfRow(shelf,count){
+    const name=escapeHtml(shelf.name);
+    const id=escapeHtml(shelf.id);
+    return `<div class="shelf-row">
+        ${actionButton('filter-shelf',`<span>${name}</span><span class="text-muted">${count}</span>`,'',shelf.id)}
+        <div class="shelf-row-actions">
+            <button type="button" class="secondary-button" data-action="rename-shelf" data-value="${id}" aria-label="Перейменувати полицю ${name}" title="Перейменувати">✎</button>
+            <button type="button" class="secondary-button tool-danger" data-action="delete-shelf" data-value="${id}" aria-label="Видалити полицю ${name}" title="Видалити">×</button>
+        </div>
+    </div>`;
 }
 
 function updateBookLabel(id,field,name,add){
@@ -284,23 +357,67 @@ function updateBookLabel(id,field,name,add){
     if(!add&&variants.length)updateBookInFirestore(id,{[field]:fieldValue.arrayRemove(...variants)}).catch(showWriteError);
 }
 
-function createShelf(name,id){
-    const storedName=libraryShelfOptions.find(shelf=>labelKey(shelf)===labelKey(name));
-    if(storedName){
-        if(id)updateBookLabel(id,'shelves',storedName,true);
+function updateBookShelf(bookId,shelfId,add){
+    const book=libraryBook(bookId);
+    if(!book||!shelvesById.has(shelfId))return;
+    const fieldValue=firebase.firestore.FieldValue;
+    if(add){
+        if(!bookShelfIds(book).has(shelfId))updateBookInFirestore(bookId,{shelfIds:fieldValue.arrayUnion(shelfId)}).catch(showWriteError);
+        return;
+    }
+    const legacyNames=labelNames(book.shelves).filter(name=>legacyShelfId(name)===shelfId);
+    const updates={shelfIds:fieldValue.arrayRemove(shelfId)};
+    if(legacyNames.length)updates.shelves=fieldValue.arrayRemove(...legacyNames);
+    updateBookInFirestore(bookId,updates).catch(showWriteError);
+}
+
+function createShelf(name,bookId){
+    const existing=libraryShelfOptions.find(shelf=>labelKey(shelf.name)===labelKey(name));
+    if(existing){
+        if(bookId)updateBookShelf(bookId,existing.id,true);
         return;
     }
     const user=db.collection('users').doc(currentUser.uid);
-    const fieldValue=firebase.firestore.FieldValue;
-    if(!id){
-        user.set({shelfNames:fieldValue.arrayUnion(name)},{merge:true}).catch(showWriteError);
+    const id=crypto.randomUUID();
+    const metadata={shelfCatalog:{[id]:{name}}};
+    if(!bookId){
+        user.set(metadata,{merge:true}).catch(showWriteError);
         return;
     }
-    if(!libraryBook(id))return;
+    if(!libraryBook(bookId))return;
     const batch=db.batch();
-    batch.set(user,{shelfNames:fieldValue.arrayUnion(name)},{merge:true});
-    batch.update(user.collection('books').doc(id),{shelves:fieldValue.arrayUnion(name)});
+    batch.set(user,metadata,{merge:true});
+    batch.update(user.collection('books').doc(bookId),{shelfIds:firebase.firestore.FieldValue.arrayUnion(id)});
     batch.commit().catch(showWriteError);
+}
+
+async function saveShelfChange(form,name){
+    const view=libraryToolsView;
+    const user=currentUser;
+    const removing=view.mode==='delete-shelf';
+    const ref=db.collection('users').doc(user.uid);
+    const button=form.querySelector('[type=submit]');
+    button.disabled=true;
+    try{
+        const result=await db.runTransaction(async transaction=>{
+            const profile=(await transaction.get(ref)).data()||{};
+            const options=shelfOptions(labelNames(profile.shelfNames),profile.shelfCatalog||{});
+            const shelf=options.find(entry=>entry.id===view.id);
+            if(!shelf)return;
+            if(!removing&&options.some(entry=>entry.id!==shelf.id&&labelKey(entry.name)===labelKey(name)))return 'duplicate';
+            const change=removing?{name:shelf.name,deleted:true}:{name};
+            transaction.set(ref,{shelfCatalog:{[shelf.id]:change}},{merge:true});
+        });
+        if(currentUser!==user||libraryToolsView!==view)return;
+        if(result==='duplicate'){
+            form.elements.label.setCustomValidity('Полиця з такою назвою вже є.');
+            form.elements.label.reportValidity();
+        }else{
+            openLibraryShelves();
+        }
+    }catch(error){
+        if(currentUser===user)showWriteError(error);
+    }finally{button.disabled=false;}
 }
 
 function enableLibraryToolsControls(){
@@ -318,24 +435,31 @@ function enableLibraryToolsControls(){
         else if(action==='trash')moveBookToTrash(id);
         else if(action==='restore')restoreBook(value);
         else if(action==='remove-tag')updateBookLabel(id,'tags',value,false);
+        else if(action==='rename-shelf'||action==='delete-shelf')openLibraryTools(action,value);
+        else if(action==='cancel-shelf')openLibraryShelves();
         else if(action==='filter-shelf'){
             closeLibraryTools();
-            organizationFilters.shelf=labelKey(value);
+            organizationFilters.shelf=value;
             document.querySelector('.library-organization').open=true;
             render();
         }
     });
     holder.addEventListener('change',event=>{
         if(event.target.matches('[data-shelf]')&&libraryToolsView?.id){
-            updateBookLabel(libraryToolsView.id,'shelves',event.target.dataset.shelf,event.target.checked);
+            updateBookShelf(libraryToolsView.id,event.target.dataset.shelf,event.target.checked);
         }
+    });
+    holder.addEventListener('input',event=>{
+        if(event.target.matches('[name=label]'))event.target.setCustomValidity('');
     });
     holder.addEventListener('submit',event=>{
         event.preventDefault();
         const form=event.target;
         if(!libraryToolsView||!currentUser||!form.dataset.form)return;
+        if(form.dataset.form==='delete-shelf'){saveShelfChange(form);return;}
         const name=form.elements.label.value.normalize('NFKC').trim().replace(/\s+/g,' ');
         if(!name)return;
+        if(form.dataset.form==='rename-shelf'){saveShelfChange(form,name);return;}
         form.reset();
         const {id}=libraryToolsView;
         if(form.dataset.form==='tag')updateBookLabel(id,'tags',name,true);

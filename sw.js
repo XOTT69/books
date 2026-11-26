@@ -1,12 +1,12 @@
-const CACHE_NAME = 'chitayko-v18';
+const CACHE_NAME = 'chitayko-v19';
 const ROOT = self.registration.scope;
 const SHELL = new URL('index.html', ROOT).href;
 const STATIC_ASSETS = [
     './',
     'index.html',
-    'book-tools.js?v=18',
-    'app.js?v=18',
-    'library.css?v=18',
+    'book-tools.js?v=19',
+    'app.js?v=19',
+    'library.css?v=19',
     'utilities.css',
     'manifest.json?v=14',
     'icon.png',

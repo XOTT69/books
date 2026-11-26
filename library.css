@@ -486,3 +486,8 @@ body.dark .tool-danger { color: #f7a39b; }
 }
 .trash-undo[hidden] { display: none; }
 .trash-undo button { min-height: 44px; }
+
+.shelf-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: .35rem; }
+.shelf-row-actions { display: flex; gap: .25rem; }
+.shelf-row-actions button { min-width: 44px; min-height: 44px; padding-inline: .45rem; font-size: 1rem; }
+.shelf-cancel { margin-top: .75rem; min-height: 44px; }

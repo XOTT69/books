@@ -485,7 +485,7 @@ async function calculateStats(){
 }
 
 // ===== EXPORT/IMPORT =====
-function exportLibrary(){if(!allBookRecords.length)return alert('Порожньо!');const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(allBookRecords,null,2));const a=document.createElement('a');a.href=d;a.download=`chitayko_${new Date().toISOString().slice(0,10)}.json`;a.click();}
+function exportLibrary(){if(!allBookRecords.length)return alert('Порожньо!');const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(allBookRecords.map(exportBookRecord),null,2));const a=document.createElement('a');a.href=d;a.download=`chitayko_${new Date().toISOString().slice(0,10)}.json`;a.click();}
 function importLibrary(){const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const t=await f.text(),books=JSON.parse(t);if(!Array.isArray(books))throw new Error('Bad');if(!confirm(`Імпортувати ${books.length} книг?`))return;const ex=new Set(allBookRecords.map(b=>(b.title||'').toLowerCase().trim()));let imp=0;const batch=db.batch();books.forEach(book=>{const ti=(book.title||'').toLowerCase().trim();if(ex.has(ti))return;const ref=db.collection('users').doc(currentUser.uid).collection('books').doc();const c={...book};delete c.id;if(!c.dateAdded)c.dateAdded=Date.now();batch.set(ref,c);imp++;});await batch.commit();alert(`✅ ${imp} книг!`);}catch(err){alert('Помилка: '+err.message);}};inp.click();}
 async function clearAppCache(){
     try{
