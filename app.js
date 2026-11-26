@@ -324,6 +324,15 @@ function enableDetailsSwipe(sheet){
     sheet.addEventListener('touchcancel',finish);
 }
 
+// Safari can dispatch native magnification gestures even with a fixed viewport.
+function fixTouchScale(doc){
+    doc.documentElement.style.touchAction='pan-x pan-y';
+    for(const type of ['gesturestart','gesturechange']){
+        doc.addEventListener(type,event=>event.preventDefault(),{passive:false});
+    }
+}
+fixTouchScale(document);
+
 // ===== THEME =====
 function applyAppTheme(dark){
     document.body.classList.toggle('dark',dark);
@@ -1371,6 +1380,7 @@ async function openEpubReader(bookId,source){
         currentBookInstance=instance;
         const reader=instance.renderTo('viewer',{width:'100%',height:'100%',spread:'none',manager:'continuous',flow:'paginated'});
         rendition=reader;
+        reader.hooks?.content.register(contents=>fixTouchScale(contents.document));
         reader.themes.register('light',{body:{background:'#fafafa',color:'#18181b'}});
         reader.themes.register('sepia',{body:{background:'#f4ecd8',color:'#5b4636'}});
         reader.themes.register('dark',{body:{background:'#09090b',color:'#d4d4d8'}});
