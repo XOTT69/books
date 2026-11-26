@@ -51,7 +51,6 @@ function libraryBook(id){
     return myLibrary.find(book=>book.id===id);
 }
 function showLibraryBook(id){
-    detailsFromSearch=false;
     showBookDetails(libraryBook(id));
 }
 function bookCover(value){
@@ -100,8 +99,7 @@ document.addEventListener('DOMContentLoaded',()=>{
             else searchInput.blur();
             return;
         }
-        if(document.getElementById('detailsSheet').classList.contains('open'))closeDetailsSheet();
-        else if(document.body.classList.contains('modal-open'))closeAllSheets();
+        if(document.body.classList.contains('modal-open'))dismissCurrentSheet();
     });
     const target=document.getElementById('recScrollTarget');
     if(target&&'IntersectionObserver' in window){
@@ -118,9 +116,12 @@ function updateKeyboardLayout(){
     const focused=document.activeElement;
     const textField=focused?.matches('textarea, input:is([type=search],[type=text],[type=email],[type=password],[type=url],[type=number]), [contenteditable=true]');
     const keyboardWasOpen=document.body.classList.contains('keyboard-open');
-    const keyboard=Boolean(viewport&&Math.abs(viewport.scale-1)<.03&&(textField||keyboardWasOpen)&&layoutHeight-viewport.height>115);
+    const unzoomed=viewport&&Math.abs(viewport.scale-1)<.03&&viewport.height>0;
+    const keyboard=Boolean(unzoomed&&(textField||keyboardWasOpen)&&layoutHeight-viewport.height>115);
     document.body.classList.toggle('keyboard-open',keyboard);
     const style=document.documentElement.style;
+    if(unzoomed)style.setProperty('--visible-viewport-height',viewport.height+'px');
+    else style.removeProperty('--visible-viewport-height');
     if(keyboard){
         style.setProperty('--keyboard-inset',Math.max(0,layoutHeight-viewport.height-viewport.offsetTop)+'px');
         style.setProperty('--sheet-height',viewport.height+'px');
@@ -162,7 +163,7 @@ function enableBackdropDismiss(){
             return;
         }
         if(document.body.classList.contains('keyboard-open'))return;
-        closeAllSheets();
+        dismissCurrentSheet();
     });
     backdrop.addEventListener('lostpointercapture',()=>{tap=null;});
 }
@@ -189,8 +190,7 @@ function enableSheetDrag(sheet){
         sheet.classList.remove('sheet-dragging');
         sheet.style.removeProperty('transform');
         if(event.type!=='pointerup'||offset<80)return;
-        if(sheet.id==='detailsSheet')closeDetailsSheet();
-        else closeAllSheets();
+        dismissCurrentSheet();
     }
     for(const type of ['pointerup','pointercancel','lostpointercapture'])handle.addEventListener(type,end);
 }
@@ -395,12 +395,13 @@ function filterLibrary(query){
 }
 
 // ===== SHEETS =====
-let sheetTrigger;
+let sheetTrigger,detailsOpenedFromSearch=false;
 
 function openSheet(id){
     const sheet=document.getElementById(id);
     const current=document.querySelector('.bottom-sheet.open');
     if(current===sheet)return;
+    if(id==='detailsSheet')detailsOpenedFromSearch=current?.id==='searchSheet';
     const focus=document.activeElement;
     if(!current)sheetTrigger=focus?.matches('button,a')?focus:null;
     if(current?.contains(focus)||focus?.matches('input,textarea'))focus.blur();
@@ -419,7 +420,7 @@ function openSheet(id){
 }
 
 function closeAllSheets(){
-    detailsFromSearch=false;
+    detailsOpenedFromSearch=false;
     resetBookSearch();
     const sheet=document.querySelector('.bottom-sheet.open');
     if(sheet){
@@ -437,7 +438,12 @@ function closeAllSheets(){
     sheetTrigger=null;
 }
 function closeDetailsSheet(){
-    if(detailsFromSearch||!document.getElementById('statusButtons').classList.contains('hidden'))openSheet('searchSheet');
+    if(detailsOpenedFromSearch)openSheet('searchSheet');
+    else closeAllSheets();
+}
+
+function dismissCurrentSheet(){
+    if(document.getElementById('detailsSheet').classList.contains('open'))closeDetailsSheet();
     else closeAllSheets();
 }
 
@@ -499,7 +505,6 @@ function isCyrillic(s){return/[а-яА-ЯіІїЇєЄґҐ]/.test(s);}
 
 const googleBooksKey='AIzaSyDkpAZ7A8sYoVmd9hzl0OI5K8eli8blsME';
 let searchController;
-let detailsFromSearch=false;
 
 function canonicalIsbn(value){
     const isbn=String(value||'').replace(/[\s-]/g,'').toUpperCase();
@@ -626,7 +631,6 @@ function renderSearchResults(books,failed){
             ${existing?'<span class="in-library">У бібліотеці</span>':''}`;
         result.onclick=()=>{
             const match=libraryMatch(book);
-            detailsFromSearch=true;
             showBookDetails(match||book,!match);
         };
         results.push(result);
@@ -706,7 +710,7 @@ clearSearchButton.addEventListener('pointerdown',event=>{
 });
 clearSearchButton.addEventListener('click',clearBookSearch);
 
-function openManualForm(){detailsFromSearch=true;tempSelectedBook='manual';toggleEditMode(true);document.getElementById('editTitle').value='';document.getElementById('editAuthor').value='';document.getElementById('editPages').value='';document.getElementById('editImage').value='';document.getElementById('statusButtons').classList.remove('hidden');openSheet('detailsSheet');}
+function openManualForm(){tempSelectedBook='manual';toggleEditMode(true);document.getElementById('editTitle').value='';document.getElementById('editAuthor').value='';document.getElementById('editPages').value='';document.getElementById('editImage').value='';document.getElementById('statusButtons').classList.remove('hidden');openSheet('detailsSheet');}
 // ===== DETAILS =====
 function showBookDetails(bookData,isNew=false){
     if(!bookData||!bookData.title)return;
