@@ -82,7 +82,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=21">
+    <link rel="stylesheet" href="library.css?v=22">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -175,7 +175,7 @@
 
         <!-- TAB: RECOMMENDATIONS -->
         <div id="tabDiscover" class="tab-content">
-            <header class="mb-5"><h1 class="text-2xl font-black tracking-tight">Рекомендації</h1><p class="text-muted text-sm mt-0.5">Підібрано для вас</p></header>
+            <header class="recommendation-heading"><h1>Рекомендації</h1></header>
             <div class="library-filters recommendation-filters">
                 <label>Мова <select id="recommendationLanguage" onchange="changeRecommendationLanguage()" aria-label="Мова рекомендацій">
                     <option value="">Українська й російська</option><option value="uk">Українська</option>
@@ -183,8 +183,9 @@
                 </select></label>
                 <button type="button" class="secondary-button" onclick="openLibraryTools('recommendation-settings')">Мої жанри</button>
             </div>
-            <div class="recommendation-tabs" id="recTabs" aria-label="Жанри рекомендацій"></div>
-            <div id="recommendationsList" class="space-y-3 mt-3"></div>
+            <div class="recommendation-tabs" id="recTabs" role="group" aria-label="Жанри рекомендацій"></div>
+            <div id="recommendationsList"></div>
+            <div id="recommendationMore" class="recommendation-status" role="status"></div>
         </div>
 
         <!-- TAB: PROFILE -->
@@ -325,8 +326,8 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="book-tools.js?v=21"></script>
-    <script defer src="reading-tools.js?v=21"></script>
-    <script defer src="app.js?v=21"></script>
+    <script defer src="book-tools.js?v=22"></script>
+    <script defer src="reading-tools.js?v=22"></script>
+    <script defer src="app.js?v=22"></script>
 </body>
 </html>
