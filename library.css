@@ -238,7 +238,15 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
         overflow: hidden;
         background: var(--paper);
     }
-    body.app-open .nav-bar { position: static; }
+    body.app-open .nav-bar {
+        position: static;
+        --nav-bottom: min(var(--safe-bottom), 12px);
+    }
+    .nav-bar-inner { align-items: end; }
+    .nav-bar .nav-tab {
+        justify-content: flex-end;
+        padding-block-end: 3px;
+    }
     body.app-open.standalone-bottom-clipped,
     body.standalone-bottom-clipped .nav-bar { background: var(--page); }
     body.standalone-bottom-clipped .nav-bar { --nav-bottom: 0px; }
