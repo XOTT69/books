@@ -296,7 +296,7 @@ body.keyboard-open .bottom-sheet { padding-bottom: 0; }
     body.app-open:not(.keyboard-open) { height: var(--visible-viewport-height, var(--viewport-height)); }
     body.app-open .nav-bar {
         position: static;
-        padding-bottom: max(var(--app-bottom-inset), 7px);
+        padding-bottom: max(var(--app-bottom-inset), 15px);
     }
     .nav-bar-inner { align-items: end; }
     .nav-bar-inner::before { top: auto; bottom: 0; transform: translateX(var(--nav-highlight-x)); }
