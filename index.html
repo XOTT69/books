@@ -98,7 +98,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=12">
+    <link rel="stylesheet" href="library.css?v=13">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -280,8 +280,10 @@
 
     <!-- DETAILS -->
     <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" role="dialog" aria-modal="true" aria-label="Картка книги" inert>
-        <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
-        <div class="detail-close"><button type="button" class="secondary-button" onclick="closeDetailsSheet()" aria-label="Закрити картку">✕</button></div>
+        <div class="details-toolbar">
+            <div class="drag-handle" aria-hidden="true"><div></div></div>
+            <button type="button" class="secondary-button" onclick="closeDetailsSheet()" aria-label="Закрити картку">✕</button>
+        </div>
         <div id="detailsContent" class="sheet-scroll flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
         <div id="editContent" class="sheet-scroll hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-3 fade-in">
             <h3 class="text-lg font-bold mb-3">Редагувати</h3>
@@ -319,6 +321,6 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="app.js?v=11"></script>
+    <script defer src="app.js?v=13"></script>
 </body>
 </html>
