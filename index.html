@@ -10,13 +10,12 @@
     <meta name="theme-color" content="#f5f1e9">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <script>tailwind.config={theme:{extend:{colors:{primary:{50:'#eaf1ec',100:'#dbe8df',200:'#c2d7c9',300:'#9db8ab',400:'#6f9383',500:'#416357',600:'#315145',700:'#244236'}}}}};</script>
+    <link rel="stylesheet" href="utilities.css">
+    <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
     <style>
         *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
         ::-webkit-scrollbar{width:0;background:transparent}
@@ -28,7 +27,6 @@
         body.dark .card-elevated{background:#1c1c20;border-color:#2a2a2e}
         body.dark .text-muted{color:#a1a1aa}
         body.dark .bg-surface{background:#09090b}
-        body.dark .nav-bar{background:rgba(9,9,11,.92);border-color:#27272a}
         body.dark .pill.inactive{background:#27272a;color:#a1a1aa}
         body.dark .stat-card{background:linear-gradient(135deg,#18181b,#1c1c20);border-color:#27272a}
         body.dark input,body.dark textarea,body.dark select{background:#18181b!important;color:#f4f4f5!important;border-color:#27272a!important}
@@ -41,7 +39,6 @@
         .card-elevated{background:#fff;border:1px solid #e4e4e7;border-radius:22px;box-shadow:0 2px 20px rgba(0,0,0,.03)}
         .bg-surface{background:#fafafa}
         .text-muted{color:#71717a}
-        .nav-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid #f4f4f5;z-index:30}
         .fade-in{animation:fadeIn .2s ease forwards}
         @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
         .bottom-sheet{transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1)}
@@ -101,9 +98,9 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css">
+    <link rel="stylesheet" href="library.css?v=9">
 </head>
-<body class="bg-surface font-sans pb-24 text-slate-900 antialiased">
+<body class="bg-surface font-sans text-slate-900 antialiased">
 
     <!-- Toast -->
     <div id="toast" class="toast">✓</div>
@@ -120,8 +117,8 @@
             <div class="text-center mb-8"><div class="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-[22px] mx-auto mb-4 flex items-center justify-center shadow-lg shadow-primary-200"><span class="text-4xl">📚</span></div><h1 class="text-2xl font-black tracking-tight">ЧитайКо</h1><p class="text-muted text-sm mt-1">Ваша хмарна бібліотека</p></div>
             <div id="authError" class="text-center text-sm text-white bg-red-500 font-medium p-3 rounded-xl mb-4 hidden"></div>
             <div class="space-y-3">
-                <input type="email" id="authEmail" placeholder="Email" class="w-full p-3.5 bg-surface rounded-xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm border border-slate-100">
-                <input type="password" id="authPassword" placeholder="Пароль (мін. 6)" class="w-full p-3.5 bg-surface rounded-xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm border border-slate-100">
+                <input type="email" id="authEmail" autocomplete="email" autocapitalize="none" placeholder="Email" class="w-full p-3.5 bg-surface rounded-xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm border border-slate-100">
+                <input type="password" id="authPassword" autocomplete="current-password" placeholder="Пароль (мін. 6)" class="w-full p-3.5 bg-surface rounded-xl outline-none focus:ring-2 ring-primary-400 font-medium text-sm border border-slate-100">
                 <div class="flex gap-2 pt-1">
                     <button onclick="handleAuth('login',this)" class="flex-1 p-3.5 text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl font-bold text-sm active:scale-95 transition-transform shadow-md shadow-primary-200">Увійти</button>
                     <button onclick="handleAuth('signup',this)" class="flex-1 p-3.5 text-slate-700 bg-slate-100 rounded-xl font-bold text-sm active:scale-95 transition-transform">Створити</button>
@@ -158,7 +155,7 @@
             </header>
             <div id="quickResume" class="hidden"></div>
             <div class="library-tools">
-                <input type="search" id="librarySearchInput" aria-label="Пошук у бібліотеці" placeholder="Пошук у бібліотеці…" class="search-box" oninput="filterLibrary(this.value)">
+                <input type="search" id="librarySearchInput" enterkeyhint="search" aria-label="Пошук у бібліотеці" placeholder="Пошук у бібліотеці…" class="search-box" oninput="filterLibrary(this.value)">
                 <div class="view-switch" aria-label="Вигляд бібліотеки">
                     <button onclick="setViewMode('list')" id="view_list" aria-label="Список" aria-pressed="true">☰</button>
                     <button onclick="setViewMode('grid')" id="view_grid" aria-label="Обкладинки" aria-pressed="false">⊞</button>
@@ -235,15 +232,15 @@
     </div>
 
     <!-- BOTTOM NAV -->
-    <nav id="mainBottomNav" class="nav-bar hidden">
-        <div class="max-w-lg mx-auto flex items-center justify-around px-2 py-2">
-            <button onclick="switchTab('library')" class="nav-tab active flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all"><span class="nav-icon" aria-hidden="true">▤</span><span class="text-[10px] font-bold uppercase tracking-wide">Книги</span></button>
-            <button onclick="switchTab('discover')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="nav-icon" aria-hidden="true">✧</span><span class="text-[10px] font-bold uppercase tracking-wide">Поради</span></button>
-            <button onclick="switchTab('profile')" class="nav-tab flex flex-col items-center gap-0.5 px-5 py-1.5 rounded-xl transition-all opacity-50"><span class="nav-icon" aria-hidden="true">◉</span><span class="text-[10px] font-bold uppercase tracking-wide">Профіль</span></button>
+    <nav id="mainBottomNav" class="nav-bar hidden" aria-label="Основна навігація">
+        <div class="nav-bar-inner">
+            <button onclick="switchTab('library')" class="nav-tab active" aria-current="page"><span class="nav-icon" aria-hidden="true">▤</span><span class="text-[10px] font-bold uppercase tracking-wide">Книги</span></button>
+            <button onclick="switchTab('discover')" class="nav-tab"><span class="nav-icon" aria-hidden="true">✧</span><span class="text-[10px] font-bold uppercase tracking-wide">Поради</span></button>
+            <button onclick="switchTab('profile')" class="nav-tab"><span class="nav-icon" aria-hidden="true">◉</span><span class="text-[10px] font-bold uppercase tracking-wide">Профіль</span></button>
         </div>
     </nav>
 
-    <div class="backdrop fixed inset-0 z-40 bg-black/40 backdrop-blur-sm hidden" onclick="closeAllSheets()"></div>
+    <div class="backdrop fixed inset-0 z-40 bg-black/40 hidden" onclick="closeAllSheets()"></div>
 
     <!-- READER -->
     <div id="readerOverlay">
@@ -267,11 +264,11 @@
     </div>
 
     <!-- SEARCH -->
-    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="height:85vh">
+    <div id="searchSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" role="dialog" aria-modal="true" aria-label="Додати книгу" inert>
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
         <div class="sheet-header"><h2>Додати книгу</h2><button type="button" class="secondary-button" onclick="closeAllSheets()" aria-label="Закрити пошук">✕</button></div>
-        <div class="px-5 pb-4 shrink-0"><input type="search" id="searchInput" aria-label="Назва, автор або ISBN" placeholder="Назва, автор або ISBN…" class="search-box"></div>
-        <div id="searchResults" class="px-4 pb-6 overflow-y-auto flex-1">
+        <div class="px-5 pb-4 shrink-0"><input type="search" id="searchInput" enterkeyhint="search" aria-label="Назва, автор або ISBN" placeholder="Назва, автор або ISBN…" class="search-box"></div>
+        <div id="searchResults" class="sheet-scroll px-4 pb-6 overflow-y-auto flex-1">
             <button onclick="openScanner()" class="w-full mb-2 p-3 text-center text-sm font-semibold text-white bg-zinc-800 rounded-xl active:scale-95 transition-transform">📷 Сканувати штрих-код</button>
             <button onclick="openManualForm()" class="w-full mb-3 p-3 text-center text-sm font-semibold text-primary-600 bg-primary-50 rounded-xl active:scale-95 transition-transform">✍️ Додати вручну</button>
             <div id="searchItems" aria-live="polite" class="search-items"></div>
@@ -279,17 +276,17 @@
     </div>
 
     <!-- DETAILS -->
-    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" style="max-height:92vh">
+    <div id="detailsSheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-2xl flex flex-col max-w-lg mx-auto" role="dialog" aria-modal="true" aria-label="Картка книги" inert>
         <div class="drag-handle w-full flex justify-center pt-4 pb-3 touch-none cursor-grab"><div class="w-10 h-1 bg-slate-200 rounded-full"></div></div>
         <div class="detail-close"><button type="button" class="secondary-button" onclick="closeDetailsSheet()" aria-label="Закрити картку">✕</button></div>
-        <div id="detailsContent" class="flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
-        <div id="editContent" class="hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-3 fade-in">
+        <div id="detailsContent" class="sheet-scroll flex-1 overflow-y-auto px-6 pb-6 pt-1"></div>
+        <div id="editContent" class="sheet-scroll hidden flex-1 overflow-y-auto px-6 pb-6 pt-2 space-y-3 fade-in">
             <h3 class="text-lg font-bold mb-3">Редагувати</h3>
             <input type="text" id="editTitle" placeholder="Назва" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
             <input type="text" id="editAuthor" placeholder="Автор" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
             <input type="number" id="editPages" placeholder="Сторінок" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-sm">
             <input type="url" id="editImage" placeholder="URL обкладинки" class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 ring-primary-400 font-medium text-xs">
-            <div class="flex gap-2 pt-2"><button onclick="saveBookEdits()" class="flex-1 p-3.5 bg-primary-600 text-white font-bold rounded-xl text-sm active:scale-95">Зберегти</button><button onclick="toggleEditMode(false)" class="flex-1 p-3.5 bg-slate-100 font-bold rounded-xl text-sm active:scale-95">Скасувати</button></div>
+            <div class="flex gap-2 pt-2"><button onclick="saveBookEdits()" class="flex-1 p-3.5 bg-primary-600 text-white font-bold rounded-xl text-sm active:scale-95">Зберегти</button><button onclick="cancelBookEdit()" class="flex-1 p-3.5 bg-slate-100 font-bold rounded-xl text-sm active:scale-95">Скасувати</button></div>
         </div>
         <div id="statusButtons" class="p-4 bg-white border-t border-slate-100 grid grid-cols-3 gap-2 shrink-0 hidden">
             <button onclick="addBookWithStatus('planned')" class="flex flex-col items-center p-3 bg-slate-50 rounded-xl active:scale-95 text-primary-600"><span class="text-lg">🕒</span><span class="text-[10px] font-bold mt-0.5">В плани</span></button>
@@ -298,11 +295,27 @@
         </div>
     </div>
     <script>
-        function loadScript(src){return new Promise((res,rej)=>{if(document.querySelector(`script[src="${src}"]`)){res();return;}const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+        const scriptLoads=new Map();
+        function loadScript(src){
+            if(!scriptLoads.has(src)){
+                scriptLoads.set(src,new Promise((resolve,reject)=>{
+                    const script=document.createElement('script');
+                    script.src=src;
+                    script.onload=resolve;
+                    script.onerror=()=>{
+                        scriptLoads.delete(src);
+                        script.remove();
+                        reject(new Error('Script failed to load: '+src));
+                    };
+                    document.head.appendChild(script);
+                }));
+            }
+            return scriptLoads.get(src);
+        }
         async function loadReaderDeps(){await Promise.all([loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js'),loadScript('https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js'),loadScript('https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js')]);}
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script src="app.js?v=8"></script>
+    <script defer src="app.js?v=9"></script>
 </body>
 </html>

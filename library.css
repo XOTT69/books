@@ -125,16 +125,12 @@ body.dark :is(#appScreen, .bottom-sheet) :is(.text-amber-600, .text-amber-400) {
 .resume-card p { margin-top: .2rem; font-size: .75rem; color: var(--muted); }
 
 body .nav-bar, body.dark .nav-bar { background: var(--paper); border-color: var(--line); color: var(--ink); padding-bottom: env(safe-area-inset-bottom); }
-.nav-bar .nav-tab { min-width: 5.2rem; }
 .nav-bar .nav-tab:not(.active) { opacity: 1; color: var(--muted); }
 .nav-bar .nav-tab.active { background: var(--soft); color: var(--accent-text); }
-.nav-icon { font-size: 1.2rem; line-height: 1.25; }
 
 body .bottom-sheet, body .bottom-sheet #statusButtons { background: var(--paper); color: var(--ink); border-color: var(--line); }
 .bottom-sheet { visibility: hidden; padding-bottom: env(safe-area-inset-bottom); }
 .bottom-sheet.open { visibility: visible; }
-#detailsSheet { max-height: min(92vh, 92dvh) !important; }
-#searchSheet { height: min(85vh, 85dvh) !important; }
 .detail-close { position: absolute; z-index: 1; right: 1rem; top: .5rem; }
 .detail-close button, .sheet-header button { min-height: 2rem; }
 .sheet-header { display: flex; align-items: center; justify-content: space-between; margin: 0 1.25rem .8rem; }
@@ -150,7 +146,11 @@ body .bottom-sheet, body .bottom-sheet #statusButtons { background: var(--paper)
 .reading-history h4, .year-stats h3 { font: 600 1.25rem/1.2 var(--serif); }
 .history-entry { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .35rem 1rem; padding-block: .65rem; border-bottom: 1px solid var(--line); font-size: .85rem; }
 .history-entry span { color: var(--muted); }
-.first-reading { display: block; }
+
+.history-edit { flex-basis: 100%; }
+.history-edit summary { color: var(--accent-text); cursor: pointer; font-size: .8rem; width: fit-content; }
+.history-dates > * { min-width: 0; }
+.history-date input[type=date] { min-width: 0; max-width: 100%; }
 .history-dates { display: flex; flex-wrap: wrap; align-items: end; gap: .55rem; margin-top: .4rem; }
 .history-date { flex: 1 1 8rem; font-size: .75rem; color: var(--muted); }
 .history-date input { display: block; width: 100%; min-height: 2.2rem; margin-top: .2rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--page); padding: .3rem .45rem; color: var(--ink); }
@@ -171,4 +171,90 @@ body .bottom-sheet, body .bottom-sheet #statusButtons { background: var(--paper)
 
 @media (prefers-reduced-motion: reduce) {
     body, .fade-in, .bottom-sheet, .card, .progress-bar { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+:root {
+    --nav-height: 3.6rem;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --nav-total: calc(var(--nav-height) + var(--safe-bottom) + 1px);
+    --viewport-height: 100vh;
+}
+@supports (height: 100dvh) {
+    :root { --viewport-height: 100dvh; }
+}
+
+.app-shell { padding-bottom: calc(var(--nav-total) + 1.2rem); }
+
+body .nav-bar, body.dark .nav-bar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 30;
+    border-top: 1px solid var(--line);
+    padding: 0 max(.65rem, env(safe-area-inset-right)) var(--safe-bottom) max(.65rem, env(safe-area-inset-left));
+}
+.nav-bar-inner {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    height: var(--nav-height);
+    max-width: 28rem;
+    margin-inline: auto;
+    gap: .35rem;
+}
+.nav-bar .nav-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 44px;
+    border-radius: .65rem;
+    gap: .15rem;
+}
+.nav-icon { font-size: 1.05rem; line-height: 1; }
+
+body.modal-open { overflow: hidden; }
+body .bottom-sheet { bottom: var(--keyboard-inset, 0px); }
+#searchSheet { height: min(85vh, calc(var(--sheet-height, var(--viewport-height)) - .5rem)) !important; }
+#detailsSheet { max-height: min(92vh, calc(var(--sheet-height, var(--viewport-height)) - .5rem)) !important; }
+.sheet-scroll { min-height: 0; overscroll-behavior-y: contain; scroll-padding-block: .8rem; }
+.drag-handle { flex-shrink: 0; touch-action: none; }
+.sheet-dragging { transition: none !important; }
+body.keyboard-open .nav-bar { visibility: hidden; }
+body.keyboard-open #authScreen { bottom: var(--keyboard-inset); }
+body.keyboard-open .bottom-sheet { padding-bottom: 0; }
+#viewer { min-height: 0; }
+#readerOverlay .reader-controls:first-child { padding-top: max(.7rem, env(safe-area-inset-top)); }
+#readerOverlay .reader-controls:last-child { padding-bottom: max(.7rem, var(--safe-bottom)); }
+#scannerSheet > :first-child { padding-top: max(1rem, env(safe-area-inset-top)); }
+
+@media (max-width: 47.99rem), (pointer: coarse) and (max-height: 32rem) {
+    .app-shell {
+        position: fixed;
+        inset: 0 0 var(--nav-total);
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left));
+    }
+    body.modal-open .app-shell { overflow: hidden; }
+    .app-shell, .sheet-scroll { scrollbar-width: none; }
+    #authScreen { padding-top: max(1.5rem, env(safe-area-inset-top)); }
+    #searchSheet, #detailsSheet { border-radius: 1.25rem 1.25rem 0 0; }
+    #searchInput, #librarySearchInput, #authScreen input, #editContent input, #detailsContent textarea, #detailsContent select, #detailsContent input[type=date], #goalInput {
+        font-size: 16px;
+    }
+    .book-card, .resume-card { box-shadow: none; }
+    .book-collection > .book-card { content-visibility: auto; contain-intrinsic-height: auto 9rem; }
+    .book-grid > .book-card { contain-intrinsic-height: auto 17rem; }
+}
+
+@media (pointer: coarse) and (max-height: 32rem) {
+    :root { --nav-height: 3rem; }
+    .history-dates { gap: .35rem; }
+    #statusButtons { padding-block: .35rem; }
+}
+
+@media (max-width: 31rem) {
+    .history-entry { flex-direction: column; }
+    .history-dates { display: grid; grid-template-columns: minmax(0, 1fr); }
 }

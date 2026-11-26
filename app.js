@@ -7,10 +7,11 @@ db.enablePersistence({synchronizeTabs:true}).catch(e=>console.log(e.code));
 let currentUser=null,myLibrary=[],tempSelectedBook=null,timeoutId=null;
 let currentLibraryTab='reading',viewMode=localStorage.getItem('viewMode')||'list';
 let rendition=null,currentReaderBookId=null,currentBookInstance=null;
+let readerOpening=false,readerProgressTimer,flushReaderProgress;
 let readerTheme=localStorage.getItem('readerTheme')||'light',readerFontSize=parseInt(localStorage.getItem('readerFontSize'))||100;
 let readingTimer=null,readingStartTime=0,currentSessionSeconds=0;
 let recStartIndex=0,currentRecQueries=[],currentRecQueryIndex=0,isFetchingRecs=false,currentRecCategory=null;
-let shownRecTitles=new Set(),libraryFilterQuery='',readerDepsLoaded=false,html5QrCode;
+let shownRecTitles=new Set(),libraryFilterQuery='',readerDepsLoaded=false;
 let currentTab='library';
 let finishedFilters={year:'',rating:'',reread:false};
 let localEpubIds=new Set();
@@ -74,16 +75,78 @@ function libraryMatch(candidate){
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded',()=>{
-    if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(e=>console.log(e));
-    document.querySelectorAll('.bottom-sheet').forEach(sheet=>{
-        let startY=0,currentY=0,isDragging=false;
-        sheet.addEventListener('touchstart',e=>{const sc=sheet.querySelector('.overflow-y-auto');if(!sc||sc.scrollTop<=0||e.target.closest('.drag-handle')){startY=e.touches[0].clientY;isDragging=true;sheet.style.transition='none';}},{passive:true});
-        sheet.addEventListener('touchmove',e=>{if(!isDragging)return;currentY=e.touches[0].clientY;const d=currentY-startY;if(d>0)sheet.style.transform=`translateY(${d}px)`;},{passive:true});
-        sheet.addEventListener('touchend',()=>{if(!isDragging)return;isDragging=false;sheet.style.transition='transform .35s cubic-bezier(.32,.72,0,1)';if(currentY-startY>100){if(sheet.id==='detailsSheet')closeDetailsSheet();else closeAllSheets();}sheet.style.transform='';});
+    if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(console.warn);
+    document.querySelectorAll('.bottom-sheet').forEach(enableSheetDrag);
+    const viewport=window.visualViewport;
+    let viewportFrame;
+    function scheduleViewportUpdate(){
+        cancelAnimationFrame(viewportFrame);
+        viewportFrame=requestAnimationFrame(updateKeyboardLayout);
+    }
+    viewport?.addEventListener('resize',scheduleViewportUpdate);
+    viewport?.addEventListener('scroll',scheduleViewportUpdate);
+    window.addEventListener('resize',scheduleViewportUpdate);
+    document.addEventListener('focusin',scheduleViewportUpdate);
+    document.addEventListener('focusout',scheduleViewportUpdate);
+    document.addEventListener('keydown',event=>{
+        if(event.key!=='Escape')return;
+        if(scannerSession&&!scannerSession.cancelled){closeScanner();return;}
+        if(document.getElementById('detailsSheet').classList.contains('open'))closeDetailsSheet();
+        else if(document.body.classList.contains('modal-open'))closeAllSheets();
     });
-    const ro=new IntersectionObserver(entries=>{if(entries[0].isIntersecting&&currentTab==='discover'&&!isFetchingRecs&&currentRecQueries.length>0)fetchMoreRecommendations();},{rootMargin:'300px'});
-    const st=document.getElementById('recScrollTarget');if(st)ro.observe(st);
+    const target=document.getElementById('recScrollTarget');
+    if(target&&'IntersectionObserver' in window){
+        const observer=new IntersectionObserver(entries=>{
+            if(entries[0].isIntersecting&&currentTab==='discover'&&!isFetchingRecs&&currentRecQueries.length)fetchMoreRecommendations();
+        },{rootMargin:'300px'});
+        observer.observe(target);
+    }
 });
+
+function updateKeyboardLayout(){
+    const viewport=window.visualViewport;
+    const layoutHeight=document.documentElement.clientHeight;
+    const focused=document.activeElement;
+    const textField=focused?.matches('textarea, input:is([type=search],[type=text],[type=email],[type=password],[type=url],[type=number]), [contenteditable=true]');
+    const keyboard=Boolean(viewport&&Math.abs(viewport.scale-1)<.03&&textField&&layoutHeight-viewport.height>115);
+    document.body.classList.toggle('keyboard-open',keyboard);
+    const style=document.documentElement.style;
+    if(keyboard){
+        style.setProperty('--keyboard-inset',Math.max(0,layoutHeight-viewport.height-viewport.offsetTop)+'px');
+        style.setProperty('--sheet-height',viewport.height+'px');
+    }else{
+        style.removeProperty('--keyboard-inset');
+        style.removeProperty('--sheet-height');
+    }
+}
+
+function enableSheetDrag(sheet){
+    const handle=sheet.querySelector('.drag-handle');
+    let pointer,start,offset;
+    handle.addEventListener('pointerdown',event=>{
+        if(!event.isPrimary||event.button!==0||!sheet.classList.contains('open'))return;
+        pointer=event.pointerId;
+        start=event.clientY;
+        offset=0;
+        handle.setPointerCapture(pointer);
+        sheet.classList.add('sheet-dragging');
+    });
+    handle.addEventListener('pointermove',event=>{
+        if(event.pointerId!==pointer)return;
+        offset=Math.max(0,event.clientY-start);
+        sheet.style.transform=`translateY(${offset}px)`;
+    });
+    function end(event){
+        if(event.pointerId!==pointer)return;
+        pointer=null;
+        sheet.classList.remove('sheet-dragging');
+        sheet.style.removeProperty('transform');
+        if(event.type!=='pointerup'||offset<80)return;
+        if(sheet.id==='detailsSheet')closeDetailsSheet();
+        else closeAllSheets();
+    }
+    for(const type of ['pointerup','pointercancel','lostpointercapture'])handle.addEventListener(type,end);
+}
 
 // ===== THEME =====
 if(localStorage.getItem('appTheme')==='dark')document.body.classList.add('dark');
@@ -91,15 +154,25 @@ function toggleAppTheme(){document.body.classList.toggle('dark');localStorage.se
 
 // ===== TABS =====
 function switchTab(tab){
+    const changed=currentTab!==tab;
     currentTab=tab;
     document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-    document.querySelectorAll('.nav-tab').forEach(b=>{b.classList.remove('active');b.classList.add('opacity-50');});
+
     const tabs={library:'tabLibrary',discover:'tabDiscover',profile:'tabProfile'};
     const el=document.getElementById(tabs[tab]);
-    el.classList.add('active');el.classList.remove('fade-in');void el.offsetWidth;el.classList.add('fade-in');
+    el.classList.add('active');
+    if(changed){
+        document.getElementById('appScreen').scrollTop=0;
+        window.scrollTo(0,0);
+    }
     const btns=document.querySelectorAll('.nav-tab');
     const idx={library:0,discover:1,profile:2}[tab];
-    btns[idx].classList.add('active');btns[idx].classList.remove('opacity-50');
+    btns.forEach((button,index)=>{
+        const selected=index===idx;
+        button.classList.toggle('active',selected);
+        if(selected)button.setAttribute('aria-current','page');
+        else button.removeAttribute('aria-current');
+    });
     if(tab==='profile'){calculateStats();updateStreakWidget();updateGoalWidget();}
     if(tab==='discover'&&!currentRecCategory)loadRealRecommendations('auto','rec_auto');
 }
@@ -194,7 +267,20 @@ async function calculateStats(){
 // ===== EXPORT/IMPORT =====
 function exportLibrary(){if(myLibrary.length===0)return alert('Порожньо!');const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(myLibrary,null,2));const a=document.createElement('a');a.href=d;a.download=`chitayko_${new Date().toISOString().slice(0,10)}.json`;a.click();}
 function importLibrary(){const inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const t=await f.text(),books=JSON.parse(t);if(!Array.isArray(books))throw new Error('Bad');if(!confirm(`Імпортувати ${books.length} книг?`))return;const ex=new Set(myLibrary.map(b=>(b.title||'').toLowerCase().trim()));let imp=0;const batch=db.batch();books.forEach(book=>{const ti=(book.title||'').toLowerCase().trim();if(ex.has(ti))return;const ref=db.collection('users').doc(currentUser.uid).collection('books').doc();const c={...book};delete c.id;if(!c.dateAdded)c.dateAdded=Date.now();batch.set(ref,c);imp++;});await batch.commit();alert(`✅ ${imp} книг!`);}catch(err){alert('Помилка: '+err.message);}};inp.click();}
-function clearAppCache(){if('caches' in window)caches.keys().then(n=>{for(let x of n)caches.delete(x);});if('serviceWorker' in navigator)navigator.serviceWorker.getRegistrations().then(r=>{for(let x of r)x.unregister();});alert('Очищено!');setTimeout(()=>window.location.reload(true),500);}
+async function clearAppCache(){
+    try{
+        if('serviceWorker' in navigator){
+            const scope=new URL('./',location.href).href;
+            const registrations=await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.filter(registration=>registration.scope===scope).map(registration=>registration.unregister()));
+        }
+        if('caches' in window){
+            const names=await caches.keys();
+            await Promise.all(names.filter(name=>name.startsWith('chitayko-')).map(name=>caches.delete(name)));
+        }
+        location.reload();
+    }catch(error){console.warn(error);alert('Не вдалося оновити кеш.');}
+}
 
 // ===== AUTH =====
 auth.onAuthStateChanged(async user=>{
@@ -210,8 +296,15 @@ auth.onAuthStateChanged(async user=>{
         document.getElementById('profileName').innerText=user.displayName||user.email?.split('@')[0]||'Читач';
         document.getElementById('profileEmail').innerText=user.email||'';
         updateViewButtons();
-        try{const ud=await db.collection('users').doc(user.uid).get();if(ud.exists&&ud.data().readingGoal)localStorage.setItem('readingGoal',ud.data().readingGoal);}catch(e){}
-        if(currentUser===user)loadLibrary();
+        loadLibrary();
+        try{
+            const profile=await db.collection('users').doc(user.uid).get();
+            const goal=profile.exists&&profile.data().readingGoal;
+            if(currentUser===user&&goal){
+                localStorage.setItem('readingGoal',goal);
+                updateGoalWidget();
+            }
+        }catch(error){console.warn(error);}
     }else{as.classList.remove('hidden');as.classList.add('flex');ap.classList.add('hidden');document.getElementById('mainBottomNav').classList.add('hidden');}
 });
 function showErrorMsg(m){const e=document.getElementById('authError');e.innerText=m;e.classList.remove('hidden');setTimeout(()=>e.classList.add('hidden'),6000);}
@@ -244,19 +337,113 @@ function loadLibrary(){
     });
 }
 async function updateBookInFirestore(id,u){if(currentUser)await db.collection('users').doc(currentUser.uid).collection('books').doc(id).update(u);}
-function filterLibrary(q){libraryFilterQuery=q.toLowerCase().trim();render();}
+let filterFrame;
+function filterLibrary(query){
+    const normalized=query.toLowerCase().trim();
+    if(libraryFilterQuery===normalized)return;
+    libraryFilterQuery=normalized;
+    cancelAnimationFrame(filterFrame);
+    filterFrame=requestAnimationFrame(render);
+}
 
 // ===== SHEETS =====
-function openSheet(id){document.body.classList.add('modal-open');document.querySelectorAll('.bottom-sheet').forEach(s=>s.classList.remove('open'));document.getElementById(id).classList.add('open');document.querySelector('.backdrop').classList.remove('hidden');}
-function closeAllSheets(){detailsFromSearch=false;document.body.classList.remove('modal-open');document.querySelectorAll('.bottom-sheet').forEach(s=>s.classList.remove('open'));document.querySelector('.backdrop').classList.add('hidden');toggleEditMode(false);}
-function closeDetailsSheet(){if(detailsFromSearch||!document.getElementById('statusButtons').classList.contains('hidden'))openSheet('searchSheet');else closeAllSheets();}
+let sheetTrigger;
+
+function openSheet(id){
+    const sheet=document.getElementById(id);
+    const current=document.querySelector('.bottom-sheet.open');
+    if(current===sheet)return;
+    const focus=document.activeElement;
+    if(!current)sheetTrigger=focus;
+    if(current?.contains(focus)||focus?.matches('input,textarea'))focus.blur();
+    if(current){
+        current.classList.remove('open');
+        current.inert=true;
+    }
+    document.body.classList.add('modal-open');
+    document.getElementById('appScreen').inert=true;
+    document.getElementById('mainBottomNav').inert=true;
+    sheet.inert=false;
+    sheet.classList.add('open');
+    document.querySelector('.backdrop').classList.remove('hidden');
+    updateKeyboardLayout();
+    sheet.querySelector('[aria-label^="Закрити"]')?.focus({preventScroll:true});
+}
+
+function closeAllSheets(){
+    detailsFromSearch=false;
+    const sheet=document.querySelector('.bottom-sheet.open');
+    if(sheet){
+        if(sheet.contains(document.activeElement))document.activeElement.blur();
+        sheet.classList.remove('open');
+        sheet.inert=true;
+    }
+    document.body.classList.remove('modal-open');
+    document.getElementById('appScreen').inert=false;
+    document.getElementById('mainBottomNav').inert=false;
+    document.querySelector('.backdrop').classList.add('hidden');
+    toggleEditMode(false);
+    updateKeyboardLayout();
+    if(sheetTrigger?.isConnected)sheetTrigger.focus({preventScroll:true});
+    sheetTrigger=null;
+}
+function closeDetailsSheet(){
+    if(detailsFromSearch||!document.getElementById('statusButtons').classList.contains('hidden'))openSheet('searchSheet');
+    else closeAllSheets();
+}
 
 // ===== SCANNER =====
-async function openScanner(){await loadScannerLib();document.getElementById('scannerSheet').classList.remove('hidden');html5QrCode=new Html5Qrcode("reader");html5QrCode.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:150},aspectRatio:1.0},(t)=>{if(navigator.vibrate)navigator.vibrate(100);closeScanner();const si=document.getElementById('searchInput');si.value=t;si.dispatchEvent(new Event('input'));},()=>{}).catch(er=>{alert("Камера: "+er);closeScanner();});}
-function closeScanner(){if(html5QrCode){html5QrCode.stop().then(()=>{html5QrCode.clear();html5QrCode=null;}).catch(e=>console.log(e));}document.getElementById('scannerSheet').classList.add('hidden');}
+let scannerSession;
+function openScanner(){
+    if(scannerSession)return;
+    const sheet=document.getElementById('scannerSheet');
+    const drawer=document.getElementById('searchSheet');
+    document.activeElement?.blur();
+    drawer.inert=true;
+    sheet.classList.remove('hidden');
+    const session={cancelled:false,scanner:null,started:false};
+    scannerSession=session;
+    session.ready=(async()=>{
+        try{
+            await loadScannerLib();
+            if(session.cancelled)return;
+            const scanner=new Html5Qrcode('reader');
+            session.scanner=scanner;
+            await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:140},aspectRatio:1},text=>{
+                if(session.cancelled)return;
+                closeScanner();
+                searchInput.value=text;
+                searchInput.dispatchEvent(new Event('input'));
+            },()=>{});
+            session.started=true;
+        }catch(error){
+            if(!session.cancelled){
+                console.warn(error);
+                closeScanner();
+                alert('Не вдалося відкрити камеру. Перевірте дозвіл або введіть ISBN вручну.');
+            }
+        }
+    })();
+}
+function closeScanner(){
+    const session=scannerSession;
+    if(!session||session.cancelled)return;
+    session.cancelled=true;
+    document.getElementById('scannerSheet').classList.add('hidden');
+    const drawer=document.getElementById('searchSheet');
+    if(drawer.classList.contains('open'))drawer.inert=false;
+    session.ready.finally(async()=>{
+        try{
+            if(session.started)await session.scanner.stop();
+            session.scanner?.clear();
+        }catch(error){console.warn(error);}
+        finally{scannerSession=null;}
+    });
+}
 
 // ===== SEARCH =====
 const searchInput=document.getElementById('searchInput'),searchItems=document.getElementById('searchItems');
+const searchResults=document.getElementById('searchResults');
 function isEnglishTitle(t){if(!t)return true;const l=t.match(/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/g);if(!l)return false;const e=t.match(/[a-zA-Z]/g);return(e&&e.length>(l.length*0.4));}
 function isCyrillic(s){return/[а-яА-ЯіІїЇєЄґҐ]/.test(s);}
 
@@ -274,6 +461,7 @@ function canonicalIsbn(value){
 }
 
 async function catalogResponse(url,signal){
+    if(signal.aborted)throw new DOMException('Search cancelled','AbortError');
     const controller=new AbortController();
     const abort=()=>controller.abort();
     signal.addEventListener('abort',abort,{once:true});
@@ -288,7 +476,7 @@ async function catalogResponse(url,signal){
     }
 }
 
-async function searchCatalogs(query,signal){
+async function searchCatalogs(query,signal,onResults){
     const authorQuery=query.match(/^author:"(.+)"$/i);
     const term=authorQuery?authorQuery[1]:query;
     const isbn=authorQuery?'':canonicalIsbn(term);
@@ -334,59 +522,89 @@ async function searchCatalogs(query,signal){
         }));
     };
 
-    const sources=await Promise.allSettled([google(googleQuery),google(googleFallback),apple(),openLibrary()]);
     const normalize=value=>value.normalize('NFKC').toLocaleLowerCase('uk').trim();
     const needle=normalize(term);
-    const seen=new Set();
-    const books=sources.flatMap(source=>source.status==='fulfilled'?source.value:[]).filter(book=>{
-        if(authorQuery&&!(book.authors?.length?book.authors:[book.author]).some(author=>normalize(author).includes(needle)))return false;
-        const key=normalize(book.title).replace(/[^\p{L}\p{N}]/gu,'')+'|'+normalize(book.author).replace(/[^\p{L}\p{N}]/gu,'');
-        if(seen.has(key))return false;
-        seen.add(key);
-        return true;
-    });
+    const resultKey=book=>normalize(book.title).replace(/[^\p{L}\p{N}]/gu,'')+'|'+normalize(book.author).replace(/[^\p{L}\p{N}]/gu,'');
     const rank=book=>{
         if(isbn)return (book.identifiers||[]).some(value=>canonicalIsbn(value)===isbn)?0:1;
         const title=normalize(book.title);
         return title===needle?0:title.startsWith(needle)?1:title.includes(needle)?2:3;
     };
-    books.sort((a,b)=>authorQuery?(a.publishedDate||'9999').localeCompare(b.publishedDate||'9999'):rank(a)-rank(b));
-    return {books:books.slice(0,30),failed:sources.every(source=>source.status==='rejected')};
+    const byCatalog=[];
+    function collect(){
+        const seen=new Set();
+        return byCatalog.flat().filter(book=>{
+            if(authorQuery&&!(book.authors?.length?book.authors:[book.author]).some(author=>normalize(author).includes(needle)))return false;
+            const key=resultKey(book);
+            if(seen.has(key))return false;
+            seen.add(key);
+            return true;
+        }).sort((a,b)=>authorQuery?(a.publishedDate||'9999').localeCompare(b.publishedDate||'9999'):rank(a)-rank(b)).slice(0,30);
+    }
+    const requests=[google(googleQuery),google(googleFallback),apple(),openLibrary()];
+    const sources=await Promise.allSettled(requests.map(async (request,index)=>{
+        byCatalog[index]=await request;
+        if(!signal.aborted&&onResults){
+            const books=collect();
+            if(books.length)onResults(books);
+        }
+    }));
+    return {books:collect(),failed:sources.every(source=>source.status==='rejected')};
 }
 
 function renderSearchResults(books,failed){
-    searchItems.replaceChildren();
     if(!books.length){
         searchItems.textContent=failed?'Каталоги тимчасово недоступні. Спробуйте ще раз.':'Книг не знайдено.';
         return;
     }
+    if(!searchItems.children.length)searchItems.textContent='';
+    const previous=new Map(Array.from(searchItems.children,element=>[element.dataset.book,element]));
+    const results=[];
     for(const {authors,...book} of books){
+        const key=book.googleId||book.title+'|'+book.author;
+        const saved=previous.get(key);
+        if(saved){results.push(saved);continue;}
         const existing=libraryMatch(book);
         const result=document.createElement('button');
         result.type='button';
+        result.dataset.book=key;
         result.className='search-result';
-        result.innerHTML=`<img loading="lazy" src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
+        result.innerHTML=`<img loading="lazy" decoding="async" src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
             <span class="min-w-0"><strong class="block truncate">${escapeHtml(book.title)}</strong>
             <span class="block truncate text-muted">${escapeHtml(book.author)}</span>
             <small class="text-muted">${book.source}</small></span>
             ${existing?'<span class="in-library">У бібліотеці</span>':''}`;
-        result.onclick=()=>{detailsFromSearch=true;showBookDetails(existing?libraryBook(existing.id)||existing:book,!existing);};
-        searchItems.append(result);
+        result.onclick=()=>{
+            const match=libraryMatch(book);
+            detailsFromSearch=true;
+            showBookDetails(match||book,!match);
+        };
+        results.push(result);
     }
+    const wanted=new Set(results);
+    for(const child of previous.values())if(!wanted.has(child))child.remove();
+    results.forEach((child,index)=>{
+        if(searchItems.children[index]!==child)searchItems.insertBefore(child,searchItems.children[index]||null);
+    });
 }
 
 searchInput.addEventListener('input',event=>{
     clearTimeout(timeoutId);
     searchController?.abort();
     const query=event.target.value.trim();
-    if(query.length<2){searchItems.replaceChildren();return;}
+    searchResults.scrollTop=0;
+    if(query.length<2){searchItems.removeAttribute('aria-busy');searchItems.replaceChildren();return;}
+    searchItems.setAttribute('aria-busy','true');
     searchItems.textContent='Шукаємо книги…';
     const controller=new AbortController();
     searchController=controller;
     timeoutId=setTimeout(async()=>{
-        const {books,failed}=await searchCatalogs(query,controller.signal);
-        if(!controller.signal.aborted)renderSearchResults(books,failed);
-    },650);
+        const {books,failed}=await searchCatalogs(query,controller.signal,books=>renderSearchResults(books,false));
+        if(!controller.signal.aborted){
+            renderSearchResults(books,failed);
+            searchItems.removeAttribute('aria-busy');
+        }
+    },450);
 });
 window.searchAuthorBooks=function(a){closeAllSheets();setTimeout(()=>{const i=document.getElementById('searchInput');i.value=`author:"${a}"`;openSheet('searchSheet');i.dispatchEvent(new Event('input'));},350);}
 function openManualForm(){detailsFromSearch=true;tempSelectedBook='manual';toggleEditMode(true);document.getElementById('editTitle').value='';document.getElementById('editAuthor').value='';document.getElementById('editPages').value='';document.getElementById('editImage').value='';document.getElementById('statusButtons').classList.remove('hidden');openSheet('detailsSheet');}
@@ -398,7 +616,7 @@ function showBookDetails(bookData,isNew=false){
     isNew=isNew&&!existing;
     tempSelectedBook=isNew?bookData:null;toggleEditMode(false);
     const sa=escapeHtml(lb.author||'Невідомий');
-    let h=`<div class="detail-cover flex gap-4 mb-5 fade-in"><img loading="lazy" src="${bookCover(lb.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${escapeHtml(lb.title||'Без назви')}</h3><button onclick="window.searchAuthorBooks(this.textContent.trim())" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal||300} стор.</span>${!isNew&&!lb.activeReread?`<select aria-label="Статус книги" onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
+    let h=`<div class="detail-cover flex gap-4 mb-5 fade-in"><img loading="lazy" decoding="async" src="${bookCover(lb.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="" class="w-24 h-36 object-cover rounded-2xl shadow-lg flex-shrink-0"><div class="flex flex-col justify-center min-w-0 flex-1"><h3 class="text-lg font-bold leading-tight mb-1.5">${escapeHtml(lb.title||'Без назви')}</h3><button onclick="window.searchAuthorBooks(this.textContent.trim())" class="text-left w-fit px-2 py-0.5 bg-primary-50 text-primary-600 rounded-lg text-xs font-semibold mb-2 active:scale-95">${sa}</button><span class="text-xs text-muted">📄 ${lb.pagesTotal||300} стор.</span>${!isNew&&!lb.activeReread?`<select aria-label="Статус книги" onchange="changeStatusFromDetails('${lb.id}',this.value)" class="mt-2 bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 outline-none cursor-pointer"><option value="planned" ${lb.status==='planned'?'selected':''}>⏳ В планах</option><option value="reading" ${lb.status==='reading'?'selected':''}>📖 Читаю</option><option value="finished" ${lb.status==='finished'?'selected':''}>✅ Прочитано</option></select>`:''}</div></div>`;
     if(!isNew){
         h+=renderReadingHistory(lb);
         // Progress slider
@@ -408,15 +626,28 @@ function showBookDetails(bookData,isNew=false){
         h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-muted mb-2">📖 Читалка</p><div class="flex gap-2"><button onclick="readSavedEpub('${lb.id}')" class="flex-1 py-2.5 bg-primary-600 text-white rounded-xl font-bold text-xs active:scale-95 shadow-md shadow-primary-200">Читати</button><div class="relative flex-1"><input type="file" id="epubFileModal_${lb.id}" accept=".epub" class="hidden" onchange="handleFileSelectAndSave(event,'${lb.id}')"><button onclick="document.getElementById('epubFileModal_${lb.id}').click()" class="w-full py-2.5 bg-slate-100 rounded-xl font-bold text-xs active:scale-95">📥 .epub</button></div></div></div>`;
         const hl=lb.highlights||[];
         if(hl.length>0)h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-amber-600 mb-2">✍️ Виділення (${hl.length})</p><div class="space-y-1.5 max-h-32 overflow-y-auto">${hl.map((x,i)=>`<div class="text-xs bg-amber-50 p-2.5 rounded-lg italic relative border border-amber-100">"${escapeHtml(x.text.substring(0,150))}"<button onclick="deleteHighlight('${lb.id}',${i})" class="absolute top-1 right-1.5 text-red-400 text-[10px]">✕</button></div>`).join('')}</div></div>`;
-        let stars='';const cr=lb.rating||0;for(let i=1;i<=5;i++)stars+=`<button type="button" aria-label="Оцінка ${i} з 5" aria-pressed="${cr===i}" onclick="setRating('${lb.id}',${i})" class="text-3xl cursor-pointer ${cr>=i?'text-amber-400':'text-slate-200'} active:scale-90 transition-transform">★</button>`;
+        let stars='';const cr=lb.rating||0;for(let i=1;i<=5;i++)stars+=`<button type="button" data-rating="${i}" aria-label="Оцінка ${i} з 5" aria-pressed="${cr===i}" onclick="setRating('${lb.id}',${i})" class="text-3xl cursor-pointer ${cr>=i?'text-amber-400':'text-slate-200'} active:scale-90 transition-transform">★</button>`;
         h+=`<div class="mb-5 text-center card-elevated p-4"><p class="text-[10px] font-bold uppercase text-muted mb-2">Оцінка</p><div class="flex justify-center gap-2">${stars}</div></div>`;
-        h+=`<div class="mb-5 p-4 card-elevated"><div class="flex justify-between items-center mb-2"><p class="text-[10px] font-bold uppercase text-muted">Нотатки</p><button onclick="saveReview('${lb.id}')" class="text-primary-600 bg-primary-50 px-3 py-1 rounded-lg text-[10px] font-bold active:scale-95">Зберегти</button></div><textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[60px]" placeholder="Враження...">${escapeHtml(lb.review||'')}</textarea></div>`;
+        h+=`<div class="mb-5 p-4 card-elevated"><div class="flex justify-between items-center mb-2"><p class="text-[10px] font-bold uppercase text-muted">Нотатки</p><button onclick="saveReview('${lb.id}',this)" class="text-primary-600 bg-primary-50 px-3 py-1 rounded-lg text-[10px] font-bold active:scale-95">Зберегти</button></div><textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[60px]" placeholder="Враження...">${escapeHtml(lb.review||'')}</textarea></div>`;
     }
     h+=`<div class="desc-scroll mb-4"><p class="text-[10px] font-bold uppercase text-muted mb-1">Анотація</p><p class="text-sm text-muted leading-relaxed">${escapeHtml(lb.description||'Немає.')}</p></div>`;
     if(!isNew)h+=`<button onclick="deleteBookFromDetails('${lb.id}')" class="w-full py-3 text-red-500 bg-red-50 rounded-xl font-bold text-sm active:scale-95 mb-4">🗑️ Видалити</button>`;
-    document.getElementById('detailsContent').innerHTML=h;
+    const details=document.getElementById('detailsContent');
+    const updateOpenCard=document.getElementById('detailsSheet').classList.contains('open');
+    details.dataset.book=lb.id||'';
+    details.innerHTML=h;
+    if(!updateOpenCard)details.scrollTop=0;
     document.getElementById('statusButtons').classList.toggle('hidden',!isNew);
     openSheet('detailsSheet');
+}
+
+function firstReadingDates(book){
+    const started=formatReadingDate(book.dateStarted);
+    const finished=formatReadingDate(book.dateFinished);
+    if(!started&&!finished)return 'Дати не вказано';
+    if(!started)return `Завершено ${finished}`;
+    if(!finished)return `Почато ${started}`;
+    return started===finished?started:`${started} — ${finished}`;
 }
 
 function renderReadingHistory(book){
@@ -432,9 +663,11 @@ function renderReadingHistory(book){
         <h4>Історія читання</h4>
         ${book.activeReread?`<div class="history-entry"><strong>Перечитування триває</strong><span>${formatReadingDate(book.activeReread.started)}</span></div>`:''}
         ${entries.map(entry=>`<div class="history-entry"><strong>Перечитування</strong><span>${entry.started?formatReadingDate(entry.started)+' — ':''}${formatReadingDate(entry.finished)}</span></div>`).join('')}
-        <div class="history-entry first-reading"><strong>Перше читання</strong><div class="history-dates">
-            ${dateInput('Початок','dateStarted')}${dateInput('Завершення','dateFinished')}
-        </div></div>
+        <div class="history-entry"><strong>Перше читання</strong><span>${firstReadingDates(book)}</span>
+            <details class="history-edit"><summary>Редагувати дати</summary><div class="history-dates">
+                ${dateInput('Початок','dateStarted')}${dateInput('Завершення','dateFinished')}
+            </div></details>
+        </div>
         ${completed?`<div class="history-actions">${actions}<details><summary>Додати минуле перечитування</summary>
             <form class="history-dates" onsubmit="savePastReread(event,'${id}')">
                 <label class="history-date">Початок<input name="started" type="date" max="${todayDate()}"></label>
@@ -517,9 +750,29 @@ async function savePastReread(event,id){
     finally{button.disabled=false;}
 }
 
-function deleteHighlight(id,i){const b=myLibrary.find(x=>x.id===id);if(!b||!b.highlights)return;b.highlights.splice(i,1);updateBookInFirestore(id,{highlights:b.highlights});showBookDetails(b);}
+async function deleteHighlight(id,index){
+    const book=libraryBook(id);
+    const highlight=book?.highlights?.[index];
+    if(!highlight)return;
+    try{
+        await updateBookInFirestore(id,{highlights:firebase.firestore.FieldValue.arrayRemove(highlight)});
+        if(document.getElementById('detailsContent').dataset.book===id&&document.getElementById('detailsSheet').classList.contains('open')){
+            showBookDetails({...book,highlights:book.highlights.filter((_,position)=>position!==index)});
+        }
+    }catch(error){showWriteError(error);}
+}
 function deleteBookFromDetails(id){if(confirm("Видалити?")){db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete();closeAllSheets();}}
-function setRating(id,r){updateBookInFirestore(id,{rating:r});setTimeout(()=>showBookDetails(myLibrary.find(b=>b.id===id)),100);}
+function setRating(id,rating){
+    const book=libraryBook(id);
+    if(!book)return;
+    updateBookInFirestore(id,{rating}).catch(showWriteError);
+    for(const star of document.querySelectorAll('#detailsContent [data-rating]')){
+        const value=Number(star.dataset.rating);
+        star.setAttribute('aria-pressed',String(value===rating));
+        star.classList.toggle('text-amber-400',value<=rating);
+        star.classList.toggle('text-slate-200',value>rating);
+    }
+}
 async function changeStatusFromDetails(id,status){
     if(!currentUser)return;
     const date=todayDate();
@@ -543,8 +796,57 @@ async function changeStatusFromDetails(id,status){
 }
 function toggleEditMode(v){if(v){document.getElementById('detailsContent').classList.add('hidden');document.getElementById('editContent').classList.remove('hidden');}else{document.getElementById('detailsContent').classList.remove('hidden');document.getElementById('editContent').classList.add('hidden');}}
 function saveBookEdits(){const u={title:document.getElementById('editTitle').value.trim()||'Без назви',author:document.getElementById('editAuthor').value.trim()||'Невідомий',pagesTotal:parseInt(document.getElementById('editPages').value)||300,image:document.getElementById('editImage').value.trim()};if(tempSelectedBook==='manual'){tempSelectedBook={...u,description:'Вручну.'};toggleEditMode(false);showBookDetails(tempSelectedBook,true);}else{updateBookInFirestore(tempSelectedBook.id,u);showBookDetails({...tempSelectedBook,...u});}}
-function saveReview(id){updateBookInFirestore(id,{review:document.getElementById(`reviewText_${id}`).value});if(navigator.vibrate)navigator.vibrate(50);}
-async function addBookWithStatus(s){if(!currentUser||!tempSelectedBook)return;if(tempSelectedBook!=='manual'){const existing=libraryMatch(tempSelectedBook);if(existing){showBookDetails(existing);return;}}if(tempSelectedBook==='manual')saveBookEdits();let nd={...tempSelectedBook,status:s,pagesRead:s==='finished'?tempSelectedBook.pagesTotal:0,dateAdded:Date.now(),rating:0,review:'',highlights:[],timeSpent:0,lastFileName:null,dateStarted:s==='reading'?todayDate():null,dateFinished:s==='finished'?todayDate():null,sortOrder:0};await db.collection('users').doc(currentUser.uid).collection('books').add(nd);tempSelectedBook=null;closeAllSheets();if(s==='finished')showCelebration();}
+function cancelBookEdit(){
+    if(tempSelectedBook==='manual')closeDetailsSheet();
+    else toggleEditMode(false);
+}
+
+async function saveReview(id,button){
+    const notes=document.getElementById(`reviewText_${id}`);
+    const value=notes.value;
+    button.disabled=true;
+    try{
+        await updateBookInFirestore(id,{review:value});
+        if(button.isConnected&&notes.value===value){
+            button.textContent='Збережено';
+            setTimeout(()=>{button.textContent='Зберегти';},1200);
+        }
+    }catch(error){showWriteError(error);}
+    finally{button.disabled=false;}
+}
+
+let addingBook=false;
+async function addBookWithStatus(status){
+    if(!currentUser||!tempSelectedBook||addingBook)return;
+    if(tempSelectedBook==='manual')saveBookEdits();
+    else{
+        const existing=libraryMatch(tempSelectedBook);
+        if(existing){showBookDetails(existing);return;}
+    }
+
+    const selected=tempSelectedBook;
+    const date=todayDate();
+    const user=currentUser;
+    const buttons=document.querySelectorAll('#statusButtons button');
+    addingBook=true;
+    buttons.forEach(button=>button.disabled=true);
+    try{
+        await db.collection('users').doc(user.uid).collection('books').add({
+            ...selected,status,pagesRead:status==='finished'?selected.pagesTotal:0,dateAdded:Date.now(),
+            rating:0,review:'',highlights:[],timeSpent:0,lastFileName:null,sortOrder:0,
+            dateStarted:status==='reading'?date:null,dateFinished:status==='finished'?date:null
+        });
+        if(currentUser!==user||tempSelectedBook!==selected)return;
+        tempSelectedBook=null;
+        if(document.getElementById('detailsSheet').classList.contains('open'))closeAllSheets();
+        if(status==='finished')showCelebration();
+    }catch(error){showWriteError(error);}
+    finally{
+        addingBook=false;
+        buttons.forEach(button=>button.disabled=false);
+    }
+}
+
 function changeStatus(id,status,event){
     event.stopPropagation();
     changeStatusFromDetails(id,status);
@@ -558,7 +860,12 @@ async function saveManualDate(id,field,input){
             input.value=dateValue(book[field]);
             return;
         }
-        await updateBookInFirestore(id,{[field]:input.value||null});
+        const value=input.value||null;
+        await updateBookInFirestore(id,{[field]:value});
+        if(input.isConnected){
+            const updated={...book,...libraryBook(id),[field]:value};
+            input.closest('.history-entry').querySelector(':scope > span').textContent=firstReadingDates(updated);
+        }
     }catch(error){
         input.value=dateValue(book[field]);
         showWriteError(error);
@@ -575,8 +882,40 @@ function changeFontSize(d){readerFontSize=Math.max(50,Math.min(200,readerFontSiz
 function changeReaderTheme(t){readerTheme=t;localStorage.setItem('readerTheme',t);applyReaderSettings();}
 function initSwipeGestures(){if(!window.Hammer)return;const v=document.getElementById('viewer');if(!window.mc){window.mc=new Hammer(v);window.mc.get('swipe').set({direction:Hammer.DIRECTION_HORIZONTAL});window.mc.on("swipeleft",()=>{if(rendition)rendition.next();});window.mc.on("swiperight",()=>{if(rendition)rendition.prev();});}}
 
-function handleFileSelectAndSave(ev,bookId){const file=ev.target.files[0];if(!file)return;if(!file.name.toLowerCase().endsWith('.epub')){alert(".epub!");ev.target.value='';return;}const bd=myLibrary.find(b=>b.id===bookId);if(bd&&bd.lastFileName&&bd.lastFileName!==file.name&&!confirm('Інший файл. Продовжити?')){ev.target.value='';return;}if(bd&&bd.lastFileName!==file.name)updateBookInFirestore(bookId,{lastFileName:file.name});const r=new FileReader();r.onload=async function(e){const ab=e.target.result;try{await localforage.setItem(`epub_${bookId}`,ab);await refreshLocalEpubs();}catch(er){}await openEpubReader(bookId,ab);closeAllSheets();};r.readAsArrayBuffer(file);ev.target.value='';}
-async function readSavedEpub(bookId){try{const ab=await localforage.getItem(`epub_${bookId}`);if(!ab){alert("Файл не знайдено! Завантажте .epub");return;}await openEpubReader(bookId,ab);closeAllSheets();}catch(e){alert("Помилка");}}
+async function handleFileSelectAndSave(event,bookId){
+    const input=event.target;
+    const file=input.files[0];
+    input.value='';
+    if(!file||readerOpening||currentBookInstance)return;
+    if(!file.name.toLowerCase().endsWith('.epub')){alert('Оберіть файл EPUB.');return;}
+    const book=libraryBook(bookId);
+    if(!book)return;
+    if(book.lastFileName&&book.lastFileName!==file.name&&!confirm('Замінити локальний файл EPUB?'))return;
+    readerOpening=true;
+    try{
+        const data=await file.arrayBuffer();
+        try{
+            await localforage.setItem(`epub_${bookId}`,data);
+            localEpubIds.add(bookId);
+            if(book.lastFileName!==file.name)updateBookInFirestore(bookId,{lastFileName:file.name}).catch(console.warn);
+            renderQuickResume();
+            render();
+        }catch(error){console.warn(error);}
+        await openEpubReader(bookId,data);
+    }catch(error){console.warn(error);alert('Не вдалося відкрити EPUB.');}
+    finally{readerOpening=false;}
+}
+
+async function readSavedEpub(bookId){
+    if(readerOpening||currentBookInstance)return;
+    readerOpening=true;
+    try{
+        const data=await localforage.getItem(`epub_${bookId}`);
+        if(!data){alert('Файл не знайдено. Завантажте EPUB.');return;}
+        await openEpubReader(bookId,data);
+    }catch(error){console.warn(error);alert('Не вдалося відкрити EPUB.');}
+    finally{readerOpening=false;}
+}
 function readSavedEpubFromCard(id,ev){ev.stopPropagation();readSavedEpub(id);}
 
 async function openEpubReader(bookId,source){
@@ -586,32 +925,83 @@ async function openEpubReader(bookId,source){
     updateBookInFirestore(bookId,{lastOpenedAt:Date.now()}).catch(console.warn);
     currentReaderBookId=bookId;document.getElementById('readerOverlay').style.display='flex';document.getElementById('readerTitle').innerText=bd.title;document.getElementById('readerProgress').innerText="...";startTimer();document.getElementById('viewer').innerHTML='';
     try{
-        currentBookInstance=ePub(source);rendition=currentBookInstance.renderTo("viewer",{width:"100%",height:"100%",spread:"none",manager:"continuous",flow:"paginated"});
-        rendition.themes.register("light",{"body":{"background":"#fafafa","color":"#18181b"}});rendition.themes.register("sepia",{"body":{"background":"#f4ecd8","color":"#5b4636"}});rendition.themes.register("dark",{"body":{"background":"#09090b","color":"#d4d4d8"}});applyReaderSettings();
-        rendition.on("selected",function(cfi,contents){rendition.annotations.highlight(cfi);currentBookInstance.getRange(cfi).then(function(range){if(!range)return;const text=range.toString().trim();if(text.length<3)return;const bk=myLibrary.find(b=>b.id===currentReaderBookId);if(bk){const hl=bk.highlights||[];hl.push({text,cfi,date:Date.now()});bk.highlights=hl;updateBookInFirestore(currentReaderBookId,{highlights:hl});}if(navigator.vibrate)navigator.vibrate([50,50,50]);});contents.window.getSelection().removeAllRanges();});
-        rendition.on("relocated",loc=>{
-            if(!loc?.start)return;
-            const percentage=Math.round((loc.start.percentage||0)*100);
-            document.getElementById('readerProgress').innerText=percentage>0?percentage+"%":"...";
-            clearTimeout(window.syncProgressTimeout);
-            window.syncProgressTimeout=setTimeout(()=>{
+        const instance=ePub(source);
+        currentBookInstance=instance;
+        const reader=instance.renderTo('viewer',{width:'100%',height:'100%',spread:'none',manager:'continuous',flow:'paginated'});
+        rendition=reader;
+        reader.themes.register('light',{body:{background:'#fafafa',color:'#18181b'}});
+        reader.themes.register('sepia',{body:{background:'#f4ecd8',color:'#5b4636'}});
+        reader.themes.register('dark',{body:{background:'#09090b',color:'#d4d4d8'}});
+        applyReaderSettings();
+        reader.on('selected',async(cfi,contents)=>{
+            reader.annotations.highlight(cfi);
+            contents.window.getSelection()?.removeAllRanges();
+            try{
+                const range=await instance.getRange(cfi);
+                const text=range?.toString().trim();
+                if(!text||text.length<3||currentUser!==readerUser)return;
+                const ref=db.collection('users').doc(readerUser.uid).collection('books').doc(bookId);
+                await ref.update({highlights:firebase.firestore.FieldValue.arrayUnion({text,cfi,date:Date.now()})});
+            }catch(error){showWriteError(error);}
+        });
+        let ready=false;
+        function rememberLocation(location,save){
+            const start=location?.start;
+            if(!start||rendition!==reader)return;
+            const percentage=Math.round((start.percentage||0)*100);
+            document.getElementById('readerProgress').innerText=percentage>0?percentage+'%':'…';
+            if(!save||!start.cfi)return;
+            clearTimeout(readerProgressTimer);
+            flushReaderProgress=()=>{
+                flushReaderProgress=null;
                 if(currentUser!==readerUser)return;
-                const progress={lastCfi:loc.start.cfi};
+                const progress={lastCfi:start.cfi};
                 if(percentage>0)progress.pagesRead=Math.round(percentage/100*(bd.pagesTotal||300));
-                const save=bd.activeReread
+                const write=bd.activeReread
                     ?saveRereadProgress(bookId,bd.activeReread.id,progress)
                     :updateBookInFirestore(bookId,progress);
-                save.catch(console.warn);
-            },3000);
-        });
+                write.catch(console.warn);
+            };
+            readerProgressTimer=setTimeout(()=>flushReaderProgress?.(),1500);
+        }
+        reader.on('relocated',location=>rememberLocation(location,ready));
         const cfi=bd.activeReread?bd.rereadProgress?.[bd.activeReread.id]?.lastCfi:bd.lastCfi;
         const safeCfi=typeof cfi==='string'&&cfi.startsWith('epubcfi')?cfi:undefined;
-        await rendition.display(safeCfi).catch(()=>rendition.display());
-        currentBookInstance.ready.then(()=>currentBookInstance.locations.generate(1600)).then(()=>{const l=rendition.currentLocation();if(l&&l.start)document.getElementById('readerProgress').innerText=Math.round(l.start.percentage*100)+"%";}).catch(()=>{});
+        try{await reader.display(safeCfi);}catch(error){
+            if(rendition!==reader)return;
+            if(!safeCfi)throw error;
+            await reader.display();
+        }
+        if(rendition!==reader)return;
+        ready=true;
+        closeAllSheets();
         initSwipeGestures();
-    }catch(er){console.error(er);document.getElementById('readerProgress').innerText="Помилка";stopTimer();}
+        instance.ready.then(()=>{
+            if(rendition===reader)return instance.locations.generate(1600);
+        }).then(()=>{
+            if(rendition===reader)rememberLocation(reader.currentLocation(),false);
+        }).catch(()=>{});
+    }catch(error){
+        if(currentReaderBookId!==bookId)return;
+        closeReader();
+        throw error;
+    }
 }
-function closeReader(){stopTimer();document.getElementById('readerOverlay').style.display='none';document.getElementById('readerSettingsMenu').classList.add('hidden');if(currentBookInstance){currentBookInstance.destroy();currentBookInstance=null;rendition=null;}document.getElementById('viewer').innerHTML='';currentReaderBookId=null;updateStreakWidget();}
+
+function closeReader(){
+    clearTimeout(readerProgressTimer);
+    flushReaderProgress?.();
+    stopTimer();
+    document.getElementById('readerOverlay').style.display='none';
+    document.getElementById('readerSettingsMenu').classList.add('hidden');
+    const instance=currentBookInstance;
+    currentBookInstance=null;
+    rendition=null;
+    currentReaderBookId=null;
+    instance?.destroy();
+    document.getElementById('viewer').replaceChildren();
+    updateStreakWidget();
+}
 
 // ===== RENDER =====
 function setLibraryTab(tab){
@@ -651,7 +1041,7 @@ function renderBookCard(book){
         </div>`:'';
     return `<article data-id="${id}" class="book-card card ${viewMode==='grid'?'book-card-grid':''}">
         <button type="button" class="book-card-main" onclick="showLibraryBook('${id}')" aria-label="Відкрити: ${title}">
-            <img loading="lazy" src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
+            <img loading="lazy" decoding="async" src="${bookCover(book.image)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" alt="">
             <span class="book-card-info"><strong>${title}</strong><span class="text-muted">${author}</span></span>
         </button>
         ${progress}${completion}${actions}
@@ -790,7 +1180,7 @@ async function fetchMoreRecommendations(isFirst=false){
             const img=(b.imageLinks?.thumbnail||PLACEHOLDER_IMG).replace(/^http:\/\//i,'https://');
             const bk={googleId:i.id||Math.random().toString(),title:b.title,author:b.authors?b.authors[0]:'Невідомий',pagesTotal:b.pageCount||300,image:img,description:b.description||'',genre:(b.categories&&b.categories[0])||''};
             h+=`<div onclick="showBookDetails(${JSON.stringify(bk).replace(/"/g,'&quot;')},true)" class="card p-3.5 flex gap-3 items-start cursor-pointer active:scale-[0.98] transition-transform fade-in">
-                <img loading="lazy" src="${bk.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-13 h-[72px] rounded-xl shadow-sm object-cover flex-shrink-0">
+                <img loading="lazy" decoding="async" src="${bk.image}" onerror="this.src='${PLACEHOLDER_IMG}'" class="w-13 h-[72px] rounded-xl shadow-sm object-cover flex-shrink-0">
                 <div class="flex-1 min-w-0">
                     <div class="font-bold text-sm leading-tight truncate">${bk.title}</div>
                     <div class="text-xs text-muted mt-0.5">${bk.author}</div>
