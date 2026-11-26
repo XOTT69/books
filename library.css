@@ -180,6 +180,7 @@ body.modal-open .backdrop { visibility: visible; opacity: 1; pointer-events: aut
 .reading-history h4, .year-stats h3 { font: 600 1.25rem/1.2 var(--serif); }
 .history-entry { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .35rem 1rem; padding-block: .65rem; border-bottom: 1px solid var(--line); font-size: .85rem; }
 .history-entry span { color: var(--muted); }
+.history-entry-dates { display: grid; gap: .15rem; }
 
 .history-edit { padding-block: .55rem; }
 .history-edit summary { color: var(--accent-text); cursor: pointer; font-size: .8rem; width: fit-content; }

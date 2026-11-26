@@ -926,12 +926,24 @@ function firstReadingDates(book){
     return started===finished?started:`${started} — ${finished}`;
 }
 
+function renderTimelineEntry(label,{started,finished,startedDates}){
+    if(startedDates?.length>1){
+        const starts=startedDates.map(date=>date===finished?'у день завершення':formatReadingDate(date));
+        return `<div class="history-entry"><strong>${label}</strong><span class="history-entry-dates">
+            <span>Завершено ${formatReadingDate(finished)}</span>
+            <small>Початок у різних записах — ${starts.join(', ')}</small>
+        </span></div>`;
+    }
+    const date=firstReadingDates({dateStarted:started,dateFinished:finished});
+    return `<div class="history-entry"><strong>${label}</strong><span>${date}</span></div>`;
+}
+
 function renderReadingTimeline(book){
     const history=readingHistoryForCard(book);
     const entries=rereads(history).slice().sort((a,b)=>b.finished.localeCompare(a.finished));
-    return `${entries.map(entry=>`<div class="history-entry"><strong>Перечитування</strong><span>${entry.started?formatReadingDate(entry.started)+' — ':''}${formatReadingDate(entry.finished)}</span></div>`).join('')}
+    return `${entries.map(entry=>renderTimelineEntry('Перечитування',entry)).join('')}
         ${(history.otherStarts||[]).map(date=>`<div class="history-entry"><strong>Початок читання</strong><span>${formatReadingDate(date)}</span></div>`).join('')}
-        <div class="history-entry"><strong>Перше читання</strong><span>${firstReadingDates(history)}</span></div>`;
+        ${renderTimelineEntry('Перше читання',{started:history.dateStarted,finished:history.dateFinished,startedDates:history.startedDates})}`;
 }
 
 function refreshOpenReadingTimeline(){
