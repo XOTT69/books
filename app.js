@@ -511,7 +511,7 @@ async function calculateStats(){
     }
     const labels=Object.keys(months).sort().slice(-8);const data=labels.map(l=>months[l]);
     if(window.myChart)window.myChart.destroy();
-    window.myChart=new Chart(ctx,{type:'bar',data:{labels:labels.map(l=>l.slice(5)),datasets:[{data,backgroundColor:'#416357',borderRadius:8,barThickness:20}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});
+    window.myChart=new Chart(ctx,{type:'bar',data:{labels:labels.map(l=>l.slice(5)),datasets:[{data,backgroundColor:getComputedStyle(document.body).getPropertyValue('--accent-text').trim(),borderRadius:8,barThickness:20}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});
 }
 
 // ===== EXPORT/IMPORT =====
@@ -972,8 +972,8 @@ function showBookDetails(bookData,isNew=false,completionDate){
         }
         h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-muted mb-2">📖 Читалка</p><div class="flex gap-2"><button onclick="readSavedEpub('${lb.id}')" class="flex-1 py-2.5 bg-primary-600 text-white rounded-xl font-bold text-xs active:scale-95 shadow-md shadow-primary-200">Читати</button><div class="relative flex-1"><input type="file" id="epubFileModal_${lb.id}" accept=".epub" class="hidden" onchange="handleFileSelectAndSave(event,'${lb.id}')"><button onclick="document.getElementById('epubFileModal_${lb.id}').click()" class="w-full py-2.5 bg-slate-100 rounded-xl font-bold text-xs active:scale-95">📥 .epub</button></div></div></div>`;
         const hl=lb.highlights||[];
-        if(hl.length>0)h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-amber-600 mb-2">✍️ Виділення (${hl.length})</p><div class="space-y-1.5 max-h-32 overflow-y-auto">${hl.map((x,i)=>`<div class="text-xs bg-amber-50 p-2.5 rounded-lg italic relative border border-amber-100">"${escapeHtml(x.text.substring(0,150))}"<button onclick="deleteHighlight('${lb.id}',${i})" class="absolute top-1 right-1.5 text-red-400 text-[10px]">✕</button></div>`).join('')}</div></div>`;
-        let stars='';const cr=lb.rating||0;for(let i=1;i<=5;i++)stars+=`<button type="button" data-rating="${i}" aria-label="Оцінка ${i} з 5" aria-pressed="${cr===i}" onclick="setRating('${lb.id}',${i})" class="text-3xl cursor-pointer ${cr>=i?'text-amber-400':'text-slate-200'} active:scale-90 transition-transform">★</button>`;
+        if(hl.length>0)h+=`<div class="mb-5 p-4 card-elevated"><p class="text-[10px] font-bold uppercase text-primary-600 mb-2">✍️ Виділення (${hl.length})</p><div class="space-y-1.5 max-h-32 overflow-y-auto">${hl.map((x,i)=>`<div class="text-xs quote-excerpt p-2.5 rounded-lg italic relative border">"${escapeHtml(x.text.substring(0,150))}"<button onclick="deleteHighlight('${lb.id}',${i})" class="absolute top-1 right-1.5 text-red-400 text-[10px]">✕</button></div>`).join('')}</div></div>`;
+        let stars='';const cr=lb.rating||0;for(let i=1;i<=5;i++)stars+=`<button type="button" data-rating="${i}" aria-label="Оцінка ${i} з 5" aria-pressed="${cr===i}" onclick="setRating('${lb.id}',${i})" class="text-3xl cursor-pointer ${cr>=i?'rating-filled':'rating-empty'} active:scale-90 transition-transform">★</button>`;
         h+=`<div class="mb-5 text-center card-elevated p-4"><p class="text-[10px] font-bold uppercase text-muted mb-2">Оцінка</p><div class="flex justify-center gap-2">${stars}</div></div>`;
         h+=`<div class="mb-5 p-4 card-elevated"><div class="flex justify-between items-center mb-2"><p class="text-[10px] font-bold uppercase text-muted">Нотатки</p><button onclick="saveReview('${lb.id}',this)" class="text-primary-600 bg-primary-50 px-3 py-1 rounded-lg text-[10px] font-bold active:scale-95">Зберегти</button></div><textarea id="reviewText_${lb.id}" class="w-full bg-transparent text-sm outline-none resize-none min-h-[60px]" placeholder="Враження...">${escapeHtml(lb.review||'')}</textarea></div>`;
     }
@@ -1147,8 +1147,8 @@ function setRating(id,rating){
     for(const star of document.querySelectorAll('#detailsContent [data-rating]')){
         const value=Number(star.dataset.rating);
         star.setAttribute('aria-pressed',String(value===rating));
-        star.classList.toggle('text-amber-400',value<=rating);
-        star.classList.toggle('text-slate-200',value>rating);
+        star.classList.toggle('rating-filled',value<=rating);
+        star.classList.toggle('rating-empty',value>rating);
     }
 }
 async function changeStatusFromDetails(id,status){
