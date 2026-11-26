@@ -1,11 +1,11 @@
-const CACHE_NAME = 'chitayko-v11';
+const CACHE_NAME = 'chitayko-v12';
 const ROOT = self.registration.scope;
 const SHELL = new URL('index.html', ROOT).href;
 const STATIC_ASSETS = [
     './',
     'index.html',
     'app.js?v=11',
-    'library.css?v=11',
+    'library.css?v=12',
     'utilities.css',
     'manifest.json',
     'icon.png',
