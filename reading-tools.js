@@ -244,7 +244,7 @@ function groupBookRecords(records){
     return groups;
 }
 
-function combinedReadingHistory(books){
+function readingStartsByCompletion(books){
     const completed=new Map();
     for(const book of books){
         const entries=[{started:book.dateStarted,finished:book.dateFinished},...rereads(book)];
@@ -256,8 +256,12 @@ function combinedReadingHistory(books){
             if(started&&started<=finished)completed.get(finished).add(started);
         }
     }
-    const sessions=[...completed.keys()].sort().flatMap(finished=>{
-        const starts=[...completed.get(finished)].sort();
+    return [...completed].sort(([a],[b])=>a.localeCompare(b));
+}
+
+function combinedReadingHistory(books){
+    const sessions=readingStartsByCompletion(books).flatMap(([finished,dates])=>{
+        const starts=[...dates].sort();
         return (starts.length?starts:[null]).map(started=>({started,finished}));
     });
     const first=sessions.shift();
@@ -557,17 +561,30 @@ function groupReadingRecords(books){
     return [...groups].map(group=>group.books);
 }
 
+function readingHistoryForDisplay(books){
+    const sessions=readingStartsByCompletion(books).map(([finished,dates])=>{
+        const starts=[...dates].sort();
+        return {started:starts[0]||null,startedDates:starts,finished};
+    });
+    const first=sessions.shift();
+    const otherStarts=[...new Set(books.filter(book=>!dateValue(book.dateFinished))
+        .map(book=>dateValue(book.dateStarted)).filter(Boolean))].sort();
+    const dateStarted=first?first.started:otherStarts.shift()||null;
+    const includedStarts=new Set([...(first?.startedDates||[]),...sessions.flatMap(entry=>entry.startedDates)]);
+    return {
+        dateStarted,dateFinished:first?.finished||null,startedDates:first?.startedDates||[],
+        rereads:sessions,otherStarts:otherStarts.filter(date=>!includedStarts.has(date)),
+        recordCount:books.length
+    };
+}
+
 function indexReadingHistories(books){
     readingHistories=new Map();
     const groups=groupReadingRecords(books);
     repeatedReadingRecords=groups.filter(group=>group.length>1);
     readingWorks=groups.map(group=>{
-        const history=combinedReadingHistory(group);
-        const datesWithStart=new Set([history.dateStarted,...rereads(history).map(entry=>entry.started)]);
-        const otherStarts=[...new Set(group.filter(book=>!dateValue(book.dateFinished))
-            .map(book=>dateValue(book.dateStarted)).filter(date=>date&&!datesWithStart.has(date)))].sort();
-        const display={...history,otherStarts,recordCount:group.length};
-        for(const book of group)readingHistories.set(book.id,display);
+        const history=readingHistoryForDisplay(group);
+        for(const book of group)readingHistories.set(book.id,history);
         const representative=group.find(isCompleted)||group[0];
         return {...representative,...history};
     });
