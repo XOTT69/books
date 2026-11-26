@@ -82,7 +82,7 @@
         /* Welcome */
         .welcome-card{background:#fff;border:1px solid #e4e4e7;border-radius:22px;padding:24px;text-align:center}
     </style>
-    <link rel="stylesheet" href="library.css?v=22">
+    <link rel="stylesheet" href="library.css?v=23">
 </head>
 <body class="bg-surface font-sans text-slate-900 antialiased">
 
@@ -184,6 +184,7 @@
                 <button type="button" class="secondary-button" onclick="openLibraryTools('recommendation-settings')">Мої жанри</button>
             </div>
             <div class="recommendation-tabs" id="recTabs" role="group" aria-label="Жанри рекомендацій"></div>
+            <p id="portalGenreSummary" class="portal-genre-summary" hidden>Історії, у яких героїня потрапляє в інший світ або час.</p>
             <div id="recommendationsList"></div>
             <div id="recommendationMore" class="recommendation-status" role="status"></div>
         </div>
@@ -326,8 +327,8 @@
         async function loadChartJS(){await loadScript('https://cdn.jsdelivr.net/npm/chart.js');}
         async function loadScannerLib(){await loadScript('https://unpkg.com/html5-qrcode');}
     </script>
-    <script defer src="book-tools.js?v=22"></script>
-    <script defer src="reading-tools.js?v=22"></script>
-    <script defer src="app.js?v=22"></script>
+    <script defer src="book-tools.js?v=23"></script>
+    <script defer src="reading-tools.js?v=23"></script>
+    <script defer src="app.js?v=23"></script>
 </body>
 </html>

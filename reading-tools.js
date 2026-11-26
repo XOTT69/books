@@ -593,7 +593,7 @@ async function mergeDuplicateBooks(form){
 // ===== PERSONAL RECOMMENDATIONS =====
 const recommendationGenres={
     'Роментезі':{id:'romantasy',subject:'Romance fantasy',uk:['романтичне фентезі','Четверте крило','Двір шипів і троянд','Жорстокий принц'],ru:['романтическое фэнтези','Четвертое крыло','Двор шипов и роз']},
-    'Попаданці':{id:'portal',subject:'Portal fantasy',uk:['попаданці','Кораліна','Лев Біла Відьма та шафа','Аліса в Країні Див'],ru:['попаданцы','Лев Колдунья и платяной шкаф','Алиса в Стране чудес']},
+    'Попаданці':{id:'portal'},
     'Фентезі':{id:'fantasy',subject:'Fantasy',uk:['фентезі пригоди','Гобіт'],ru:['фэнтези приключения','Ведьмак']},
     'Романтика':{id:'romance',subject:'Romance',uk:['любовний роман','Гіпотеза кохання'],ru:['любовный роман','Гипотеза любви']},
     'Детектив':{id:'detective',subject:'Mystery and detective fiction',uk:['детектив роман','Убивство у Східному експресі'],ru:['детектив роман','Убийство в Восточном экспрессе']},
@@ -602,6 +602,66 @@ const recommendationGenres={
     'Саморозвиток':{id:'self',subject:'Self-help',uk:['саморозвиток','Атомні звички'],ru:['саморазвитие','Атомные привычки']},
     'Фантастика':{id:'scifi',subject:'Science fiction',uk:['наукова фантастика','Марсіянин'],ru:['научная фантастика','Марсианин']}
 };
+// Local editions with the premise verified against publisher or catalog descriptions.
+const portalFantasyPicks={
+    uk:[
+        {title:'Чужоземка',author:'Діана Ґеблдон',isbn:'9786175484845',pagesTotal:736,source:'BookChef',
+            image:'https://bookchef.ua/storage/products/5578/photo/main.jpg',
+            description:'Колишня військова медсестра Клер проходить крізь коло каменів і опиняється у Шотландії XVIII століття.'},
+        {title:'Що знає вітер',author:'Емі Гармон',isbn:'9789669822369',pagesTotal:448,source:'Vivat',
+            image:'https://vivat.com.ua/storage/1.d/import/media/6/2a2974bf4b0deef063e9084bf6fd34c6.jpg',
+            description:'На ірландському озері Енн Ґаллагер переноситься з 2001 року в 1921-й, де зустрічає свого дідуся дитиною.'},
+        {title:'Десять тисяч дверей Дженьєрі',author:'Алікс І. Герроу',isbn:'9786171702431',pagesTotal:416,source:'Vivat',
+            image:'https://vivat.com.ua/storage/1.d/files/4/7/477e1672_fab8b7228f784f2128c95958033f091f.jpg',
+            description:'Дженьєрі знаходить двері до інших світів і дізнається, як ці переходи пов’язані з історією її родини.'},
+        {title:'Кораліна',author:'Ніл Ґейман',isbn:'9789669484352',pagesTotal:190,source:'КМ-Букс',
+            image:'https://laboratory.ua/files/products/1566.330x300.jpg.webp',
+            description:'Кораліна відчиняє потаємні двері та потрапляє в моторошну копію власного дому.'},
+        {title:'Аліса в Задзеркальній країні',author:'Льюїс Керрол',googleId:'HSRtEAAAQBAJ',pagesTotal:138,source:'Google Books',
+            description:'Аліса проходить крізь дзеркало й опиняється у світі, де її мандрівка перетворюється на шахову партію.'}
+    ],
+    ru:[
+        {title:'Улыбнись мне, Артур Эдинброг',author:'Антонина Крейн',isbn:'9785045332965',googleId:'8ZsxEQAAQBAJ',pagesTotal:353,source:'Google Books',
+            description:'Искусствоведка Виолетта переносится в мир Гало и становится фамильяром студента-колдуна.'},
+        {title:'Попаданка за пять монет',author:'Лидия Миленина',isbn:'9785045059794',googleId:'n58xEQAAQBAJ',pagesTotal:426,source:'Google Books',
+            description:'Студентка Аня участвует в эксперименте профессора и оказывается в мире, которому грозит гибель.'},
+        {title:'Рубиновая книга',author:'Керстин Гир',isbn:'9785457536128',googleId:'fkSrAgAAQBAJ',pagesTotal:304,source:'Google Books',
+            description:'Шестнадцатилетняя Гвендолин обнаруживает, что может перемещаться в прошлое, и узнаёт о тайном обществе путешественников во времени.'},
+        {title:'Чужестранка. Книга 1. Восхождение к любви',author:'Диана Гэблдон',isbn:'9785042779121',googleId:'wl0UEAAAQBAJ',pagesTotal:575,source:'Google Books',
+            description:'Медсестра Клэр переносится из XX века в Шотландию XVIII столетия и оказывается среди враждующих кланов.'}
+    ]
+};
+const portalFantasySearches={
+    uk:['героїня потрапляє в інший світ фентезі','дівчина прокинулася в іншому світі роман','героїня переноситься в минуле роман'],
+    ru:['героиня попадает в другой мир фэнтези','девушка очнулась в другом мире роман','героиня переносится в прошлое роман']
+};
+const portalSynopsisRules={
+    uk:{
+        heroine:/(?:^|[^\p{L}])(?:героїня|дівчина|дівчинка|студентка|жінка|вона|яка|котра)(?!\p{L})/iu,
+        transfer:/потрап(?:ляє|ила|ить)|опин(?:яється|илася|илась)|перен(?:оситься|еслася|еслась|осить|есло)|прокинулася|отямилася|відкинуло|проходить|пройшла/iu,
+        feminine:/потрапила|опинила|перенесла|прокинулася|отямилася|пройшла/iu,
+        destination:/(?:в|у|до)\s+(?:(?:інш\p{L}*|паралельн\p{L}*|чуж\p{L}*|магічн\p{L}*|фантастичн\p{L}*)\s+світ\p{L}*|минул\p{L}*|майбутн\p{L}*|інш\p{L}*\s+(?:епох\p{L}*|тіл\p{L}*))/iu
+    },
+    ru:{
+        heroine:/(?:^|[^\p{L}])(?:героиня|девушка|девочка|студентка|женщина|она|которая)(?!\p{L})/iu,
+        transfer:/попад(?:ает|ёт)|попала|оказывается|оказалась|перен(?:осится|еслась|осит|есло)|очнулась|проснулась|проходит|прошла/iu,
+        feminine:/попала|оказалась|перенеслась|очнулась|проснулась|прошла/iu,
+        destination:/(?:в|во)\s+(?:(?:друг\p{L}*|параллельн\p{L}*|чуж\p{L}*|магическ\p{L}*|фантастическ\p{L}*)\s+мир\p{L}*|прошл\p{L}*|будущ\p{L}*|друг\p{L}*\s+(?:эпох\p{L}*|тел\p{L}*))/iu
+    }
+};
+
+function matchesPortalSynopsis(description,language){
+    const rules=portalSynopsisRules[language];
+    if(!rules)return false;
+    return normalizeReadingSearch(description).split(/[.!?;…]+|,\s+(?:який|котрий|который)\s+/u).some(sentence=>{
+        const movement=rules.transfer.exec(sentence);
+        if(!movement)return false;
+        const before=sentence.slice(Math.max(0,movement.index-80),movement.index);
+        const after=sentence.slice(movement.index+movement[0].length,movement.index+movement[0].length+65);
+        return rules.destination.test(after)&&(rules.heroine.test(before)||rules.feminine.test(movement[0]));
+    });
+}
+
 const recommendationLanguageCodes={uk:'ukr',ru:'rus'};
 const recommendationLanguageLabels={uk:'Українська',ru:'Російська'};
 let recommendationFeed;
@@ -670,6 +730,7 @@ function renderRecommendationControls(category='auto'){
         }));
         tabs.scrollLeft=scrollLeft;
     }
+    document.getElementById('portalGenreSummary').hidden=category!=='Попаданці';
     for(const button of tabs.children){
         const active=button.dataset.genre===category;
         button.classList.toggle('active',active);
@@ -764,10 +825,15 @@ function recommendationQueries(category,language){
     const perGenre=genres.map((name,genreIndex)=>{
         const genre=recommendationGenres[name];
         const codes=genreIndex%2?languages.slice().reverse():languages;
+        if(genre.id==='portal'){
+            return [...codes.map(language=>({source:'portal-picks',language})),
+                ...portalFantasySearches.uk.flatMap((_,index)=>codes.map(language=>({
+                    source:'google',language,query:portalFantasySearches[language][index],portal:true
+                })))];
+        }
         const terms=codes.map(code=>{
             const [keyword,...titles]=genre[code];
             const searches=[{query:keyword,subject:genre.subject},...titles.map(title=>({query:title,title}))];
-            if(name==='Попаданці'&&code==='uk')searches.push(searches.shift());
             return searches;
         });
         const queries=[];
@@ -807,7 +873,14 @@ function recommendationTitleIsBook(title){
     return !/^(Мир фантастики|Навигатор игрового мира)(?:[\s№]|$)/iu.test(title);
 }
 
-async function queryRecommendationCatalog({source,language,query,title,page=1},signal){
+async function queryRecommendationCatalog({source,language,query,title,portal,page=1},signal){
+    if(source==='portal-picks'){
+        const books=portalFantasyPicks[language].map(({isbn,...book})=>({
+            ...book,language,genre:'Попаданці',identifiers:isbn?[isbn]:[],
+            image:book.image||`https://books.google.com/books/content?id=${book.googleId}&printsec=frontcover&img=1&zoom=1`
+        }));
+        return {books,hasMore:false};
+    }
     const matchTitle=value=>!title||bookIdentity(value).includes(bookIdentity(title));
     if(source==='google'){
         const params=new URLSearchParams({key:googleBooksKey,q:query,printType:'books',langRestrict:language,maxResults:'24',startIndex:String((page-1)*24)});
@@ -816,10 +889,13 @@ async function queryRecommendationCatalog({source,language,query,title,page=1},s
         const books=items.flatMap(({id,volumeInfo:data})=>{
             if(!data?.title||data.language!==language||!data.authors?.length||!matchTitle(data.title)||
                 (data.pageCount>0&&data.pageCount<48)||data.printType==='MAGAZINE'||!recommendationTitleIsBook(data.title))return [];
+            const description=(data.description||'').replace(/<[^>]*>/g,' ');
+            if(portal&&(!matchesPortalSynopsis(description,language)||
+                /^(Foreign Language Study|Literary Criticism|Education)(?:\s|\/|$)/i.test(data.categories?.[0]||'')))return [];
             return [{
                 language,googleId:id||'',title:data.title,author:data.authors[0],pagesTotal:data.pageCount||300,
                 image:(data.imageLinks?.thumbnail||data.imageLinks?.smallThumbnail||'').replace(/^http:\/\//i,'https://'),
-                description:(data.description||'').replace(/<[^>]*>/g,''),genre:data.categories?.[0]||'',
+                description,genre:portal?'Попаданці':data.categories?.[0]||'',
                 publishedDate:data.publishedDate||'',identifiers:(data.industryIdentifiers||[]).map(entry=>entry.identifier).filter(Boolean),
                 source:'Google Books'
             }];
